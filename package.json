@@ -2,10 +2,15 @@
   "devDependencies": {
     "concurrently": "^9.2.1"
   },
-  "scripts": {
-    "dev": "concurrently \"npm run start --prefix frontend\" \"python backend/manage.py runserver\""
-  },
   "dependencies": {
     "sass": "^1.93.2"
+  },
+  "scripts": {
+    "frontend": "cd frontend && npx vite",
+    "frontend:build": "cd frontend && npx vite build",
+    "frontend:preview": "cd frontend && npx vite preview",
+    "frontend:lint": "cd frontend && npx eslint .",
+    "backend": "cmd /c .venv\\Scripts\\python.exe backend/manage.py runserver",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\""
   }
 }
