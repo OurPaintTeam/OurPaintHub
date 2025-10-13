@@ -46,3 +46,29 @@ def login_user(request):
         login(request, user)  # создаём сессию
         return Response({"username": user.username}, status=200)
     return Response({"error": "Неверные учетные данные"}, status=400)
+
+@api_view(["GET"])
+def news_view(request):
+    return Response([
+        {"id": 1, "title": "Новости будут добавлены позже", "content": "Пока раздел находится в разработке."}
+    ])
+
+@api_view(["GET"])
+def documentation_view(request):
+    return Response([
+        {"id": 1, "title": "Документация будет добавлена позже", "content": "Пока раздел находится в разработке."}
+    ])
+
+@api_view(["GET"])
+def download_view(request):
+    return Response([
+        {"id": 1, "title": "Скачивание будет добавлено позже", "content": "Пока раздел находится в разработке."}
+    ])
+
+@api_view(["GET"])
+def account_view(request):
+    return Response({
+        "username": "Вася",
+        "email": "@",
+        "id": "1"
+    })
