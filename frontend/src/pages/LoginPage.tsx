@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "./InputPage.scss";
+import "./LoginPage.scss";
 
 const InputPage: React.FC = () => {
   const [username, setUsername] = useState("");
