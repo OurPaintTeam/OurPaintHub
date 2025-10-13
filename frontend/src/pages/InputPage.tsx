@@ -1,0 +1,71 @@
+import React, { useState } from "react";
+import "./InputPage.scss";
+
+const InputPage: React.FC = () => {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setMessage("Ошибка: " + JSON.stringify(errorData));
+        return;
+      }
+
+      const data = await response.json();
+      setMessage("Успех! : " + data.username);
+      setTimeout(() => navigate("/account"), 1000);
+    } catch (error) {
+      setMessage("Ошибка сети: " + error);
+    }
+  };
+
+  return (
+    <div className="input-container">
+      <h1>Вход</h1>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Имя пользователя</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Пароль</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit">Войти</button>
+      </form>
+      {message && <p className="message">{message}</p>}
+    </div>
+  );
+};
+
+export default InputPage;
