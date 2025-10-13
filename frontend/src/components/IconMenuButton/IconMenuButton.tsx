@@ -27,6 +27,7 @@ const IconMenuButton: React.FC = () => {
         <div className="icon-menu" ref={menuRef}>
           <button onClick={() => { navigate("/input"); setMenuOpen(false); }}>Вход</button>
           <button onClick={() => { navigate("/registration"); setMenuOpen(false); }}>Регистрация</button>
+          <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Аккаунт</button>
         </div>
       )}
     </div>
