@@ -1,0 +1,29 @@
+.main-layout {
+  display: flex;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #2c2c2c;
+  background-color: #f8f9fb;
+}
+
+// панель навигации
+.sidebar {
+  width: 260px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 24px 20px;
+  box-sizing: border-box;
+  border-right: 1px solid #dcdcdc;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+  gap: 30px;
+}
+
+// Основной контент
+.content {
+  flex: 1;
+  padding: 48px 60px;
+  background-color: #fafbfc;
+  overflow-y: auto;
+}
