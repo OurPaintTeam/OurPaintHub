@@ -20,34 +20,34 @@ export default function App() {
 }
 
 function Hello() {
-  const [message, setMessage] = useState("Loading...");
+  const [message, setMessage] = useState<string>("Loading...");
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/hello/")
       .then((res) => res.json())
-      .then((data) => setMessage(data.message))
-      .catch((err) => setMessage("Error: " + err));
+      .then((data: { message: string }) => setMessage(data.message))
+      .catch((err: Error) => setMessage("Error: " + err.message));
   }, []);
 
   return <h1>{message}</h1>;
 }
 
 function Welcome() {
-  const [message, setMessage] = useState("Loading...");
+  const [message, setMessage] = useState<string>("Loading...");
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/welcome/")
       .then((res) => res.json())
-      .then((data) => setMessage(data.message))
-      .catch((err) => setMessage("Error: " + err));
+      .then((data: { message: string }) => setMessage(data.message))
+      .catch((err: Error) => setMessage("Error: " + err.message));
   }, []);
 
   return <h1>{message}</h1>;
 }
 
 function SendMessage() {
-  const [text, setText] = useState("");
-  const [response, setResponse] = useState("");
+  const [text, setText] = useState<string>("");
+  const [response, setResponse] = useState<string>("");
 
   const handleSend = async () => {
     try {
@@ -56,9 +56,9 @@ function SendMessage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      const data = await res.json();
+      const data: { message: string } = await res.json();
       setResponse("Sent: " + data.message);
-    } catch (err) {
+    } catch (err: any) {
       setResponse("Error: " + err.message);
     }
   };
