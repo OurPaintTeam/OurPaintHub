@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import StartPage from "./pages/StartPage";
+import HomePage from "./pages/HomePage";
 import RegistrationPage from "./pages/RegistrationPage";
 import InputPage from "./pages/InputPage";
 import AccountPage from "./pages/AccountPage";
@@ -8,7 +8,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<StartPage />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/registration" element={<RegistrationPage />} />
         <Route path="/input" element={<InputPage />} />
         <Route path="/account" element={<AccountPage />} />
