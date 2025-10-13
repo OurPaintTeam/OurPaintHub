@@ -2,7 +2,10 @@
   "devDependencies": {
     "concurrently": "^9.2.1"
   },
-"scripts": {
-  "dev": "concurrently \"npm run start --prefix frontend\" \"python backend/manage.py runserver\""
-}
+  "scripts": {
+    "dev": "concurrently \"npm run start --prefix frontend\" \"python backend/manage.py runserver\""
+  },
+  "dependencies": {
+    "sass": "^1.93.2"
+  }
 }
