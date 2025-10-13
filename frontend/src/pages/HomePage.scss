@@ -1,0 +1,24 @@
+.home-container {
+  display: flex;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+
+  .left-panel {
+    width: 25%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+  }
+
+  .main-panel {
+    width: 75%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+}
