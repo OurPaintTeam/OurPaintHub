@@ -1,0 +1,32 @@
+.account-info {
+  display: flex;
+ // align-items: center;
+  padding: 40px;
+  color: #333;
+  background-color: #f9fafb;
+  min-height: 100%;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4a90e2, #007bff);
+  flex-shrink: 0;
+}
+
+.details {
+  margin-left: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  p {
+    margin: 0;
+    font-size: 18px;
+
+    strong {
+      color: #222;
+    }
+  }
+}
