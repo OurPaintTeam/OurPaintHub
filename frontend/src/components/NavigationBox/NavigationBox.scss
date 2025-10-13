@@ -1,40 +1,32 @@
-.nav-box {
-  width: 100%;
+.navigation-box {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  background-color: #f0f0f0;
-  padding: 20px;
-  border-radius: 8px;
+  gap: 12px;
+  width: 100%;
 
-  .navigate-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  button {
     width: 100%;
+    padding: 12px 18px;
+    border: none;
+    background-color: transparent;
+    text-align: left;
+    font-size: 15px;
+    color: #2f2f2f;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
 
-    button {
-      width: 100%;
-      padding: 10px 15px;
-      border: none;
-      background: none;
-      text-align: left;
-      font-size: 16px;
-      color: #333;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: background-color 0.2s ease;
+    &:hover {
+      background-color: #e6ebf1;
+      color: #000;
+    }
 
-      &:hover {
-        background-color: #e0e0e0;
-      }
-
-      &.active {
-        font-weight: 600;
-        text-decoration: underline;
-        color: #000;
-      }
+    &.active {
+      background-color: #dbe4f3;
+      font-weight: 600;
+      color: #1e3a8a;
+      border-left: 4px solid #1e3a8a;
+      padding-left: 14px;
     }
   }
 }

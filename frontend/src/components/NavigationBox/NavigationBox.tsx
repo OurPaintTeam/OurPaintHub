@@ -1,29 +1,16 @@
-import React, { useState } from "react";
-import IconMenuButton from "../IconMenuButton/IconMenuButton";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import "./NavigationBox.scss";
 
-interface NavigationBoxProps {
-  activeSection: string;
-  setActiveSection: (section: string) => void;
-}
+const NavigationBox = () => {
+  const navigate = useNavigate();
 
-const NavigationBox: React.FC<NavigationBoxProps> = ({ activeSection, setActiveSection }) => {
   return (
-   <div className="nav-box">
-  <IconMenuButton />
-
-  <div className="navigate-buttons">
-    <button className={activeSection === "news" ? "active" : ""} onClick={() => setActiveSection("news")}>
-      Новости
-    </button>
-    <button className={activeSection === "docs" ? "active" : ""} onClick={() => setActiveSection("docs")}>
-      Документация
-    </button>
-    <button className={activeSection === "download" ? "active" : ""} onClick={() => setActiveSection("download")}>
-      Скачать
-    </button>
-  </div>
-</div>
+    <div className="navigation-box">
+      <button onClick={() => navigate("/news")}>Новости</button>
+      <button onClick={() => navigate("/docs")}>Документация</button>
+      <button onClick={() => navigate("/download")}>Скачать</button>
+    </div>
   );
 };
 
