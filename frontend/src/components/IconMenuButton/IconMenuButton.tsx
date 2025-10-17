@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./IconMenuButton.scss";
 
-const IconMenuButton: React.FC = () => {
+interface IconMenuButtonProps {
+  isAuthenticated?: boolean;
+}
+
+const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false }) => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -17,6 +21,14 @@ const IconMenuButton: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    // Принудительно обновляем состояние авторизации
+    window.dispatchEvent(new Event('storage'));
+    navigate('/login');
+    setMenuOpen(false);
+  };
+
   return (
     <div className="icon-menu-button">
       <button className="circle-icon-button" onClick={() => setMenuOpen(prev => !prev)}>
@@ -25,9 +37,17 @@ const IconMenuButton: React.FC = () => {
 
       {menuOpen && (
         <div className="icon-menu" ref={menuRef}>
-          <button onClick={() => { navigate("/login"); setMenuOpen(false); }}>Вход</button>
-          <button onClick={() => { navigate("/registration"); setMenuOpen(false); }}>Регистрация</button>
-          <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Аккаунт</button>
+          {isAuthenticated ? (
+            <>
+              <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Аккаунт</button>
+              <button onClick={handleLogout}>Выйти</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { navigate("/login"); setMenuOpen(false); }}>Вход</button>
+              <button onClick={() => { navigate("/registration"); setMenuOpen(false); }}>Регистрация</button>
+            </>
+          )}
         </div>
       )}
     </div>
