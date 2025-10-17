@@ -2,7 +2,11 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import "./NavigationBox.scss";
 
-const NavigationBox = () => {
+interface NavigationBoxProps {
+  isAuthenticated?: boolean;
+}
+
+const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false }) => {
   const navigate = useNavigate();
 
   return (
