@@ -1,51 +1,64 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login
+from .models import User
+import hashlib
 
 @api_view(["POST"])
 def register_user(request):
     """
     POST /api/register/
     {
-        "username": "...",
         "email": "...",
         "password": "..."
     }
     """
-    username = request.data.get("username")
     email = request.data.get("email")
     password = request.data.get("password")
 
-    if not username or not password or not email:
+    if not password or not email:
         return Response({"error": "Все поля обязательны"}, status=400)
 
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Пользователь уже существует"}, status=400)
+    # Проверяем валидность email
+    if not User.validate_email(email):
+        return Response({"error": "Неверный формат email"}, status=400)
 
-    user = User.objects.create_user(username=username, email=email, password=password)
-    return Response({"username": user.username, "email": user.email}, status=201)
+    # Проверяем, существует ли пользователь
+    if User.objects.filter(email=email).exists():
+        return Response({"error": "Пользователь с таким email уже существует"}, status=400)
+
+    try:
+        user = User.objects.create(email=email, password=password)
+        return Response({
+            "message": "Пользователь успешно зарегистрирован", 
+            "email": user.email, 
+            "id": user.id
+        }, status=201)
+    except Exception as e:
+        return Response({"error": f"Ошибка при создании пользователя: {str(e)}"}, status=500)
 
 @api_view(["POST"])
 def login_user(request):
     """
     POST /api/login/
     {
-        "username": "...",
+        "email": "...",
         "password": "..."
     }
     """
-    username = request.data.get("username")
+    email = request.data.get("email")
     password = request.data.get("password")
 
-    if not username or not password:
+    if not email or not password:
         return Response({"error": "Все поля обязательны"}, status=400)
 
-    user = authenticate(request, username=username, password=password)
-    if user:
-        login(request, user)  # создаём сессию
-        return Response({"username": user.username}, status=200)
-    return Response({"error": "Неверные учетные данные"}, status=400)
+    try:
+        user = User.objects.get(email=email)
+        if user.check_password(password):
+            return Response({"message": "Успешная авторизация", "email": user.email, "id": user.id}, status=200)
+        else:
+            return Response({"error": "Неверный пароль"}, status=400)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=400)
 
 @api_view(["GET"])
 def news_view(request):
