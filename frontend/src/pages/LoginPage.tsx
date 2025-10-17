@@ -1,32 +1,44 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./LoginPage.scss";
 
-const InputPage: React.FC = () => {
-  const [username, setUsername] = useState("");
+const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setMessage("");
+    
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/login/", {
+      const response = await fetch("http://localhost:8000/api/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ email, password }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        setMessage("Ошибка: " + JSON.stringify(errorData));
+        setMessage(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
         return;
       }
 
-      const data = await response.json();
-      setMessage("Успех! : " + data.username);
+      setMessage("Успешная авторизация!");
+      // Сохраняем данные пользователя в localStorage
+      localStorage.setItem('user', JSON.stringify({ email: data.email, id: data.id }));
+      // Принудительно обновляем состояние авторизации
+      window.dispatchEvent(new Event('storage'));
+      // Переходим на страницу аккаунта
       setTimeout(() => navigate("/account"), 1000);
     } catch (error) {
       setMessage("Ошибка сети: " + error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -35,21 +47,13 @@ const InputPage: React.FC = () => {
       <h1>Вход</h1>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Имя пользователя</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
           <label>Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            placeholder="example@email.com"
           />
         </div>
         <div className="form-group">
@@ -59,13 +63,16 @@ const InputPage: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            placeholder="Введите пароль"
           />
         </div>
-        <button type="submit">Войти</button>
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? "Вход..." : "Войти"}
+        </button>
       </form>
-      {message && <p className="message">{message}</p>}
+      {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
     </div>
   );
 };
 
-export default InputPage;
+export default LoginPage;
