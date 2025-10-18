@@ -62,6 +62,7 @@ const RegistrationPage: React.FC = () => {
   };
 
   return (
+ <div className="main-box">
     <div className="registration-container">
       <h1>Регистрация</h1>
       <form onSubmit={handleSubmit}>
@@ -118,6 +119,7 @@ const RegistrationPage: React.FC = () => {
           {message}
         </p>
       )}
+    </div>
     </div>
   );
 };
