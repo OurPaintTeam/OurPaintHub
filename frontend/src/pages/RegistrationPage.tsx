@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./RegistrationPage.scss";
 
@@ -8,12 +8,31 @@ const RegistrationPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordError, setShowPasswordError] = useState(false);
+
+  const confirmGroupRef = useRef<HTMLDivElement | null>(null);
+
+  function triggerErrorAnimation(element: HTMLElement | null) {
+    if (!element) return;
+    element.classList.remove("input-error");
+    void element.offsetWidth; // перезапуск анимации
+    element.classList.add("input-error");
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
-    
+
+    if (password !== confirmPassword) {
+      setShowPasswordError(true);
+      setMessage("Ошибка: пароли не совпадают");
+      triggerErrorAnimation(confirmGroupRef.current);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("http://localhost:8000/api/registration/", {
         method: "POST",
@@ -29,8 +48,11 @@ const RegistrationPage: React.FC = () => {
       }
 
       setMessage("Успех! Пользователь зарегистрирован: " + data.email);
-      localStorage.setItem('user', JSON.stringify({ email: data.email, id: data.id }));
-      window.dispatchEvent(new Event('storage'));
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ email: data.email, id: data.id })
+      );
+      window.dispatchEvent(new Event("storage"));
       setTimeout(() => navigate("/account"), 1000);
     } catch (error) {
       setMessage("Ошибка сети: " + error);
@@ -53,6 +75,7 @@ const RegistrationPage: React.FC = () => {
             placeholder="example@email.com"
           />
         </div>
+
         <div className="form-group">
           <label>Пароль</label>
           <input
@@ -64,11 +87,37 @@ const RegistrationPage: React.FC = () => {
             placeholder="Минимум 6 символов"
           />
         </div>
+
+        <div className="form-group" ref={confirmGroupRef}>
+          <label>Повторите пароль</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={6}
+            placeholder="Повторите пароль"
+            className={showPasswordError ? "input-error" : ""}
+          />
+          {showPasswordError && (
+            <p className="error-text">Пароли не совпадают</p>
+          )}
+        </div>
+
         <button type="submit" disabled={isLoading}>
           {isLoading ? "Регистрация..." : "Зарегистрироваться"}
         </button>
       </form>
-      {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
+
+      {message && (
+        <p
+          className={`message ${
+            message.includes("Ошибка") ? "error" : "success"
+          }`}
+        >
+          {message}
+        </p>
+      )}
     </div>
   );
 };
