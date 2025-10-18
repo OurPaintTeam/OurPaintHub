@@ -43,6 +43,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
+      <div className="main-box">
     <div className="input-container">
       <h1>Вход</h1>
       <form onSubmit={handleSubmit}>
@@ -71,6 +72,7 @@ const LoginPage: React.FC = () => {
         </button>
       </form>
       {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
+    </div>
     </div>
   );
 };
