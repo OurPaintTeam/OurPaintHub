@@ -1,49 +1,120 @@
+body {
+  background: linear-gradient(135deg, #BDECB6 0%, #6666cc 100%);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  font-size: 1em;
+}
+
 .registration-container {
-  max-width: 400px;
-  margin: 50px auto;
-  padding: 20px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background-color: #f9f9f9;
+  max-width: 25em;
+  margin: 15em auto;
+  padding: 3em;
+  border-radius: 0.75em;
+  background-color: #f0f0ff;
+  box-shadow: 0 1.25em 1.875em rgba(51, 51, 255, 0.3);
 
   h1 {
     text-align: center;
-    margin-bottom: 20px;
+    margin-top: 0;
+    margin-bottom: 0.75em;
+    font-weight: 700;
+    color: #222266;
+    user-select: none;
   }
 
   .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 1.25em;
+    user-select: none;
 
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+      color: #444488;
+      user-select: none;
     }
 
     input {
       width: 100%;
-      padding: 8px;
+      padding: 0.85em 1em;
       box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      border: 0.1em solid #bbbbee;
+      border-radius: 0.5em;
+      font-size: 1em;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border-color: #3333ff;
+        box-shadow: 0 0 0.5em rgba(51, 51, 255, 0.5);
+        background-color: #fafaff;
+      }
+    }
+
+    &.input-error input {
+      border-color: #e74c3c;
+      background-color: #fff5f5;
+      box-shadow: 0 0 0.4em rgba(231, 76, 60, 0.4);
+      animation: shake 0.25s ease;
+    }
+
+    &.input-success input {
+      border-color: #2ecc71;
+      background-color: #f0fff5;
+      box-shadow: 0 0 0.4em rgba(46, 204, 113, 0.4);
+    }
+
+    .error-text {
+      color: #e74c3c;
+      font-size: 0.9rem;
+      margin-top: 0.4rem;
+      animation: fadeIn 0.3s ease;
     }
   }
 
   button {
     width: 100%;
-    padding: 10px;
-    background-color: #4caf50;
+    padding: 1em;
+    background-color: #3333ff;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0.5em;
+    font-weight: 700;
+    font-size: 1.1em;
     cursor: pointer;
-  }
+    box-shadow: 0 0.3125em 0.9375em rgba(51, 51, 255, 0.4);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    user-select: none;
 
-  button:hover {
-    background-color: #45a049;
+    &:hover {
+      background-color: #0000cc;
+      box-shadow: 0 0.5em 1.25em rgba(0, 0, 204, 0.6);
+    }
   }
 
   .message {
-    margin-top: 15px;
+    margin-top: 1.2em;
     text-align: center;
+    font-style: italic;
+    color: #5555aa;
   }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
 }
