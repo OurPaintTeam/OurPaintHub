@@ -1,18 +1,25 @@
-body {
-  background: linear-gradient(135deg, #BDECB6 0%, #6666cc 100%);
+html, body {
+  height: 100%;
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #333;
-  font-size: 1em;
+}
+
+.main-box {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #BDECB6 0%, #6666cc 100%);
 }
 
 .input-container {
-  max-width: 20em;
-  margin: 15em auto;
+  max-width: 30em;
+  width: 90%;
   padding: 3em;
   border-radius: 0.75em;
   background-color: #f0f0ff;
   box-shadow: 0 1.25em 1.875em rgba(51, 51, 255, 0.3);
+    box-sizing: border-box;
 
   h1 {
     text-align: center;
@@ -79,5 +86,38 @@ body {
     text-align: center;
     font-style: italic;
     color: #5555aa;
+  }
+}
+
+
+@media (max-width: 480px) {
+  .input-container {
+    width: 90%;
+    padding: 1.5rem;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    input, button {
+      font-size: 0.95rem;
+      padding: 0.7em 0.8em;
+    }
+  }
+}
+
+@media (min-width: 1600px) {
+  .input-container {
+    max-width: 900px;
+    padding: 4rem;
+
+    h1 {
+      font-size: 3rem;
+    }
+
+    input, button {
+      font-size: 1.5rem;
+      padding: 1.5em;
+    }
   }
 }
