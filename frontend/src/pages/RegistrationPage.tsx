@@ -50,7 +50,11 @@ const RegistrationPage: React.FC = () => {
       setMessage("Успех! Пользователь зарегистрирован: " + data.email);
       localStorage.setItem(
         "user",
-        JSON.stringify({ email: data.email, id: data.id })
+        JSON.stringify({ 
+          email: data.email, 
+          id: data.id, 
+          nickname: data.nickname 
+        })
       );
       window.dispatchEvent(new Event("storage"));
       setTimeout(() => navigate("/account"), 1000);
