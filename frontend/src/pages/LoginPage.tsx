@@ -31,6 +31,21 @@ const LoginPage: React.FC = () => {
       setMessage("Успешная авторизация!");
       // Сохраняем данные пользователя в localStorage
       localStorage.setItem('user', JSON.stringify({ email: data.email, id: data.id }));
+
+      try {
+        const profileResponse = await fetch(`http://localhost:8000/api/profile/?user_id=${data.id}`);
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          localStorage.setItem('user', JSON.stringify({ 
+            email: data.email, 
+            id: data.id, 
+            nickname: profileData.nickname 
+          }));
+        }
+      } catch (profileError) {
+        console.error("Ошибка при загрузке профиля:", profileError);
+      }
+      
       // Принудительно обновляем состояние авторизации
       window.dispatchEvent(new Event('storage'));
       // Переходим на страницу аккаунта
