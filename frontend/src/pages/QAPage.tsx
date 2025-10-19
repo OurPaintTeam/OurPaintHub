@@ -19,7 +19,7 @@ const QAPage = () => {
   }, []);
 
   return (
-    <MainLayout>
+    <MainLayout isAuthenticated={true}>
       <h1>QA</h1>
       <div>
         {loading ? (
