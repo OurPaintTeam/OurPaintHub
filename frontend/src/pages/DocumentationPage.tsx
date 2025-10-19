@@ -19,7 +19,7 @@ const DocumentationPage = () => {
   }, []);
 
   return (
-    <MainLayout>
+    <MainLayout isAuthenticated={true}>
       <h1>Документация</h1>
       <div>
         {loading ? (

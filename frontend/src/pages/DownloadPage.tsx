@@ -19,7 +19,7 @@ const DownloadPage = () => {
   }, []);
 
   return (
-    <MainLayout>
+    <MainLayout isAuthenticated={true}>
       <h1>Скачивание</h1>
       <div>
         {loading ? (
