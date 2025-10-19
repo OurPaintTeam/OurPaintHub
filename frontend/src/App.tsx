@@ -6,6 +6,7 @@ import DownloadPage from "./pages/DownloadPage";
 import AccountPage from "./pages/AccountPage";
 import LoginPage from "./pages/LoginPage";
 import RegistrationPage from "./pages/RegistrationPage";
+import QAPage from "./pages/QAPage";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -44,6 +45,7 @@ function App() {
         <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
         <Route path="/docs" element={<DocumentationPage isAuthenticated={isAuthenticated} />} />
         <Route path="/download" element={<DownloadPage isAuthenticated={isAuthenticated} />} />
+        <Route path="/QA" element={<QAPage isAuthenticated={isAuthenticated} />} />
         <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
         <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />

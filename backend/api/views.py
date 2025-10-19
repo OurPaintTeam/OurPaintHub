@@ -85,3 +85,9 @@ def account_view(request):
         "email": "@",
         "id": "1"
     })
+
+@api_view(["GET"])
+def QA_view(request):
+    return Response([
+        {"id": 1, "title": "Данные будут добавлены позже", "content": "Пока раздел находится в разработке."}
+    ])

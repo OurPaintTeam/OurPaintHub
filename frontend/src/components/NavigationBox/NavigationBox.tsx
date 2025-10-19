@@ -14,6 +14,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false }
       <button onClick={() => navigate("/news")}>Новости</button>
       <button onClick={() => navigate("/docs")}>Документация</button>
       <button onClick={() => navigate("/download")}>Скачать</button>
+      <button onClick={() => navigate("/QA")}>QA</button>
     </div>
   );
 };
