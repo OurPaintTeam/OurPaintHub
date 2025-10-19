@@ -19,7 +19,7 @@ const NewsPage = () => {
   }, []);
 
   return (
-    <MainLayout>
+    <MainLayout isAuthenticated={true}>
       <h1>Новости</h1>
       <div>
         {loading ? (
