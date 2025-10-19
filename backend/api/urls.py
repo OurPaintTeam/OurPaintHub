@@ -7,6 +7,7 @@ urlpatterns = [
     path("news/", views.news_view, name="news"),
     path("documentation/", views.documentation_view, name="documentation"),
     path("download/", views.download_view, name="download"),
-    path("account/", views.account_view, name="account"),
+    path("profile/", views.get_user_profile, name="get_user_profile"),
+    path("profile/update/", views.update_user_profile, name="update_user_profile"),
     path("QA/", views.QA_view, name="QA"),
 ]
