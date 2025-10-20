@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 
-const DocumentationPage = () => {
+interface DocumentationPageProps {
+  isAuthenticated?: boolean;
+}
+
+const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated = false }) => {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +23,7 @@ const DocumentationPage = () => {
   }, []);
 
   return (
-    <MainLayout isAuthenticated={true}>
+    <MainLayout isAuthenticated={isAuthenticated}>
       <h1>Документация</h1>
       <div>
         {loading ? (

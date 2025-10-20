@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 
-const DownloadPage = () => {
+interface DownloadPageProps {
+  isAuthenticated?: boolean;
+}
+
+const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) => {
   const [inf, setInf] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +23,7 @@ const DownloadPage = () => {
   }, []);
 
   return (
-    <MainLayout isAuthenticated={true}>
+    <MainLayout isAuthenticated={isAuthenticated}>
       <h1>Скачивание</h1>
       <div>
         {loading ? (

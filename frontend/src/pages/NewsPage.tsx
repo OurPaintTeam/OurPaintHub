@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 
-const NewsPage = () => {
+interface NewsPageProps {
+  isAuthenticated?: boolean;
+}
+
+const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +23,7 @@ const NewsPage = () => {
   }, []);
 
   return (
-    <MainLayout isAuthenticated={true}>
+    <MainLayout isAuthenticated={isAuthenticated}>
       <h1>Новости</h1>
       <div>
         {loading ? (
