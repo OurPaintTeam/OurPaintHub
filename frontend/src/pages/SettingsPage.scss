@@ -5,6 +5,20 @@
   background-color: #f9fafb;
   min-height: 100vh;
 
+  .back-btn {
+    background: transparent;
+    border: none;
+    color: #4a90e2;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 10px;
+    padding: 6px 0;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
   h1 {
     color: #333;
     margin-bottom: 30px;

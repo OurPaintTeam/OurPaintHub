@@ -132,6 +132,7 @@ const SettingsPage: React.FC = () => {
   return (
     <MainLayout isAuthenticated={true}>
       <div className="settings-container">
+        <button onClick={() => navigate(-1)} className="back-btn">Назад</button>
         <h1>Настройки профиля</h1>
         
         <div className="settings-form">
