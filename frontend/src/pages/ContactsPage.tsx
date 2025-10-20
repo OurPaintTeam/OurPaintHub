@@ -15,10 +15,18 @@ const ContactsPage: React.FC = () => {
     navigate('/login');
   };
 
+
+
   return (
     <MainLayout isAuthenticated={true}>
-       <div>
-       Контакты
+       <div className="contacts-header">
+        <h1>Контакты</h1>
+        <button
+         className="add-cnt-btn"
+         aria-label="Добавить контакт"
+           >
+             +
+            </button>
       </div>
     </MainLayout>
   );
