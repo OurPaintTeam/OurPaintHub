@@ -40,6 +40,9 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
           {isAuthenticated ? (
             <>
               <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Аккаунт</button>
+              <button onClick={() => { navigate("/projects"); setMenuOpen(false); }}>Проекты</button>
+              <button onClick={() => { navigate("/contacts"); setMenuOpen(false); }}>Контакты</button>
+              <button onClick={() => { navigate("/chats"); setMenuOpen(false); }}>Чаты</button>
               <button onClick={handleLogout}>Выйти</button>
             </>
           ) : (
