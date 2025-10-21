@@ -9,6 +9,9 @@ import RegistrationPage from "./pages/RegistrationPage";
 import QAPage from "./pages/QAPage";
 import SettingsPage from "./pages/SettingsPage";
 import PublicAccountPage from "./pages/PublicAccountPage";
+import AddNewsPage from "./pages/AddNewsPage";
+import EditNewsPage from "./pages/EditNewsPage";
+import NewsDetailPage from "./pages/NewsDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import ChatsPage from "./pages/ChatsPage";
 import ContactsPage from "./pages/ContactsPage";
@@ -48,12 +51,15 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/news" />} />
         <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
+        <Route path="/news/:id" element={<NewsDetailPage />} />
         <Route path="/docs" element={<DocumentationPage isAuthenticated={isAuthenticated} />} />
         <Route path="/download" element={<DownloadPage isAuthenticated={isAuthenticated} />} />
         <Route path="/QA" element={<QAPage isAuthenticated={isAuthenticated} />} />
         <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
         <Route path="/account/id/:id" element={<PublicAccountPage />} />
         <Route path="/settings" element={isAuthenticated ? <SettingsPage /> : <Navigate to="/login" />} />
+        <Route path="/news/add" element={isAuthenticated ? <AddNewsPage /> : <Navigate to="/login" />} />
+        <Route path="/news/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
         <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
         <Route path="/chats" element={isAuthenticated ? <ChatsPage /> : <Navigate to="/login" />} />
