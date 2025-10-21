@@ -34,6 +34,21 @@
 .profile-section {
   margin: 20px 0;
   
+  .admin-badge {
+    margin: 15px 0;
+    
+    .admin-label {
+      display: inline-block;
+      background: #ffd700;
+      color: #8b4513;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 14px;
+      border: 1px solid #ffd700;
+    }
+  }
+  
   .bio-section {
     margin: 10px 0;
     

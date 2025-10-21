@@ -9,6 +9,7 @@ interface AccountData {
   nickname?: string;
   bio?: string | null;
   date_of_birth?: string | null;
+  is_admin?: boolean;
 }
 
 const AccountPage: React.FC = () => {
@@ -44,6 +45,16 @@ const AccountPage: React.FC = () => {
           date_of_birth: profileData.date_of_birth
         } : null);
       }
+      
+      // Проверяем роль пользователя
+      const roleResponse = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      if (roleResponse.ok) {
+        const roleData = await roleResponse.json();
+        setAccount(prev => prev ? { 
+          ...prev, 
+          is_admin: roleData.is_admin
+        } : null);
+      }
     } catch (error) {
       console.error("Ошибка при загрузке профиля:", error);
     }
@@ -70,6 +81,12 @@ const AccountPage: React.FC = () => {
               
               <div className="profile-section">
                 <p><strong>Имя пользователя:</strong> {account.nickname || "Не установлено"}</p>
+                
+                {account.is_admin && (
+                  <div className="admin-badge">
+                    <span className="admin-label">👑 Администратор</span>
+                  </div>
+                )}
                 
                 {account.bio && (
                   <div className="bio-section">
