@@ -163,7 +163,7 @@ class EntityLog(models.Model):
         ('faq', 'FAQ'),
     ]
     
-    time = models.TimeField()
+    time = models.DateTimeField(auto_now_add=True)
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     id_user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='id_user')
     type = models.CharField(max_length=255, choices=TYPE_CHOICES)
