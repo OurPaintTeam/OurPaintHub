@@ -1,0 +1,28 @@
+.projects-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  h1 {
+    margin: 0;
+  }
+
+  .add-file-btn {
+    font-size: 24px;
+    line-height: 24px;
+    padding: 4px 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: 1px solid #333;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #eee;
+    }
+  }
+
+  .file-input {
+    display: none;
+  }
+}

@@ -17,8 +17,14 @@ const ChatsPage: React.FC = () => {
 
   return (
     <MainLayout isAuthenticated={true}>
-       <div>
-       Чаты
+      <div className="chats-header ">
+        <h1>Чаты</h1>
+        <button
+         className="add-chats-btn"
+         aria-label="Начать чат"
+           >
+             +
+            </button>
       </div>
     </MainLayout>
   );
