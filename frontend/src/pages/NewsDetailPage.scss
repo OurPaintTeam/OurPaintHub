@@ -1,0 +1,198 @@
+.news-detail-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #4a90e2;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 40px;
+  
+  p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+}
+
+.back-to-news-btn {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  
+  &:hover {
+    background: #357abd;
+  }
+}
+
+.news-detail {
+  background: #fff;
+  padding: 30px;
+  
+  .news-header {
+    margin-bottom: 20px;
+    
+    h1 {
+      color: #333;
+      font-size: 32px;
+      margin: 0 0 15px 0;
+      line-height: 1.3;
+    }
+    
+    .news-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      
+      .edit-btn, .delete-btn {
+        background: none;
+        border: 1px solid #ddd;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+        
+        &:hover {
+          background: rgba(0, 0, 0, 0.05);
+        }
+      }
+      
+      .edit-btn:hover {
+        border-color: #4a90e2;
+        color: #4a90e2;
+      }
+      
+      .delete-btn:hover {
+        border-color: #dc3545;
+        color: #dc3545;
+      }
+    }
+  }
+  
+  .news-meta {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 14px;
+    color: #666;
+    
+    span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      
+      &::before {
+        content: '📅';
+        font-size: 12px;
+      }
+      
+      &.author::before {
+        content: '👤';
+      }
+      
+      &.updated::before {
+        content: '🔄';
+      }
+    }
+  }
+  
+  .news-content {
+    color: #666;
+    line-height: 1.8;
+    font-size: 16px;
+    
+    // Стили для Markdown элементов
+    h1, h2, h3, h4, h5, h6 {
+      color: #333;
+      margin: 25px 0 15px 0;
+    }
+    
+    h1 { font-size: 28px; }
+    h2 { font-size: 24px; }
+    h3 { font-size: 20px; }
+    
+    p {
+      margin: 15px 0;
+    }
+    
+    ul, ol {
+      margin: 15px 0;
+      padding-left: 25px;
+    }
+    
+    li {
+      margin: 8px 0;
+    }
+    
+    code {
+      background: #f4f4f4;
+      padding: 3px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    pre {
+      background: #f4f4f4;
+      padding: 15px;
+      border-radius: 6px;
+      overflow: auto;
+      margin: 20px 0;
+      
+      code {
+        background: none;
+        padding: 0;
+      }
+    }
+    
+    blockquote {
+      border-left: 4px solid #4a90e2;
+      margin: 20px 0;
+      padding: 15px 20px;
+      background: #f8f9fa;
+      font-style: italic;
+    }
+    
+    a {
+      color: #4a90e2;
+      text-decoration: none;
+      
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+    
+    strong {
+      font-weight: bold;
+    }
+    
+    em {
+      font-style: italic;
+    }
+  }
+}
