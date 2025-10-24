@@ -1,29 +1,36 @@
 .main-layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #2c2c2c;
   background-color: #f8f9fb;
 }
 
-// панель навигации
-.sidebar {
-  width: 260px;
-  background-color: #ffffff;
+.navbar {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  padding: 24px 20px;
-  box-sizing: border-box;
-  border-right: 1px solid #dcdcdc;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
-  gap: 30px;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #7C3AED;
+  color: white;
+  padding: 0.8rem 2rem;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.2);
+  flex-shrink: 0;
 }
 
-// Основной контент
+.nav-logo {
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  gap: 0.5rem;
+}
+
+.nav-user {
+  font-weight: 600;
+}
+
 .content {
   flex: 1;
-  padding: 48px 60px;
-  background-color: #fafbfc;
+  padding: 2rem;
   overflow-y: auto;
 }

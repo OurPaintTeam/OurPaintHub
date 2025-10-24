@@ -1,24 +1,18 @@
 import React from "react";
 import NavigationBox from "../components/NavigationBox/NavigationBox";
-import IconMenuButton from "../components/IconMenuButton/IconMenuButton";
 import "./MainLayout.scss";
 
 interface MainLayoutProps {
   children: React.ReactNode;
   isAuthenticated?: boolean;
+  userName?: string;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children, isAuthenticated = false }) => {
+const MainLayout: React.FC<MainLayoutProps> = ({ children, isAuthenticated, userName }) => {
   return (
     <div className="main-layout">
+      <NavigationBox isAuthenticated={isAuthenticated} userName={userName} />
 
-    {/* Панель навигации */}
-      <aside className="sidebar">
-        <IconMenuButton isAuthenticated={isAuthenticated} />
-        <NavigationBox isAuthenticated={isAuthenticated} />
-      </aside>
-
-        {/* Основной контент*/}
       <main className="content">
         {children}
       </main>
