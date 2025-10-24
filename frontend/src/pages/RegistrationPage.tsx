@@ -1,14 +1,22 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faUser,
+  faEnvelope,
+  faLock,
+  faPalette,
+} from "@fortawesome/free-solid-svg-icons";
 import "./RegistrationPage.scss";
 
 const RegistrationPage: React.FC = () => {
   const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswordError, setShowPasswordError] = useState(false);
 
   const confirmGroupRef = useRef<HTMLDivElement | null>(null);
@@ -16,7 +24,7 @@ const RegistrationPage: React.FC = () => {
   function triggerErrorAnimation(element: HTMLElement | null) {
     if (!element) return;
     element.classList.remove("input-error");
-    void element.offsetWidth; // перезапуск анимации
+    void element.offsetWidth;
     element.classList.add("input-error");
   }
 
@@ -37,7 +45,7 @@ const RegistrationPage: React.FC = () => {
       const response = await fetch("http://localhost:8000/api/registration/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }),
       });
 
       const data = await response.json();
@@ -50,10 +58,10 @@ const RegistrationPage: React.FC = () => {
       setMessage("Успех! Пользователь зарегистрирован: " + data.email);
       localStorage.setItem(
         "user",
-        JSON.stringify({ 
-          email: data.email, 
-          id: data.id, 
-          nickname: data.nickname 
+        JSON.stringify({
+          email: data.email,
+          id: data.id,
+          nickname: data.nickname,
         })
       );
       window.dispatchEvent(new Event("storage"));
@@ -66,64 +74,89 @@ const RegistrationPage: React.FC = () => {
   };
 
   return (
- <div className="main-box">
-    <div className="registration-container">
-      <h1>Регистрация</h1>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="example@email.com"
-          />
+    <div className="auth-page">
+      <div className="auth-container">
+        <div className="auth-header">
+          <FontAwesomeIcon icon={faPalette} />
+          <h1>OurPaintHUB</h1>
+          <p>Платформа для обмена проектами</p>
         </div>
 
-        <div className="form-group">
-          <label>Пароль</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            placeholder="Минимум 6 символов"
-          />
-        </div>
+        <div className="auth-form">
+          <h2>Регистрация</h2>
 
-        <div className="form-group" ref={confirmGroupRef}>
-          <label>Повторите пароль</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            minLength={6}
-            placeholder="Повторите пароль"
-            className={showPasswordError ? "input-error" : ""}
-          />
-          {showPasswordError && (
-            <p className="error-text">Пароли не совпадают</p>
+          <form onSubmit={handleSubmit}>
+            <div className="input-group">
+              <FontAwesomeIcon icon={faUser} />
+              <input
+                type="text"
+                placeholder="Полное имя"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
+            <div className="input-group">
+              <FontAwesomeIcon icon={faEnvelope} />
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="input-group">
+              <FontAwesomeIcon icon={faLock} />
+              <input
+                type="password"
+                placeholder="Пароль"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="input-group" ref={confirmGroupRef}>
+              <FontAwesomeIcon icon={faLock} />
+              <input
+                type="password"
+                placeholder="Подтвердите пароль"
+                required
+                minLength={6}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={showPasswordError ? "input-error" : ""}
+              />
+              {showPasswordError && (
+                <p className="error-text">Пароли не совпадают</p>
+              )}
+            </div>
+
+            <button type="submit" className="auth-btn" disabled={isLoading}>
+              {isLoading ? "Регистрация..." : "Зарегистрироваться"}
+            </button>
+          </form>
+
+          {message && (
+            <p
+              className={`message ${
+                message.includes("Ошибка") ? "error" : "success"
+              }`}
+            >
+              {message}
+            </p>
           )}
+
+          <p>
+            Уже есть аккаунт?{" "}
+            <a onClick={() => navigate("/login")}>Войти</a>
+          </p>
         </div>
-
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? "Регистрация..." : "Зарегистрироваться"}
-        </button>
-      </form>
-
-      {message && (
-        <p
-          className={`message ${
-            message.includes("Ошибка") ? "error" : "success"
-          }`}
-        >
-          {message}
-        </p>
-      )}
-    </div>
+      </div>
     </div>
   );
 };
