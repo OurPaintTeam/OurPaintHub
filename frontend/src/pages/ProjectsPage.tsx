@@ -1,27 +1,53 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import "./ProjectsPage.scss";
 
 const ProjectsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [loading, setLoading] = useState(true);
 
-
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    // update auth state
-    window.dispatchEvent(new Event('storage'));
-    navigate('/login');
-  };
+const [projects, setProjects] = useState<
+  { name: string; type: string; id: number }[]
+>([]);
 
   const handleAddFileClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileAdd = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      console.log("Выбран файл:", files[0]);
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("project_name", file.name);
+    formData.append("type", file.name.split(".").pop() || "bin");
+
+    try {
+      const response = await fetch("http://localhost:8000/api/project/add/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ошибка сервера: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Проект успешно добавлен:", data);
+
+      setProjects((prev) => [
+        ...prev,
+        {
+          name: data.project_name || file.name,
+          type: data.file_type || file.name.split(".").pop() || "bin",
+          id: data.project_id,
+        },
+      ]);
+
+      event.target.value = "";
+    } catch (error) {
+      console.error("Ошибка при загрузке:", error);
     }
   };
 
@@ -40,8 +66,22 @@ const ProjectsPage: React.FC = () => {
           type="file"
           ref={fileInputRef}
           className="file-input"
-          onChange={handleFileChange}
+          onChange={handleFileAdd}
+          style={{ display: "none" }}
         />
+      </div>
+
+      <div className="projects-list">
+        {projects.length === 0 ? (
+          <p className="empty-text">Нет добавленных проектов</p>
+        ) : (
+          projects.map((proj) => (
+            <div key={proj.id} className="project-item">
+              <strong>{proj.name}</strong>
+              <span className="type-label">({proj.type})</span>
+            </div>
+          ))
+        )}
       </div>
     </MainLayout>
   );
