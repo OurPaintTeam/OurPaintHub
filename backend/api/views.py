@@ -1,7 +1,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import User, UserProfile, Role, Documentation, EntityLog
-import hashlib
 
 @api_view(["POST"])
 def register_user(request):
@@ -450,3 +449,19 @@ def QA_view(request):
     return Response([
         {"id": 1, "title": "Данные будут добавлены позже", "content": "Пока раздел находится в разработке."}
     ])
+
+@api_view(["POST"])
+def add_project(request):
+        return Response({"error"}, status=500)
+
+@api_view(["DELETE"])
+def delete_project(request, project_id):
+        return Response({"error": "Проект не найден"}, status=404)
+
+@api_view(["PATCH"])
+def change_project(request, project_id):
+        return Response({"error": "Проект не найден"}, status=404)
+
+@api_view(["GET"])
+def download_project(project_id):
+        return Response({"error": "Файл не найден"}, status=404)
