@@ -16,6 +16,7 @@ import ProjectsPage from "./pages/ProjectsPage";
 import ChatsPage from "./pages/ChatsPage";
 import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
+import FriendsPage from "./pages/FriendsPage";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -67,6 +68,7 @@ function App() {
         <Route path="/contacts" element={isAuthenticated ? <ContactsPage /> : <Navigate to="/login" />} />
         <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
         <Route path="/main" element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />} />
+        <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
       </Routes>
     </Router>
   );
