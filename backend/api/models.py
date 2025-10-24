@@ -85,7 +85,7 @@ class ProjectMeta(models.Model):
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE, db_column='project_id')
     project_name = models.CharField(max_length=255)
-    path = models.TextField()
+    data = models.BinaryField()
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     type = models.CharField(max_length=16, choices=TYPE_CHOICES, null=True, blank=True)
     
