@@ -1,87 +1,66 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import "./ProjectsPage.scss";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUpload } from "@fortawesome/free-solid-svg-icons";
 
 const ProjectsPage: React.FC = () => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<"my-projects" | "friends-projects" | "received-projects">("my-projects");
 
-const [projects, setProjects] = useState<
-  { name: string; type: string; id: number }[]
->([]);
+  const showProjectTab = (tab: typeof activeTab) => setActiveTab(tab);
 
-  const handleAddFileClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileAdd = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("project_name", file.name);
-    formData.append("type", file.name.split(".").pop() || "bin");
-
-    try {
-      const response = await fetch("http://localhost:8000/api/project/add/", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Проект успешно добавлен:", data);
-
-      setProjects((prev) => [
-        ...prev,
-        {
-          name: data.project_name || file.name,
-          type: data.file_type || file.name.split(".").pop() || "bin",
-          id: data.project_id,
-        },
-      ]);
-
-      event.target.value = "";
-    } catch (error) {
-      console.error("Ошибка при загрузке:", error);
-    }
+  const showUploadProjectModal = () => {
+    alert("Загрузка проекта");
   };
 
   return (
     <MainLayout isAuthenticated={true}>
-      <div className="projects-header">
-        <h1>Проекты</h1>
-        <button
-          onClick={handleAddFileClick}
-          className="add-file-btn"
-          aria-label="Добавить файл"
-        >
-          +
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="file-input"
-          onChange={handleFileAdd}
-          style={{ display: "none" }}
-        />
-      </div>
+      <div className="projects-page page">
+        <div className="page-header">
+            <h1>Мои проекты</h1>
+               <button className="btn-primary" onClick={showUploadProjectModal}>
+             <FontAwesomeIcon icon={faUpload} /> Загрузить проект
+          </button>
+        </div>
 
-      <div className="projects-list">
-        {projects.length === 0 ? (
-          <p className="empty-text">Нет добавленных проектов</p>
-        ) : (
-          projects.map((proj) => (
-            <div key={proj.id} className="project-item">
-              <strong>{proj.name}</strong>
-              <span className="type-label">({proj.type})</span>
-            </div>
-          ))
-        )}
+        <div className="projects-tabs">
+          <button
+            className={`tab-btn ${activeTab === "my-projects" ? "active" : ""}`}
+            onClick={() => showProjectTab("my-projects")}
+          >
+            Мои проекты
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "friends-projects" ? "active" : ""}`}
+            onClick={() => showProjectTab("friends-projects")}
+          >
+            Проекты друзей
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "received-projects" ? "active" : ""}`}
+            onClick={() => showProjectTab("received-projects")}
+          >
+            Полученные
+          </button>
+        </div>
+
+        <div id="my-projects" className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
+          <div id="user-projects-list">
+            {/* Список проектов пользователя */}
+          </div>
+        </div>
+
+        <div id="friends-projects" className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
+          <div id="friends-projects-list">
+            {/* Проекты друзей */}
+          </div>
+        </div>
+
+        <div id="received-projects" className={`projects-content ${activeTab === "received-projects" ? "active" : ""}`}>
+          <div id="received-projects-list">
+            {/* Полученные проекты */}
+          </div>
+        </div>
       </div>
     </MainLayout>
   );

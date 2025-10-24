@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import "./AccountPage.scss";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
 
 interface AccountData {
   id: number;
@@ -10,6 +12,9 @@ interface AccountData {
   bio?: string | null;
   date_of_birth?: string | null;
   is_admin?: boolean;
+  friends_count?: number;
+  projects_count?: number;
+  received_count?: number;
 }
 
 const AccountPage: React.FC = () => {
@@ -18,42 +23,44 @@ const AccountPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // get data from user table
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setAccount(user);
-        // Загружаем полный профиль с сервера
-        loadUserProfile(user.id);
-      } catch (error) {
-        console.error("Ошибка при парсинге данных пользователя:", error);
-      }
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      navigate("/login");
+      return;
     }
-    setLoading(false);
-  }, []);
+
+    try {
+      const parsed = JSON.parse(userData);
+      setAccount(parsed);
+      loadUserProfile(parsed.id);
+    } catch (error) {
+      console.error("Ошибка при парсинге данных пользователя:", error);
+      navigate("/login");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   const loadUserProfile = async (userId: number) => {
     try {
       const response = await fetch(`http://localhost:8000/api/profile/?user_id=${userId}`);
       if (response.ok) {
         const profileData = await response.json();
-        setAccount(prev => prev ? { 
-          ...prev, 
+        setAccount(prev => prev ? {
+          ...prev,
           nickname: profileData.nickname,
           bio: profileData.bio,
-          date_of_birth: profileData.date_of_birth
+          date_of_birth: profileData.date_of_birth,
+          friends_count: profileData.friends_count,
+          projects_count: profileData.projects_count,
+          received_count: profileData.received_count
         } : null);
       }
-      
-      // Проверяем роль пользователя
+
       const roleResponse = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
       if (roleResponse.ok) {
         const roleData = await roleResponse.json();
-        setAccount(prev => prev ? { 
-          ...prev, 
-          is_admin: roleData.is_admin
-        } : null);
+        setAccount(prev => prev ? { ...prev, is_admin: roleData.is_admin } : null);
       }
     } catch (error) {
       console.error("Ошибка при загрузке профиля:", error);
@@ -61,68 +68,73 @@ const AccountPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    // update auth state
-    window.dispatchEvent(new Event('storage'));
-    navigate('/login');
+    localStorage.removeItem("user");
+    window.dispatchEvent(new Event("storage"));
+    navigate("/login");
   };
 
+  if (loading) {
+    return (
+      <MainLayout isAuthenticated={!!account}>
+        <p>Загрузка...</p>
+      </MainLayout>
+    );
+  }
+
   return (
-    <MainLayout isAuthenticated={true}>
-      <div className="account-info">
-        <div className="avatar"></div>
-        <div className="details">
-          {loading ? (
-            <p>Загрузка информации...</p>
-          ) : account ? (
-            <>
-              <p><strong>Email:</strong> {account.email}</p>
-              <p><strong>ID:</strong> {account.id}</p>
-              
-              <div className="profile-section">
-                <p><strong>Имя пользователя:</strong> {account.nickname || "Не установлено"}</p>
-                
-                {account.is_admin && (
-                  <div className="admin-badge">
-                    <span className="admin-label">👑 Администратор</span>
-                  </div>
-                )}
-                
-                {account.bio && (
-                  <div className="bio-section">
-                    <p><strong>О себе:</strong></p>
-                    <p className="bio-text">{account.bio}</p>
-                  </div>
-                )}
-                
-                {account.date_of_birth && (
-                  <p><strong>Дата рождения:</strong> {new Date(account.date_of_birth).toLocaleDateString('ru-RU')}</p>
-                )}
-              </div>
-              
-              <div className="action-buttons">
-                <button 
-                  onClick={() => navigate('/settings')} 
-                  className="settings-btn"
-                >
-                  Настройки профиля
-                </button>
-                
-                <button onClick={handleLogout} className="logout-btn">
-                  Выйти
-                </button>
-              </div>
-            </>
-          ) : (
-            <div>
-              <p>Вы не авторизованы</p>
-              <button onClick={() => navigate('/login')} className="login-btn">
-                Войти
-              </button>
+    <MainLayout isAuthenticated={!!account}>
+      {account ? (
+        <div className="profile-page page">
+          <div className="page-header">
+            <h1>Профиль</h1>
+          </div>
+
+          <div className="profile-info">
+            <div className="profile-avatar">
+              <FontAwesomeIcon icon={faUserCircle} />
             </div>
-          )}
+            <div className="profile-details">
+              <h2>{account.nickname || "Не установлено"}</h2>
+              <p>{account.email}</p>
+              {account.is_admin && <p>👑 Администратор</p>}
+              {account.date_of_birth && (
+                <p>Дата рождения: {new Date(account.date_of_birth).toLocaleDateString("ru-RU")}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="profile-stats">
+            <div className="stat-card">
+              <div className="stat-number">{account.friends_count || 0}</div>
+              <div className="stat-label">Друзей</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-number">{account.projects_count || 0}</div>
+              <div className="stat-label">Проектов</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-number">{account.received_count || 0}</div>
+              <div className="stat-label">Получено</div>
+            </div>
+          </div>
+
+          <div className="action-buttons">
+            <button onClick={() => navigate("/settings")} className="settings-btn">
+              Настройки профиля
+            </button>
+            <button onClick={handleLogout} className="logout-btn">
+              Выйти
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <p>Вы не авторизованы</p>
+          <button onClick={() => navigate("/login")} className="login-btn">
+            Войти
+          </button>
+        </div>
+      )}
     </MainLayout>
   );
 };

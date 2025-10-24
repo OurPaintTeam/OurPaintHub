@@ -1,122 +1,107 @@
-.account-info {
+.profile-page {
+  padding-left: 12rem;
+  padding-right: 12rem;
+}
+
+.profile-info {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
   display: flex;
- // align-items: center;
-  padding: 40px;
-  color: #333;
-  background-color: #f9fafb;
-  min-height: 100%;
+  gap: 1.5rem;
+  align-items: center;
 }
 
-.avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4a90e2, #007bff);
-  flex-shrink: 0;
+.profile-avatar {
+  font-size: 4rem;
+  color: #7C3AED;
 }
 
-.details {
-  margin-left: 25px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  p {
-    margin: 0;
-    font-size: 18px;
-
-    strong {
-      color: #222;
-    }
-  }
+.profile-details h2 {
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 1.5rem;
 }
 
-.profile-section {
-  margin: 20px 0;
-  
-  .admin-badge {
-    margin: 15px 0;
-    
-    .admin-label {
-      display: inline-block;
-      background: #ffd700;
-      color: #8b4513;
-      padding: 8px 16px;
-      border-radius: 4px;
-      font-weight: 700;
-      font-size: 14px;
-      border: 1px solid #ffd700;
-    }
-  }
-  
-  .bio-section {
-    margin: 10px 0;
-    
-    .bio-text {
-      background: #f8f9fa;
-      padding: 10px;
-      border-radius: 4px;
-      border-left: 3px solid #4a90e2;
-      margin-top: 5px;
-      font-style: italic;
-      color: #555;
-    }
-  }
+.profile-details p {
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #7C3AED;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
 }
 
 .action-buttons {
+  margin-top: 1.5rem;
   display: flex;
-  gap: 15px;
-  margin-top: 25px;
-  
-  .settings-btn {
-    background: #4a90e2;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s;
-    
-    &:hover {
-      background: #357abd;
-    }
-  }
-  
-  .logout-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s;
-    
-    &:hover {
-      background: #c82333;
-    }
-  }
+  gap: 1rem;
 }
 
-.message {
-  margin: 10px 0;
-  padding: 10px;
-  border-radius: 4px;
-  font-size: 14px;
-  
-  &.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-  }
-  
-  &.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-  }
+.settings-btn,
+.logout-btn,
+.login-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.settings-btn {
+  background: #7c3aed;
+  color: white;
+}
+
+.settings-btn:hover {
+  background: #6d28d9;
+}
+
+.logout-btn {
+  background: #dc2626;
+  color: white;
+}
+
+.logout-btn:hover {
+  background: #b91c1c;
+}
+
+.login-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.login-btn:hover {
+  background: #2563eb;
 }

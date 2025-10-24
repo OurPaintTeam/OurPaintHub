@@ -24,7 +24,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
     { label: "Документация", path: "/docs" },
     { label: "Друзья", path: "/friends" },
     { label: "Мои Проекты", path: "/projects" },
-    { label: "Профиль", path: "/profile" },
+    { label: "Профиль", path: "/account" },
   ];
 
   return (
