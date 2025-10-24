@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEnvelope, faLock, faPalette } from "@fortawesome/free-solid-svg-icons";
 import "./LoginPage.scss";
 
 const LoginPage: React.FC = () => {
@@ -13,7 +15,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
-    
+
     try {
       const response = await fetch("http://localhost:8000/api/login/", {
         method: "POST",
@@ -29,26 +31,25 @@ const LoginPage: React.FC = () => {
       }
 
       setMessage("Успешная авторизация!");
-      // Сохраняем данные пользователя в localStorage
-      localStorage.setItem('user', JSON.stringify({ email: data.email, id: data.id }));
+      localStorage.setItem("user", JSON.stringify({ email: data.email, id: data.id }));
 
+      // Профиль
       try {
-        const profileResponse = await fetch(`http://localhost:8000/api/profile/?user_id=${data.id}`);
+        const profileResponse = await fetch(
+          `http://localhost:8000/api/profile/?user_id=${data.id}`
+        );
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
-          localStorage.setItem('user', JSON.stringify({ 
-            email: data.email, 
-            id: data.id, 
-            nickname: profileData.nickname 
-          }));
+          localStorage.setItem(
+            "user",
+            JSON.stringify({ email: data.email, id: data.id, nickname: profileData.nickname })
+          );
         }
       } catch (profileError) {
-        console.error("Ошибка при загрузке профиля:", profileError);
+        console.error(profileError);
       }
-      
-      // Принудительно обновляем состояние авторизации
-      window.dispatchEvent(new Event('storage'));
-      // Переходим на страницу аккаунта
+
+      window.dispatchEvent(new Event("storage"));
       setTimeout(() => navigate("/account"), 1000);
     } catch (error) {
       setMessage("Ошибка сети: " + error);
@@ -58,36 +59,56 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-      <div className="main-box">
-    <div className="input-container">
-      <h1>Вход</h1>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="example@email.com"
-          />
+    <div className="login-page">
+      <div className="login-container">
+        <div className="login-header">
+          <FontAwesomeIcon icon={faPalette} />
+          <h1>OurPaintHUB</h1>
+          <p>Платформа для обмена проектами</p>
+          <h2>Вход в систему</h2>
         </div>
-        <div className="form-group">
-          <label>Пароль</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder="Введите пароль"
-          />
+
+        <div className="login-form">
+          <form onSubmit={handleSubmit}>
+            <div className="input-group">
+              <FontAwesomeIcon icon={faEnvelope} />
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="input-group">
+              <FontAwesomeIcon icon={faLock} />
+              <input
+                type="password"
+                placeholder="Пароль"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <button type="submit" className="login-btn" disabled={isLoading}>
+              {isLoading ? "Вход..." : "Войти"}
+            </button>
+          </form>
+
+          {message && (
+            <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
+              {message}
+            </p>
+          )}
+
+          <p style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            Нет аккаунта?{" "}
+            <a onClick={() => navigate("/registration")}>Зарегистрироваться</a>
+          </p>
         </div>
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? "Вход..." : "Войти"}
-        </button>
-      </form>
-      {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
-    </div>
+      </div>
     </div>
   );
 };

@@ -1,67 +1,88 @@
 html, body {
   height: 100%;
   margin: 0;
+  padding: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.main-box {
-  height: 100vh;
+.login-page {
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #BDECB6 0%, #6666cc 100%);
+  background: linear-gradient(135deg, #7C3AED 0%, #9D4EDD 50%, #5A189A 100%);
+  box-sizing: border-box;
 }
 
-.input-container {
-  max-width: 30em;
-  width: 90%;
-  padding: 3em;
-  border-radius: 0.75em;
-  background-color: #f0f0ff;
+.login-container {
+  background: #f0f0ff;
+  padding: 3rem;
+  border-radius: 0.75rem;
   box-shadow: 0 1.25em 1.875em rgba(51, 51, 255, 0.3);
-    box-sizing: border-box;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-sizing: border-box;
+}
 
-  h1 {
-    text-align: center;
-    margin-top: 0em;
-    margin-bottom: 0.75em;
-    font-weight: 700;
-    color: #222266;
-    user-select: none;
+.login-header {
+  margin-bottom: 1rem;
+
+  svg {
+    font-size: 3rem;
+    color: #3333ff;
+    margin-bottom: 0.75rem;
   }
 
-  .form-group {
-    margin-bottom: 1.25em;
-     user-select: none;
+  h1 {
+    font-size: 1.8rem;
+    color: #222266;
+    margin-bottom: 0.25rem;
+  }
 
-    label {
-      display: block;
-      margin-bottom: 0.5em;
-      font-weight: 600;
-      color: #444488;
-      user-select: none;
+  p {
+    color: #444488;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  .input-group {
+    position: relative;
+
+    svg {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 1rem;
+      pointer-events: none;
     }
 
     input {
       width: 100%;
-      padding: 0.85em 1em;
-      box-sizing: border-box;
+      padding: 0.85rem 1rem 0.85rem 2.8rem;
       border: 0.1em solid #bbbbee;
       border-radius: 0.5em;
       font-size: 1em;
-      transition: border-color 0.3s ease;
-    }
+      transition: all 0.3s ease;
 
-
-    input:focus {
-      outline: none;
-      border-color: #3333ff;
-      box-shadow: 0 0 0.5em rgba(51, 51, 255, 0.5);
-      background-color: #fafaff;
+      &:focus {
+        outline: none;
+        border-color: #3333ff;
+        box-shadow: 0 0 0.5em rgba(51, 51, 255, 0.5);
+        background-color: #fafaff;
+      }
     }
   }
 
-  button {
+  .login-btn {
     width: 100%;
     padding: 1em;
     background-color: #3333ff;
@@ -73,51 +94,48 @@ html, body {
     cursor: pointer;
     box-shadow: 0 0.3125em 0.9375em rgba(51, 51, 255, 0.4);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
-    user-select: none;
-  }
 
-  button:hover {
-    background-color: #0000cc;
-    box-shadow: 0 0.5em 1.25em rgba(0, 0, 204, 0.6);
+    &:hover {
+      background-color: #0000cc;
+      box-shadow: 0 0.5em 1.25em rgba(0, 0, 204, 0.6);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
   }
 
   .message {
-    margin-top: 1.2em;
+    margin-top: 1rem;
     text-align: center;
     font-style: italic;
     color: #5555aa;
   }
-}
 
+  a {
+    color: #3333ff;
+    cursor: pointer;
+    font-weight: 600;
 
-@media (max-width: 480px) {
-  .input-container {
-    width: 90%;
-    padding: 1.5rem;
-
-    h1 {
-      font-size: 1.5rem;
-    }
-
-    input, button {
-      font-size: 0.95rem;
-      padding: 0.7em 0.8em;
+    &:hover {
+      color: #0000cc;
     }
   }
 }
 
-@media (min-width: 1600px) {
-  .input-container {
-    max-width: 900px;
-    padding: 4rem;
+@media (max-width: 480px) {
+  .login-container {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
 
-    h1 {
-      font-size: 3rem;
-    }
+  .login-header svg {
+    font-size: 2.5rem;
+  }
 
-    input, button {
-      font-size: 1.5rem;
-      padding: 1.5em;
-    }
+  input, .login-btn {
+    font-size: 0.95rem;
+    padding: 0.7em 0.8em;
   }
 }
