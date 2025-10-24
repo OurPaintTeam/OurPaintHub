@@ -1,6 +1,5 @@
-// ProjectsPage.scss
 .projects-page {
-  padding-left: 2rem; // смещение вправо
+  padding-left: 2rem;
 
   .projects-tabs {
     display: flex;
@@ -20,7 +19,7 @@
 
       &.active {
         color: #7C3AED;
-        border-bottom: 4px solid #7C3AED; // активная вкладка выделена границей
+        border-bottom: 4px solid #7C3AED;
       }
     }
   }
