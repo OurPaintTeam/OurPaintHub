@@ -158,3 +158,23 @@
   margin-top: 6px;
 }
 
+.project-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-card-header-buttons button {
+  margin-left: 6px;
+}
+
+.project-card-body {
+  margin-top: 8px;
+}
+
+.edit-private-checkbox {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+}

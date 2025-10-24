@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 import "./ProjectsPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import { faUpload, faEdit, faTrash, faDownload, faShare } from "@fortawesome/free-solid-svg-icons";
 
 interface UserData {
   id: number;
@@ -166,17 +166,40 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
 
   const handleSave = async () => {
     try {
-      // API для обновления имени и приватности
-      await fetch(`http://localhost:8000/api/project/update/${project.id}/`, {
+      const response = await fetch(`http://localhost:8000/api/project/change/${project.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_name: newName, private: isPrivate }),
       });
+      if (!response.ok) throw new Error("Ошибка при обновлении проекта");
+
       setIsEditing(false);
       fetchProjects();
     } catch (error) {
       console.error("Ошибка обновления проекта:", error);
+      alert("Не удалось сохранить изменения");
     }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Удалить проект?")) return;
+    try {
+      const response = await fetch(`http://localhost:8000/api/project/delete/${project.id}/`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Ошибка при удалении проекта");
+      fetchProjects();
+    } catch (error) {
+      console.error("Ошибка удаления проекта:", error);
+      alert("Не удалось удалить проект");
+    }
+  };
+
+  const handleDownload = () => {
+    const link = document.createElement("a");
+    link.href = `http://localhost:8000/api/project/download/${project.id}/`;
+    link.download = project.project_name;
+    link.click();
   };
 
   const handleShare = () => {
@@ -187,29 +210,58 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
     <div className="project-card">
       <div className="project-card-header">
         {isEditing ? (
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input
+            className="project-name-input"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
         ) : (
           <span className="project-name">{project.project_name}</span>
         )}
-        <button className="btn-edit-mini" onClick={() => setIsEditing(!isEditing)}>
-          {isEditing ? "✖" : "✎"}
-        </button>
+
+        <div className="project-card-header-buttons">
+          {isEditing ? (
+            <button className="btn-save" onClick={handleSave}>Сохранить</button>
+          ) : (
+            <>
+              <button className="btn-edit-mini" onClick={() => setIsEditing(true)}>
+                <FontAwesomeIcon icon={faEdit} />
+              </button>
+              <button className="btn-delete-mini" onClick={handleDelete}>
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
+              <button className="btn-download-mini" onClick={handleDownload}>
+                <FontAwesomeIcon icon={faDownload} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="project-card-body">
-        {isEditing && (
-          <label>
-            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} /> Приватный
-          </label>
-        )}
         <p>Тип: {project.type}</p>
         <p>Вес: {project.weight}</p>
-        {!isEditing && <p>Статус: {project.private ? "Приватный" : "Публичный"}</p>}
+
         {isEditing ? (
-          <button className="btn-save" onClick={handleSave}>Сохранить</button>
+          <div className="edit-private-checkbox">
+            <label>
+              Приватный:&nbsp;
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
+            </label>
+          </div>
         ) : (
-          <button className="btn-share" onClick={handleShare}>Поделиться</button>
+          <p>Статус: {project.private ? "Приватный" : "Публичный"}</p>
         )}
+      </div>
+
+      <div className="project-card-footer">
+        <button className="btn-share" onClick={handleShare}>
+          <FontAwesomeIcon icon={faShare} /> Поделиться
+        </button>
       </div>
     </div>
   );
