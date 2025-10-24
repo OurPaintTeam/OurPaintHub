@@ -1,0 +1,83 @@
+/* Friends & Users */
+.friends-page, .projects-page {
+    padding-left: 12rem; /* сдвиг всего контента правее */
+}
+
+.friends-tabs,
+.projects-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 1rem 1.5rem;
+    color: #6b7280;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    border-top: 3px solid transparent;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    color: #7C3AED;
+    border-bottom-color: #7C3AED;
+    border-top-color: #F5E6EB;
+    border-left-color: #F5E6EB;
+    border-right-color: #F5E6EB;
+}
+
+.user-card,
+.friend-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.user-card:hover,
+.friend-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #7C3AED;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.user-details h4 {
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.user-details p {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin: 0;
+}
