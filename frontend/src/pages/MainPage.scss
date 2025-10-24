@@ -1,0 +1,81 @@
+.main-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  h1 {
+    font-size: 2.5rem;
+    color: #1f2937;
+    font-weight: 700;
+  }
+
+  p {
+    color: #6b7280;
+    font-size: 1.125rem;
+    margin: 0;
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.dashboard-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-icon {
+    font-size: 2.5rem;
+    color: #7C3AED;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  .card-link {
+    background: none;
+    border: none;
+    color: #7C3AED;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    cursor: pointer;
+    padding: 0;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
