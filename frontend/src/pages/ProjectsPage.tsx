@@ -15,6 +15,7 @@ interface ProjectData {
   project_name: string;
   type: string;
   weight: string;
+  private: boolean;
 }
 
 const ProjectsPage: React.FC = () => {
@@ -59,15 +60,16 @@ const ProjectsPage: React.FC = () => {
       if (!input.files || input.files.length === 0) return;
 
       const file = input.files[0];
-
       const ext = file.name.split('.').pop()?.toLowerCase() || "txt";
       const allowedTypes = ['ourp','json','pdf','tiff','jpg','md','txt','png','jpeg','svg','bmp'];
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
       const type = allowedTypes.includes(ext) ? ext : 'txt';
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
 
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("project_name", file.name);
-      formData.append("weight", "123");
+      formData.append("project_name", nameWithoutExt);
+      formData.append("weight", fileSizeMB);
       formData.append("type", type);
       formData.append("private", "false");
 
@@ -78,11 +80,8 @@ const ProjectsPage: React.FC = () => {
         });
 
         let result;
-        try {
-          result = await response.json();
-        } catch {
-          result = { error: 'Сервер вернул не JSON' };
-        }
+        try { result = await response.json(); }
+        catch { result = { error: 'Сервер вернул не JSON' }; }
 
         if (response.ok) {
           alert("Проект успешно добавлен!");
@@ -132,19 +131,15 @@ const ProjectsPage: React.FC = () => {
         </div>
 
         <div id="my-projects" className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
-          <div id="user-projects-list">
-            {myProjects.length === 0 ? (
-              <p>Проекты отсутствуют</p>
-            ) : (
-              <ul>
-                {myProjects.map(p => (
-                  <li key={p.id}>
-                    {p.project_name} ({p.type}, {p.weight})
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {myProjects.length === 0 ? (
+            <p>Проекты отсутствуют</p>
+          ) : (
+            <div className="projects-grid">
+              {myProjects.map((p) => (
+                <ProjectCard key={p.id} project={p} fetchProjects={() => user && fetchUserProjects(user.id)} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div id="friends-projects" className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
@@ -156,6 +151,67 @@ const ProjectsPage: React.FC = () => {
         </div>
       </div>
     </MainLayout>
+  );
+};
+
+interface ProjectCardProps {
+  project: ProjectData;
+  fetchProjects: () => void;
+}
+
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(project.project_name);
+  const [isPrivate, setIsPrivate] = useState(project.private);
+
+  const handleSave = async () => {
+    try {
+      // API для обновления имени и приватности
+      await fetch(`http://localhost:8000/api/project/update/${project.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_name: newName, private: isPrivate }),
+      });
+      setIsEditing(false);
+      fetchProjects();
+    } catch (error) {
+      console.error("Ошибка обновления проекта:", error);
+    }
+  };
+
+  const handleShare = () => {
+    console.log("Поделиться проектом:", project.id);
+  };
+
+  return (
+    <div className="project-card">
+      <div className="project-card-header">
+        {isEditing ? (
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} />
+        ) : (
+          <span className="project-name">{project.project_name}</span>
+        )}
+        <button className="btn-edit-mini" onClick={() => setIsEditing(!isEditing)}>
+          {isEditing ? "✖" : "✎"}
+        </button>
+      </div>
+
+      <div className="project-card-body">
+        {isEditing && (
+          <label>
+            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} /> Приватный
+          </label>
+        )}
+        <p>Тип: {project.type}</p>
+        <p>Вес: {project.weight}</p>
+        {!isEditing && <p>Статус: {project.private ? "Приватный" : "Публичный"}</p>}
+        {isEditing ? (
+          <button className="btn-save" onClick={handleSave}>Сохранить</button>
+        ) : (
+          <button className="btn-share" onClick={handleShare}>Поделиться</button>
+        )}
+      </div>
+    </div>
   );
 };
 

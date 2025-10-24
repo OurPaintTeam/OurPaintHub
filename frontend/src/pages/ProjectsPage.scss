@@ -87,3 +87,74 @@
   background: #6d28d9;
   transform: translateY(-1px);
 }
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.project-card {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 12px;
+  background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-name {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.project-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-card button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-edit-name {
+  background-color: #5bc0de;
+  color: #fff;
+}
+
+.btn-share {
+  background-color: #5cb85c;
+  color: #fff;
+  margin-top: 6px;
+}
+
+.btn-edit-mini {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.btn-save {
+  background-color: #5cb85c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
