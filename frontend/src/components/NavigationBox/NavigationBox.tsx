@@ -1,5 +1,7 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPalette } from "@fortawesome/free-solid-svg-icons";
 import "./NavigationBox.scss";
 
 interface NavigationBoxProps {
@@ -9,32 +11,42 @@ interface NavigationBoxProps {
 
 const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, userName }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     window.location.reload();
   };
 
+  const menuItems = [
+    { label: "Главная", path: "/" },
+    { label: "Новости", path: "/news" },
+    { label: "Документация", path: "/docs" },
+    { label: "Друзья", path: "/friends" },
+    { label: "Мои Проекты", path: "/projects" },
+    { label: "Профиль", path: "/profile" },
+  ];
+
   return (
     <nav className="navbar">
       <div className="nav-container">
-        {/* Логотип */}
-        <div className="nav-logo">
-          <i className="fas fa-palette"></i>
-          <span>OurPaintHUB</span>
+       <div className="nav-logo">
+        <FontAwesomeIcon icon={faPalette} />
+         <span>OurPaintHUB</span>
         </div>
 
-        {/* Меню */}
         <div className="nav-menu">
-          <button className="nav-link" onClick={() => navigate("/")}>Главная</button>
-          <button className="nav-link" onClick={() => navigate("/news")}>Новости</button>
-          <button className="nav-link" onClick={() => navigate("/docs")}>Документация</button>
-          <button className="nav-link" onClick={() => navigate("/friends")}>Друзья</button>
-          <button className="nav-link" onClick={() => navigate("/projects")}>Мои Проекты</button>
-          <button className="nav-link" onClick={() => navigate("/account")}>Профиль</button>
+          {menuItems.map((item) => (
+            <button
+              key={item.path}
+              className={`nav-link ${location.pathname === item.path ? "active" : ""}`}
+              onClick={() => navigate(item.path)}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
-        {/* Пользователь и выход */}
         {isAuthenticated && (
           <div className="nav-user">
             <span>{userName}</span>
