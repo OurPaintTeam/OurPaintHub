@@ -19,7 +19,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
   };
 
   const menuItems = [
-    { label: "Главная", path: "/" },
+    { label: "Главная", path: "/main" },
     { label: "Новости", path: "/news" },
     { label: "Документация", path: "/docs" },
     { label: "Друзья", path: "/friends" },
