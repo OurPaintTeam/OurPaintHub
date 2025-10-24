@@ -1,6 +1,8 @@
+from django.http import HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import User, UserProfile, Role, Documentation, EntityLog
+from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta
+from decimal import Decimal
 
 @api_view(["POST"])
 def register_user(request):
@@ -450,18 +452,110 @@ def QA_view(request):
         {"id": 1, "title": "Данные будут добавлены позже", "content": "Пока раздел находится в разработке."}
     ])
 
+
 @api_view(["POST"])
-def add_project(request):
-        return Response({"error"}, status=500)
+def add_project(request, user_id):
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+
+    project_name = request.data.get("project_name")
+    weight = request.data.get("weight")
+    type_ = request.data.get("type")
+    private = request.data.get("private", "false").lower() == "true"
+    uploaded_file = request.FILES.get("file")
+
+    if not uploaded_file:
+        return Response({"error": "Файл не выбран"}, status=400)
+    if not project_name or weight is None or not type_:
+        return Response({"error": "Недостаточно данных"}, status=400)
+
+    try:
+        weight = Decimal(weight)
+    except:
+        return Response({"error": "Вес должен быть числом"}, status=400)
+
+    allowed_types = [choice[0] for choice in ProjectMeta.TYPE_CHOICES]
+    if type_ not in allowed_types:
+        type_ = 'txt'
+
+    try:
+        project = Project.objects.create(user=user, private=private)
+        file_data = uploaded_file.read()
+        ProjectMeta.objects.create(
+            project=project,
+            project_name=project_name,
+            weight=weight,
+            type=type_,
+            data=file_data
+        )
+    except Exception as e:
+        return Response({"error": f"Ошибка при сохранении проекта: {str(e)}"}, status=500)
+
+    return Response({"message": "Проект успешно создан", "project_id": project.id}, status=201)
+
+@api_view(["GET"])
+def get_user_projects(request, user_id):
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+
+    projects = ProjectMeta.objects.filter(project__user=user)
+    data = [
+        {
+            "id": p.id,
+            "project_name": p.project_name,
+            "weight": str(p.weight),
+            "type": p.type,
+        } for p in projects
+    ]
+    return Response({"projects": data})
 
 @api_view(["DELETE"])
 def delete_project(request, project_id):
+    try:
+        project = ProjectMeta.objects.get(pk=project_id)
+    except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
+
+    project.delete()
+    return Response({"success": "Проект удалён"}, status=200)
 
 @api_view(["PATCH"])
 def change_project(request, project_id):
+    try:
+        project_meta = ProjectMeta.objects.get(project_id=project_id)
+    except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
+
+    data = request.data
+    project_name = data.get("project_name")
+    private = data.get("private")
+
+    if project_name is not None:
+        project_meta.project_name = project_name
+
+    if private is not None:
+        if isinstance(private, str):
+            private = private.lower() == "true"
+        project_meta.project.private = private
+        project_meta.project.save()
+
+    project_meta.save()
+    return Response({"success": True})
 
 @api_view(["GET"])
 def download_project(project_id):
-        return Response({"error": "Файл не найден"}, status=404)
+    try:
+        project_meta = ProjectMeta.objects.get(pk=project_id)
+        if not project_meta.data:
+            return Response({"error": "Файл не найден"}, status=404)
+
+        response = HttpResponse(project_meta.data, content_type="application/octet-stream")
+        response['Content-Disposition'] = f'attachment; filename="{project_meta.project_name}"'
+        return response
+
+    except ProjectMeta.DoesNotExist:
+        return Response({"error": "Проект не найден"}, status=404)

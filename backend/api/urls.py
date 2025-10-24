@@ -15,6 +15,7 @@ urlpatterns = [
     path("user/role/", views.check_user_role, name="check_user_role"),
     path("QA/", views.QA_view, name="QA"),
     path("project/add/<int:user_id>/", views.add_project, name="add_project"),
+    path("project/get_user_projects/<int:user_id>/", views.get_user_projects, name="get_user_projects"),
     path("project/delete/<int:project_id>/", views.delete_project, name="delete_project"),
     path("project/change/<int:project_id>/", views.change_project, name="change_project"),
     path("project/download/<int:project_id>/", views.download_project, name="download_project"),
