@@ -10,20 +10,41 @@ interface UserData {
   nickname?: string;
 }
 
+interface ProjectData {
+  id: number;
+  project_name: string;
+  type: string;
+  weight: string;
+}
+
 const ProjectsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"my-projects" | "friends-projects" | "received-projects">("my-projects");
   const [user, setUser] = useState<UserData | null>(null);
+  const [myProjects, setMyProjects] = useState<ProjectData[]>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        fetchUserProjects(parsedUser.id);
       } catch {
         console.error("Ошибка парсинга данных пользователя");
       }
     }
   }, []);
+
+  const fetchUserProjects = async (userId: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
+      if (!response.ok) throw new Error("Ошибка при загрузке проектов");
+      const data = await response.json();
+      setMyProjects(data.projects);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const showUploadProjectModal = async () => {
     if (!user) {
@@ -65,6 +86,7 @@ const ProjectsPage: React.FC = () => {
 
         if (response.ok) {
           alert("Проект успешно добавлен!");
+          fetchUserProjects(user.id);
         } else {
           alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
         }
@@ -111,20 +133,26 @@ const ProjectsPage: React.FC = () => {
 
         <div id="my-projects" className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
           <div id="user-projects-list">
-            {/* Список проектов пользователя */}
+            {myProjects.length === 0 ? (
+              <p>Проекты отсутствуют</p>
+            ) : (
+              <ul>
+                {myProjects.map(p => (
+                  <li key={p.id}>
+                    {p.project_name} ({p.type}, {p.weight})
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
         <div id="friends-projects" className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
-          <div id="friends-projects-list">
-            {/* Проекты друзей */}
-          </div>
+          <div id="friends-projects-list">{/* Проекты друзей */}</div>
         </div>
 
         <div id="received-projects" className={`projects-content ${activeTab === "received-projects" ? "active" : ""}`}>
-          <div id="received-projects-list">
-            {/* Полученные проекты */}
-          </div>
+          <div id="received-projects-list">{/* Полученные проекты */}</div>
         </div>
       </div>
     </MainLayout>
