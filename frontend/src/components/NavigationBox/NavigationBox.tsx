@@ -18,21 +18,30 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
     window.location.reload();
   };
 
-  const menuItems = [
-    { label: "Главная", path: "/main" },
-    { label: "Новости", path: "/news" },
-    { label: "Документация", path: "/docs" },
-    { label: "Друзья", path: "/friends" },
-    { label: "Мои Проекты", path: "/projects" },
-    { label: "Профиль", path: "/account" },
-  ];
+  const menuItems = isAuthenticated
+    ? [
+        { label: "Главная", path: "/main" },
+        { label: "Новости", path: "/news" },
+        { label: "Документация", path: "/docs" },
+        { label: "Приложение", path: "/download" },
+        { label: "Друзья", path: "/friends" },
+        { label: "Мои Проекты", path: "/projects" },
+        { label: "Профиль", path: "/account" },
+      ]
+    : [
+        { label: "Новости", path: "/news" },
+        { label: "Документация", path: "/docs" },
+        { label: "Приложение", path: "/download" },
+        { label: "Войти", path: "/login" },
+        { label: "Регистрация", path: "/registration" },
+      ];
 
   return (
     <nav className="navbar">
       <div className="nav-container">
-       <div className="nav-logo">
-        <FontAwesomeIcon icon={faPalette} />
-         <span>OurPaintHUB</span>
+        <div className="nav-logo">
+          <FontAwesomeIcon icon={faPalette} />
+          <span>OurPaintHUB</span>
         </div>
 
         <div className="nav-menu">
