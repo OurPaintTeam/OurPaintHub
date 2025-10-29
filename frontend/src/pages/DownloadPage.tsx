@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
+import "./DownloadPage.scss";
 
-interface DownloadPageProps {
-  isAuthenticated?: boolean;
+interface DownloadItem {
+  id: number;
+  title: string;
+  content: string;
+  version?: string;
+  release_date?: string;
+  file_url?: string;
 }
 
-const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) => {
-  const [inf, setInf] = useState([]);
+const DownloadPage: React.FC = () => {
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/download/")
       .then((res) => res.json())
       .then((data) => {
-        setInf(data);
+        setDownloads(data);
         setLoading(false);
       })
       .catch((err) => {
@@ -23,26 +29,36 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
   }, []);
 
   return (
-    <MainLayout isAuthenticated={isAuthenticated}>
-      <h1>Скачивание</h1>
-      <div>
-        {loading ? (
-          <p>Загрузка информации...</p>
-        ) : (
-          inf.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                marginBottom: "20px",
-                borderBottom: "1px solid #ddd",
-                paddingBottom: "10px",
-              }}
-            >
-              <h2>{item.title}</h2>
-              <p>{item.content}</p>
-            </div>
-          ))
-        )}
+    <MainLayout isAuthenticated={true}>
+      <div className="download-container">
+        <div className="download-header">
+          <h1>Версии для скачивания</h1>
+        </div>
+
+        <div className="download-content">
+          {loading ? (
+            <p>Загрузка информации...</p>
+          ) : (
+            downloads.map((item) => (
+              <div key={item.id} className="download-item">
+                <h2 className="download-title">
+                  {item.title} {item.version && `(v${item.version})`}
+                </h2>
+                <p className="download-description">{item.content}</p>
+                {item.release_date && (
+                  <div className="download-meta">
+                    <small>Дата релиза: {new Date(item.release_date).toLocaleDateString("ru-RU")}</small>
+                  </div>
+                )}
+                {item.file_url && (
+                  <a href={item.file_url} className="download-btn" target="_blank" rel="noopener noreferrer">
+                    Скачать
+                  </a>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </MainLayout>
   );
