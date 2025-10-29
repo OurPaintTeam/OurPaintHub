@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
+import "./QAPage.scss";
 
-const QAPage = () => {
-  const [qa, setQA] = useState([]);
+interface QAItem {
+  id: number;
+  title: string;
+  content: string;
+  author_email?: string;
+  created_at?: string;
+}
+
+const QAPage: React.FC = () => {
+  const [qa, setQA] = useState<QAItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,25 +29,50 @@ const QAPage = () => {
 
   return (
     <MainLayout isAuthenticated={true}>
-      <h1>QA</h1>
-      <div>
-        {loading ? (
-          <p>Загрузка данных...</p>
-        ) : (
-          qa.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                marginBottom: "20px",
-                borderBottom: "1px solid #ddd",
-                paddingBottom: "10px",
-              }}
-            >
-              <h2>{item.title}</h2>
-              <p>{item.content}</p>
-            </div>
-          ))
-        )}
+      <div className="qa-container">
+        <div className="qa-header">
+          <h1>Вопросы и ответы</h1>
+        </div>
+
+        <div className="qa-content">
+          {loading ? (
+            <p>Загрузка данных...</p>
+          ) : (
+            qa.map((item) => (
+              <div key={item.id} className="qa-item">
+                <h2 className="qa-title">{item.title}</h2>
+                <div className="qa-body">
+                  <p>{item.content}</p>
+                </div>
+                {item.author_email && (
+                  <div className="qa-meta">
+                    <small>Автор: {item.author_email}</small>
+                    {item.created_at && (
+                      <small>
+                        •{" "}
+                        {(() => {
+                          try {
+                            const date = new Date(item.created_at);
+                            if (isNaN(date.getTime())) return "Дата недоступна";
+                            return date.toLocaleString("ru-RU", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                          } catch {
+                            return "Дата недоступна";
+                          }
+                        })()}
+                      </small>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </MainLayout>
   );
