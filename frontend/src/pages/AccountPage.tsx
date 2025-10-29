@@ -100,6 +100,7 @@ const AccountPage: React.FC = () => {
               {account.date_of_birth && (
                 <p>Дата рождения: {new Date(account.date_of_birth).toLocaleDateString("ru-RU")}</p>
               )}
+          {account.bio && <p>О себе: {account.bio}</p>}
             </div>
           </div>
 
