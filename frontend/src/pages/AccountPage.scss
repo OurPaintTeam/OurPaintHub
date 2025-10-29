@@ -105,3 +105,18 @@
 .login-btn:hover {
   background: #2563eb;
 }
+
+.friends-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.friends-section h3 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
