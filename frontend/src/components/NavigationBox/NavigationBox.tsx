@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPalette } from "@fortawesome/free-solid-svg-icons";
+import IconMenuButton from "../IconMenuButton/IconMenuButton";
 import "./NavigationBox.scss";
 
 interface NavigationBoxProps {
@@ -24,14 +25,13 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
         { label: "Новости", path: "/news" },
         { label: "Документация", path: "/docs" },
         { label: "Приложение", path: "/download" },
-        { label: "Друзья", path: "/friends" },
-        { label: "Мои Проекты", path: "/projects" },
-        { label: "Профиль", path: "/account" },
+        { label: "Вопросы", path: "/QA" },
       ]
     : [
         { label: "Новости", path: "/news" },
         { label: "Документация", path: "/docs" },
         { label: "Приложение", path: "/download" },
+        { label: "Вопросы", path: "/QA" },
         { label: "Войти", path: "/login" },
         { label: "Регистрация", path: "/registration" },
       ];
@@ -58,7 +58,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
 
         {isAuthenticated && (
           <div className="nav-user">
-            <span>{userName}</span>
+            <IconMenuButton isAuthenticated={true} userName={userName} />
             <button className="btn-logout" onClick={handleLogout}>
               <i className="fas fa-sign-out-alt"></i> Выход
             </button>

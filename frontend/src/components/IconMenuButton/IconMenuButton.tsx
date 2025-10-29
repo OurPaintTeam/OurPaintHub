@@ -32,27 +32,17 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
   return (
     <div className="icon-menu-button">
       <button className="circle-icon-button" onClick={() => setMenuOpen(prev => !prev)}>
-        <img src="/logo1.ico" alt="Logo" />
+        <img src="/logo2.ico" alt="Logo" />
       </button>
 
-      {menuOpen && (
-        <div className="icon-menu" ref={menuRef}>
-          {isAuthenticated ? (
-            <>
-              <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Аккаунт</button>
-              <button onClick={() => { navigate("/projects"); setMenuOpen(false); }}>Проекты</button>
-              <button onClick={() => { navigate("/contacts"); setMenuOpen(false); }}>Контакты</button>
-              <button onClick={() => { navigate("/chats"); setMenuOpen(false); }}>Чаты</button>
-              <button onClick={handleLogout}>Выйти</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { navigate("/login"); setMenuOpen(false); }}>Вход</button>
-              <button onClick={() => { navigate("/registration"); setMenuOpen(false); }}>Регистрация</button>
-            </>
-          )}
-        </div>
-      )}
+{menuOpen && (
+  <div className="icon-menu" ref={menuRef}>
+    <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Профиль</button>
+    <button onClick={() => { navigate("/projects"); setMenuOpen(false); }}>Проекты</button>
+    <button onClick={() => { navigate("/friends"); setMenuOpen(false); }}>Контакты</button>
+    <button onClick={() => { navigate("/chats"); setMenuOpen(false); }}>Чаты</button>
+  </div>
+)}
     </div>
   );
 };
