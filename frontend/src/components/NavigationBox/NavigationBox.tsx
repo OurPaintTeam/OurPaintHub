@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPalette } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faBell } from "@fortawesome/free-solid-svg-icons";
 import IconMenuButton from "../IconMenuButton/IconMenuButton";
 import "./NavigationBox.scss";
 
@@ -13,6 +13,22 @@ interface NavigationBoxProps {
 const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, userName }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [requestsCount, setRequestsCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+    try {
+      const parsed = JSON.parse(userData);
+      fetch(`http://localhost:8000/api/friends/requests/?user_id=${parsed.id}`)
+        .then(res => res.ok ? res.json() : [])
+        .then((list) => setRequestsCount(Array.isArray(list) ? list.length : 0))
+        .catch(() => setRequestsCount(0));
+    } catch {
+      // ignore
+    }
+  }, [isAuthenticated, location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -58,6 +74,23 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
 
         {isAuthenticated && (
           <div className="nav-user">
+            <button
+              className="nav-link"
+              onClick={() => navigate('/friends')}
+              title={requestsCount > 0 ? `Заявки: ${requestsCount}` : 'Заявок нет'}
+            >
+              <FontAwesomeIcon icon={faBell} />
+              {requestsCount > 0 && (
+                <span style={{
+                  marginLeft: '6px',
+                  background: '#ef4444',
+                  borderRadius: '999px',
+                  padding: '0 8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700
+                }}>{requestsCount}</span>
+              )}
+            </button>
             <IconMenuButton isAuthenticated={true} userName={userName} />
             <button className="btn-logout" onClick={handleLogout}>
               <i className="fas fa-sign-out-alt"></i> Выход
