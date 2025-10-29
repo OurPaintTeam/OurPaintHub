@@ -13,7 +13,6 @@ import AddNewsPage from "./pages/AddNewsPage";
 import EditNewsPage from "./pages/EditNewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import ChatsPage from "./pages/ChatsPage";
 import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
 import FriendsPage from "./pages/FriendsPage";
@@ -64,7 +63,6 @@ function App() {
         <Route path="/news/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
         <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
-        <Route path="/chats" element={isAuthenticated ? <ChatsPage /> : <Navigate to="/login" />} />
         <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
         <Route path="/main" element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />} />
         <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
