@@ -455,6 +455,17 @@ def QA_view(request):
 
 @api_view(["POST"])
 def add_project(request, user_id):
+    """
+    POST /api/project/add/<int:user_id>/
+    Добавить проект для пользователя.
+    {
+        "project_name": "Новый проект",
+        "weight": "1.5",
+        "type": "txt",
+        "private": "true",
+        "file": <файл>
+    }
+        """
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
@@ -496,7 +507,24 @@ def add_project(request, user_id):
     return Response({"message": "Проект успешно создан", "project_id": project.id}, status=201)
 
 @api_view(["GET"])
-def get_user_projects(request, user_id):
+def get_user_projects(user_id):
+    """
+    GET /api/project/get_user_projects/<int:user_id>/
+    Получить список проектов пользователя.
+
+    Возвращает JSON:
+    {
+        "projects": [
+            {
+                "id": 1,
+                "project_name": "Проект 1",
+                "weight": "1.50",
+                "type": "txt"
+            },
+            ...
+        ]
+    }
+        """
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
@@ -514,7 +542,11 @@ def get_user_projects(request, user_id):
     return Response({"projects": data})
 
 @api_view(["DELETE"])
-def delete_project(request, project_id):
+def delete_project( project_id):
+    """
+    DELETE /api/project/delete/<int:project_id>/
+    Удалить проект по ID
+        """
     try:
         project = ProjectMeta.objects.get(pk=project_id)
     except ProjectMeta.DoesNotExist:
@@ -525,6 +557,16 @@ def delete_project(request, project_id):
 
 @api_view(["PATCH"])
 def change_project(request, project_id):
+    """
+    PATCH /api/project/change/<int:project_id>/
+    Изменить проект по ID.
+
+    Пример тела запроса (JSON):
+    {
+        "project_name": "Новое название",
+        "private": "false"
+    }
+       """
     try:
         project_meta = ProjectMeta.objects.get(project_id=project_id)
     except ProjectMeta.DoesNotExist:
@@ -548,6 +590,10 @@ def change_project(request, project_id):
 
 @api_view(["GET"])
 def download_project(project_id):
+    """
+    GET /api/project/download/<int:project_id>/
+    Скачать файл проекта
+        """
     try:
         project_meta = ProjectMeta.objects.get(pk=project_id)
         if not project_meta.data:
