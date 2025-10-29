@@ -65,7 +65,6 @@ function App() {
         <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
         <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
         <Route path="/chats" element={isAuthenticated ? <ChatsPage /> : <Navigate to="/login" />} />
-        <Route path="/contacts" element={isAuthenticated ? <ContactsPage /> : <Navigate to="/login" />} />
         <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
         <Route path="/main" element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />} />
         <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
