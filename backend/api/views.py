@@ -537,6 +537,7 @@ def get_user_projects(request, user_id):
                 "project_name": p.project_name,
                 "weight": str(p.weight) if p.weight is not None else "0",
                 "type": p.type or "",
+                "private": p.project.private,
             })
         except Exception as e:
             print(f"Ошибка сериализации проекта {p.id}: {e}")
@@ -571,7 +572,7 @@ def change_project(request, project_id):
     }
        """
     try:
-        project_meta = ProjectMeta.objects.get(project_id=project_id)
+        project_meta = ProjectMeta.objects.get(pk=project_id)
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
 
@@ -589,10 +590,19 @@ def change_project(request, project_id):
         project_meta.project.save()
 
     project_meta.save()
-    return Response({"success": True})
+    return Response({
+        "success": True,
+        "project": {
+            "id": project_meta.id,
+            "project_name": project_meta.project_name,
+            "weight": str(project_meta.weight),
+            "type": project_meta.type,
+            "private": project_meta.project.private
+        }
+    })
 
 @api_view(["GET"])
-def download_project(project_id):
+def download_project(request, project_id):
     """
     GET /api/project/download/<int:project_id>/
     Скачать файл проекта
