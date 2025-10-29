@@ -606,14 +606,17 @@ def download_project(request, project_id):
     """
     GET /api/project/download/<int:project_id>/
     Скачать файл проекта
-        """
+    """
     try:
         project_meta = ProjectMeta.objects.get(pk=project_id)
         if not project_meta.data:
             return Response({"error": "Файл не найден"}, status=404)
 
+        ext = project_meta.type if project_meta.type else "txt"
+        filename = f"{project_meta.project_name}.{ext}"
+
         response = HttpResponse(project_meta.data, content_type="application/octet-stream")
-        response['Content-Disposition'] = f'attachment; filename="{project_meta.project_name}"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
     except ProjectMeta.DoesNotExist:
