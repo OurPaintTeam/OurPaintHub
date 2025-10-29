@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDotCircle, faVectorSquare, faCircle, faDrawPolygon, faKeyboard, faNetworkWired, faSave, faTerminal } from "@fortawesome/free-solid-svg-icons";
+import {
+  faDotCircle,
+  faCircle,
+  faDrawPolygon,
+  faKeyboard,
+  faNetworkWired,
+  faSave,
+  faTerminal,
+  faShapes
+} from "@fortawesome/free-solid-svg-icons";
 import "./DocumentationPage.scss";
 
 interface DocumentationPageProps {
@@ -20,14 +29,14 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("Примитивы");
 
-  const categories: { name: string; icon: any }[] = [
-    { name: "Примитивы", icon: faDotCircle },
-    { name: "Требования", icon: faVectorSquare },
-    { name: "Горячие клавиши", icon: faKeyboard },
-    { name: "Работа по сети", icon: faNetworkWired },
-    { name: "Сохранение", icon: faSave },
-    { name: "Консольные команды", icon: faTerminal },
-  ];
+const categories: { name: string; icon: any }[] = [
+  { name: "Примитивы", icon: faDotCircle },
+  { name: "Требования", icon: faShapes },
+  { name: "Горячие клавиши", icon: faKeyboard },
+  { name: "Работа по сети", icon: faNetworkWired },
+  { name: "Сохранение", icon: faSave },
+  { name: "Консольные команды", icon: faTerminal },
+];
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/documentation/")

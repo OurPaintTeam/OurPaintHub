@@ -164,6 +164,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
   const [newName, setNewName] = useState(project.project_name);
   const [isPrivate, setIsPrivate] = useState(project.private);
 
+  useEffect(() => {
+    if (isEditing) {
+      setIsPrivate(project.private);
+      setNewName(project.project_name);
+    }
+  }, [isEditing, project.private, project.project_name]);
+
   const handleSave = async () => {
     try {
       const response = await fetch(`http://localhost:8000/api/project/change/${project.id}/`, {
@@ -173,13 +180,20 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
       });
       if (!response.ok) throw new Error("Ошибка при обновлении проекта");
 
+      const result = await response.json();
       setIsEditing(false);
+
+      if (result.project && typeof result.project.private === "boolean") {
+        setIsPrivate(result.project.private);
+      }
+
       fetchProjects();
     } catch (error) {
       console.error("Ошибка обновления проекта:", error);
       alert("Не удалось сохранить изменения");
     }
   };
+
 
   const handleDelete = async () => {
     if (!window.confirm("Удалить проект?")) return;

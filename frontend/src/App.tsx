@@ -14,7 +14,7 @@ import AddNewsPage from "./pages/AddNewsPage";
 import EditNewsPage from "./pages/EditNewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import ChatsPage from "./pages/ChatsPage";
+import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
 import FriendsPage from "./pages/FriendsPage";
 import "./styles/toast.scss";
@@ -50,29 +50,26 @@ function App() {
   }
 
   return (
-    <ToastProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Navigate to="/news" />} />
-          <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
-          <Route path="/news/:id" element={<NewsDetailPage />} />
-          <Route path="/docs" element={<DocumentationPage />} />
-          <Route path="/download" element={<DownloadPage />} />
-          <Route path="/QA" element={<QAPage />} />
-          <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
-          <Route path="/account/id/:id" element={<PublicAccountPage />} />
-          <Route path="/settings" element={isAuthenticated ? <SettingsPage /> : <Navigate to="/login" />} />
-          <Route path="/news/add" element={isAuthenticated ? <AddNewsPage /> : <Navigate to="/login" />} />
-          <Route path="/news/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
-          <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
-          <Route path="/chats" element={isAuthenticated ? <ChatsPage /> : <Navigate to="/login" />} />
-          <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
-          <Route path="/main" element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />} />
-          <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
-        </Routes>
-      </Router>
-    </ToastProvider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Navigate to="/news" />} />
+        <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
+        <Route path="/news/:id" element={<NewsDetailPage />} />
+        <Route path="/docs" element={<DocumentationPage />} />
+        <Route path="/download" element={<DownloadPage />} />
+        <Route path="/QA" element={<QAPage />} />
+        <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
+        <Route path="/account/id/:id" element={<PublicAccountPage />} />
+        <Route path="/settings" element={isAuthenticated ? <SettingsPage /> : <Navigate to="/login" />} />
+        <Route path="/news/add" element={isAuthenticated ? <AddNewsPage /> : <Navigate to="/login" />} />
+        <Route path="/news/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
+        <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
+        <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
+        <Route path="/main" element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />} />
+        <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
+      </Routes>
+    </Router>
   );
 }
 

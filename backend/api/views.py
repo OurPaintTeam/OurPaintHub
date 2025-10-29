@@ -523,12 +523,10 @@ def add_project(request, user_id):
     return Response({"message": "Проект успешно создан", "project_id": project.id}, status=201)
 
 @api_view(["GET"])
-def get_user_projects(user_id):
+def get_user_projects(request, user_id):
     """
     GET /api/project/get_user_projects/<int:user_id>/
-    Получить список проектов пользователя.
-
-    Возвращает JSON:
+    Получить список проектов пользователя
     {
         "projects": [
             {
@@ -544,21 +542,27 @@ def get_user_projects(user_id):
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+        return Response({"projects": []})
 
     projects = ProjectMeta.objects.filter(project__user=user)
-    data = [
-        {
-            "id": p.id,
-            "project_name": p.project_name,
-            "weight": str(p.weight),
-            "type": p.type,
-        } for p in projects
-    ]
+    data = []
+    for p in projects:
+        try:
+            data.append({
+                "id": p.id,
+                "project_name": p.project_name,
+                "weight": str(p.weight) if p.weight is not None else "0",
+                "type": p.type or "",
+                "private": p.project.private,
+            })
+        except Exception as e:
+            print(f"Ошибка сериализации проекта {p.id}: {e}")
+            continue
+
     return Response({"projects": data})
 
 @api_view(["DELETE"])
-def delete_project( project_id):
+def delete_project(request, project_id):
     """
     DELETE /api/project/delete/<int:project_id>/
     Удалить проект по ID
@@ -584,7 +588,7 @@ def change_project(request, project_id):
     }
        """
     try:
-        project_meta = ProjectMeta.objects.get(project_id=project_id)
+        project_meta = ProjectMeta.objects.get(pk=project_id)
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
 
@@ -602,21 +606,33 @@ def change_project(request, project_id):
         project_meta.project.save()
 
     project_meta.save()
-    return Response({"success": True})
+    return Response({
+        "success": True,
+        "project": {
+            "id": project_meta.id,
+            "project_name": project_meta.project_name,
+            "weight": str(project_meta.weight),
+            "type": project_meta.type,
+            "private": project_meta.project.private
+        }
+    })
 
 @api_view(["GET"])
-def download_project(project_id):
+def download_project(request, project_id):
     """
     GET /api/project/download/<int:project_id>/
     Скачать файл проекта
-        """
+    """
     try:
         project_meta = ProjectMeta.objects.get(pk=project_id)
         if not project_meta.data:
             return Response({"error": "Файл не найден"}, status=404)
 
+        ext = project_meta.type if project_meta.type else "txt"
+        filename = f"{project_meta.project_name}.{ext}"
+
         response = HttpResponse(project_meta.data, content_type="application/octet-stream")
-        response['Content-Disposition'] = f'attachment; filename="{project_meta.project_name}"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
     except ProjectMeta.DoesNotExist:
