@@ -8,6 +8,7 @@ class User(models.Model):
     email = models.CharField(max_length=255, unique=True)
     password = models.TextField()
     registration_date = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'users'
@@ -32,6 +33,7 @@ class UserProfile(models.Model):
     avatar = models.TextField(null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'user_profile'
@@ -57,6 +59,7 @@ class Role(models.Model):
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
     role = models.CharField(max_length=255, choices=ROLE_CHOICES)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'role'
@@ -64,6 +67,7 @@ class Role(models.Model):
 class Project(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
     private = models.BooleanField(default=True)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'projects'
@@ -88,6 +92,7 @@ class ProjectMeta(models.Model):
     data = models.BinaryField()
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     type = models.CharField(max_length=16, choices=TYPE_CHOICES, null=True, blank=True)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'project_meta'
@@ -168,6 +173,7 @@ class EntityLog(models.Model):
     id_user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='id_user')
     type = models.CharField(max_length=255, choices=TYPE_CHOICES)
     id_entity = models.BigIntegerField()
+    objects = models.Manager()
     
     class Meta:
         db_table = 'entity_logs'
@@ -204,6 +210,7 @@ class Documentation(models.Model):
     type = models.CharField(max_length=255, choices=TYPE_CHOICES)
     admin = models.ForeignKey(User, on_delete=models.CASCADE, db_column='admin')
     text = models.TextField(null=True, blank=True)
+    objects = models.Manager()
     
     class Meta:
         db_table = 'documentation'
