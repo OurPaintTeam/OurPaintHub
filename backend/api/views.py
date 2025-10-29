@@ -507,12 +507,10 @@ def add_project(request, user_id):
     return Response({"message": "Проект успешно создан", "project_id": project.id}, status=201)
 
 @api_view(["GET"])
-def get_user_projects(user_id):
+def get_user_projects(request, user_id):
     """
     GET /api/project/get_user_projects/<int:user_id>/
-    Получить список проектов пользователя.
-
-    Возвращает JSON:
+    Получить список проектов пользователя
     {
         "projects": [
             {
@@ -528,21 +526,26 @@ def get_user_projects(user_id):
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+        return Response({"projects": []})
 
     projects = ProjectMeta.objects.filter(project__user=user)
-    data = [
-        {
-            "id": p.id,
-            "project_name": p.project_name,
-            "weight": str(p.weight),
-            "type": p.type,
-        } for p in projects
-    ]
+    data = []
+    for p in projects:
+        try:
+            data.append({
+                "id": p.id,
+                "project_name": p.project_name,
+                "weight": str(p.weight) if p.weight is not None else "0",
+                "type": p.type or "",
+            })
+        except Exception as e:
+            print(f"Ошибка сериализации проекта {p.id}: {e}")
+            continue
+
     return Response({"projects": data})
 
 @api_view(["DELETE"])
-def delete_project( project_id):
+def delete_project(request, project_id):
     """
     DELETE /api/project/delete/<int:project_id>/
     Удалить проект по ID
