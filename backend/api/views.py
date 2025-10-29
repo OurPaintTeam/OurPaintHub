@@ -1,7 +1,9 @@
 from django.http import HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta
+from django.db.models import Q
+from django.db import connection
+from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta, Friendship
 from decimal import Decimal
 
 @api_view(["POST"])
@@ -229,13 +231,27 @@ def get_user_profile(request):
         user = User.objects.get(id=user_id)
         try:
             profile = UserProfile.objects.get(user=user)
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM friendship
+                    WHERE status = 'accepted' AND (user1 = %s OR user2 = %s)
+                    """,
+                    [user.id, user.id]
+                )
+                row = cursor.fetchone()
+                friends_count = int(row[0]) if row and row[0] is not None else 0
+
             return Response({
                 "id": user.id,
                 "email": user.email,
                 "nickname": profile.name,
                 "avatar": profile.avatar,
                 "bio": profile.bio,
-                "date_of_birth": profile.date_of_birth
+                "date_of_birth": profile.date_of_birth,
+                "friends_count": friends_count
             }, status=200)
         except UserProfile.DoesNotExist:
             return Response({"error": "Профиль пользователя не найден"}, status=404)
@@ -605,3 +621,508 @@ def download_project(project_id):
 
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
+
+@api_view(["GET"])
+def get_all_users(request):
+    """
+    GET /api/users/
+    Получить список всех пользователей (с исключением текущего, если указан exclude_id)
+    
+    Параметры:
+    - exclude_id: ID пользователя, которого нужно исключить из списка
+    - search: Поиск по email (частичное совпадение, case-insensitive)
+    """
+    exclude_id = request.GET.get('exclude_id')
+    search = request.GET.get('search', '').strip()
+    
+    users = User.objects.all()
+    if exclude_id:
+        try:
+            exclude_id = int(exclude_id)
+            users = users.exclude(id=exclude_id)
+        except ValueError:
+            return Response({"error": "Неверный формат exclude_id"}, status=400)
+
+    if search:
+        users = users.filter(email__icontains=search)
+    
+    result = []
+    for user in users:
+        try:
+            profile = UserProfile.objects.get(user=user)
+            nickname = profile.name
+        except UserProfile.DoesNotExist:
+            nickname = None
+        
+        result.append({
+            "id": user.id,
+            "email": user.email,
+            "nickname": nickname
+        })
+    
+    return Response(result, status=200)
+
+@api_view(["GET"])
+def get_friends(request):
+    """
+    GET /api/friends/
+    Получить список друзей пользователя (статус 'accepted')
+
+    Параметры:
+    - user_id: ID пользователя
+    """
+    user_id = request.GET.get('user_id')
+    search = (request.GET.get('search') or '').strip()
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    
+    # Получаем друзей через сырой SQL (без pk id у friendship)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2
+            FROM friendship
+            WHERE (user1 = %s OR user2 = %s) AND status = 'accepted'
+            """,
+            [user.id, user.id]
+        )
+        rows = cursor.fetchall()
+
+    friend_ids = []
+    for u1, u2 in rows:
+        friend_ids.append(u2 if u1 == user.id else u1)
+
+    friends = User.objects.filter(id__in=friend_ids)
+    if search:
+        friends = friends.filter(email__icontains=search)
+    result = []
+    for friend_user in friends:
+        try:
+            profile = UserProfile.objects.get(user=friend_user)
+            nickname = profile.name
+        except UserProfile.DoesNotExist:
+            nickname = None
+        result.append({
+            "id": friend_user.id,
+            "email": friend_user.email,
+            "nickname": nickname
+        })
+    return Response(result, status=200)
+
+@api_view(["POST"])
+def add_friend(request):
+    """
+    POST /api/friends/add/
+    Отправить запрос в друзья или принять запрос
+    
+    Тело запроса:
+    {
+        "user_id": 1,  # ID текущего пользователя
+        "friend_id": 2  # ID пользователя, с которым устанавливается дружба
+    }
+    """
+    user_id = request.data.get('user_id')
+    friend_id = request.data.get('friend_id')
+    
+    if not user_id or not friend_id:
+        return Response({"error": "ID пользователя и друга обязательны"}, status=400)
+    
+    try:
+        user_id = int(user_id)
+        friend_id = int(friend_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+    
+    if user_id == friend_id:
+        return Response({"error": "Нельзя добавить себя в друзья"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        friend = User.objects.get(id=friend_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2, status
+            FROM friendship
+            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
+            LIMIT 1
+            """,
+            [user.id, friend.id, friend.id, user.id]
+        )
+        row = cursor.fetchone()
+
+        if row:
+            u1, u2, status = row
+            if status == 'sent' and u2 == user.id:
+                cursor.execute(
+                    """
+                    UPDATE friendship
+                    SET status = 'accepted'
+                    WHERE user1 = %s AND user2 = %s
+                    """,
+                    [u1, u2]
+                )
+                from datetime import datetime
+                entity_id = min(u1, u2) * 1000000 + max(u1, u2)  # Уникальный ID для пары
+                EntityLog.objects.create(
+                    time=datetime.now().time(),
+                    action='change',
+                    id_user=user,
+                    type='friendship',
+                    id_entity=entity_id
+                )
+                return Response({"message": "Запрос в друзья принят", "status": "accepted"}, status=200)
+            elif status == 'accepted':
+                return Response({"error": "Вы уже друзья"}, status=400)
+            else:
+                return Response({"error": "Запрос в друзья уже отправлен"}, status=400)
+        else:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO friendship (user1, user2, status) VALUES (%s, %s, 'sent')
+                    """,
+                    [user.id, friend.id]
+                )
+                from datetime import datetime
+                entity_id = min(user.id, friend.id) * 1000000 + max(user.id, friend.id)
+                EntityLog.objects.create(
+                    time=datetime.now().time(),
+                    action='add',
+                    id_user=user,
+                    type='friendship',
+                    id_entity=entity_id
+                )
+                return Response({"message": "Запрос в друзья отправлен", "status": "sent"}, status=201)
+            except Exception as e:
+                return Response({"error": f"Ошибка при создании дружбы: {str(e)}"}, status=500)
+
+@api_view(["GET"])
+def get_friend_requests(request):
+    """
+    GET /api/friends/requests/
+    Входящие заявки (status='sent'), где текущий пользователь — получатель (user2)
+    
+    Параметры:
+    - user_id: ID текущего пользователя
+    """
+    user_id = request.GET.get('user_id')
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1
+            FROM friendship
+            WHERE user2 = %s AND status = 'sent'
+            """,
+            [user_id]
+        )
+        rows = cursor.fetchall()
+
+    sender_ids = [r[0] for r in rows]
+    senders = User.objects.filter(id__in=sender_ids)
+
+    result = []
+    for sender in senders:
+        try:
+            profile = UserProfile.objects.get(user=sender)
+            nickname = profile.name
+        except UserProfile.DoesNotExist:
+            nickname = None
+        result.append({
+            "id": sender.id,
+            "email": sender.email,
+            "nickname": nickname
+        })
+    return Response(result, status=200)
+
+@api_view(["GET"])
+def get_sent_friend_requests(request):
+    """
+    GET /api/friends/requests/sent/
+    Отправленные заявки (status='sent'), где текущий пользователь — отправитель (user1)
+    
+    Параметры:
+    - user_id: ID текущего пользователя
+    """
+    user_id = request.GET.get('user_id')
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user2
+            FROM friendship
+            WHERE user1 = %s AND status = 'sent'
+            """,
+            [user_id]
+        )
+        rows = cursor.fetchall()
+
+    receiver_ids = [r[0] for r in rows]
+    receivers = User.objects.filter(id__in=receiver_ids)
+
+    result = []
+    for receiver in receivers:
+        try:
+            profile = UserProfile.objects.get(user=receiver)
+            nickname = profile.name
+        except UserProfile.DoesNotExist:
+            nickname = None
+        result.append({
+            "id": receiver.id,
+            "email": receiver.email,
+            "nickname": nickname
+        })
+    return Response(result, status=200)
+
+@api_view(["POST"])
+def respond_friend_request(request):
+    """
+    POST /api/friends/requests/respond/
+    Принять или отклонить входящую заявку
+
+    Тело запроса:
+    {
+      "user_id": <текущий пользователь-получатель>,
+      "from_user_id": <отправитель заявки>,
+      "action": "accept" | "decline"
+    }
+    """
+    user_id = request.data.get('user_id')
+    from_user_id = request.data.get('from_user_id')
+    action = (request.data.get('action') or '').lower()
+
+    if not user_id or not from_user_id or action not in ("accept", "decline"):
+        return Response({"error": "user_id, from_user_id и корректный action обязательны"}, status=400)
+
+    try:
+        user_id = int(user_id)
+        from_user_id = int(from_user_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+
+    if user_id == from_user_id:
+        return Response({"error": "Некорректные участники заявки"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT 1 FROM friendship
+            WHERE user1 = %s AND user2 = %s AND status = 'sent'
+            LIMIT 1
+            """,
+            [from_user_id, user_id]
+        )
+        exists = cursor.fetchone()
+        if not exists:
+            return Response({"error": "Заявка не найдена"}, status=404)
+
+        if action == 'accept':
+            cursor.execute(
+                """
+                UPDATE friendship
+                SET status = 'accepted'
+                WHERE user1 = %s AND user2 = %s
+                """,
+                [from_user_id, user_id]
+            )
+            from datetime import datetime
+            entity_id = min(from_user_id, user_id) * 1000000 + max(from_user_id, user_id)
+            try:
+                user_obj = User.objects.get(id=user_id)
+                EntityLog.objects.create(
+                    time=datetime.now().time(),
+                    action='change',
+                    id_user=user_obj,
+                    type='friendship',
+                    id_entity=entity_id
+                )
+            except User.DoesNotExist:
+                pass
+            return Response({"message": "Заявка принята", "status": "accepted"}, status=200)
+        else:
+            from datetime import datetime
+            entity_id = min(from_user_id, user_id) * 1000000 + max(from_user_id, user_id)
+            try:
+                user_obj = User.objects.get(id=user_id)
+                EntityLog.objects.create(
+                    time=datetime.now().time(),
+                    action='remove',
+                    id_user=user_obj,
+                    type='friendship',
+                    id_entity=entity_id
+                )
+            except User.DoesNotExist:
+                pass
+            
+            cursor.execute(
+                """
+                DELETE FROM friendship
+                WHERE user1 = %s AND user2 = %s
+                """,
+                [from_user_id, user_id]
+            )
+            return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
+
+@api_view(["DELETE"])
+def remove_friend(request):
+    """
+    DELETE /api/friends/remove/
+    Удалить друга (удалить friendship со status='accepted')
+    
+    Тело запроса:
+    {
+        "user_id": 1,  # ID текущего пользователя
+        "friend_id": 2  # ID друга, которого удаляем
+    }
+    """
+    user_id = request.data.get('user_id')
+    friend_id = request.data.get('friend_id')
+    
+    if not user_id or not friend_id:
+        return Response({"error": "ID пользователя и друга обязательны"}, status=400)
+    
+    try:
+        user_id = int(user_id)
+        friend_id = int(friend_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+    
+    if user_id == friend_id:
+        return Response({"error": "Нельзя удалить себя из друзей"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        friend = User.objects.get(id=friend_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    
+    # Удаляем дружбу через сырой SQL
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2, status
+            FROM friendship
+            WHERE ((user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)) AND status = 'accepted'
+            LIMIT 1
+            """,
+            [user_id, friend_id, friend_id, user_id]
+        )
+        row = cursor.fetchone()
+        
+        if not row:
+            return Response({"error": "Дружба не найдена или уже удалена"}, status=404)
+        
+        u1, u2, status = row
+
+        from datetime import datetime
+        entity_id = min(u1, u2) * 1000000 + max(u1, u2)
+        EntityLog.objects.create(
+            time=datetime.now().time(),
+            action='remove',
+            id_user=user,
+            type='friendship',
+            id_entity=entity_id
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM friendship
+            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
+            """,
+            [user_id, friend_id, friend_id, user_id]
+        )
+        
+        return Response({"message": "Друг успешно удален"}, status=200)
+
+@api_view(["POST"])
+def cancel_friend_request(request):
+    """
+    POST /api/friends/requests/cancel/
+    Отменить отправленную заявку (удалить friendship со status='sent', где user1 = текущий пользователь)
+    
+    Тело запроса:
+    {
+        "user_id": 1,  # ID текущего пользователя (отправитель)
+        "receiver_id": 2  # ID получателя заявки
+    }
+    """
+    user_id = request.data.get('user_id')
+    receiver_id = request.data.get('receiver_id')
+    
+    if not user_id or not receiver_id:
+        return Response({"error": "ID пользователя и получателя обязательны"}, status=400)
+    
+    try:
+        user_id = int(user_id)
+        receiver_id = int(receiver_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный формат ID"}, status=400)
+    
+    if user_id == receiver_id:
+        return Response({"error": "Некорректные параметры"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    
+    # Отменяем заявку через сырой SQL
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2, status
+            FROM friendship
+            WHERE user1 = %s AND user2 = %s AND status = 'sent'
+            LIMIT 1
+            """,
+            [user_id, receiver_id]
+        )
+        row = cursor.fetchone()
+        
+        if not row:
+            return Response({"error": "Заявка не найдена или уже обработана"}, status=404)
+        
+        u1, u2, status = row
+        
+        from datetime import datetime
+        entity_id = min(u1, u2) * 1000000 + max(u1, u2)
+        EntityLog.objects.create(
+            time=datetime.now().time(),
+            action='remove',
+            id_user=user,
+            type='friendship',
+            id_entity=entity_id
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM friendship
+            WHERE user1 = %s AND user2 = %s
+            """,
+            [user_id, receiver_id]
+        )
+        
+        return Response({"message": "Заявка отменена"}, status=200)
