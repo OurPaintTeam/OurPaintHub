@@ -19,4 +19,12 @@ urlpatterns = [
     path("project/delete/<int:project_id>/", views.delete_project, name="delete_project"),
     path("project/change/<int:project_id>/", views.change_project, name="change_project"),
     path("project/download/<int:project_id>/", views.download_project, name="download_project"),
+    path("users/", views.get_all_users, name="get_all_users"),
+    path("friends/", views.get_friends, name="get_friends"),
+    path("friends/add/", views.add_friend, name="add_friend"),
+    path("friends/remove/", views.remove_friend, name="remove_friend"),
+    path("friends/requests/", views.get_friend_requests, name="get_friend_requests"),
+    path("friends/requests/sent/", views.get_sent_friend_requests, name="get_sent_friend_requests"),
+    path("friends/requests/cancel/", views.cancel_friend_request, name="cancel_friend_request"),
+    path("friends/requests/respond/", views.respond_friend_request, name="respond_friend_request"),
 ]
