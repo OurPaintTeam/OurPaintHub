@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import "./AddNewsPage.scss";
+import "./ContentEditorPage.scss";
 
 interface UserData {
   id: number;
@@ -122,7 +122,7 @@ const EditNewsPage: React.FC = () => {
   if (loading) {
     return (
       <MainLayout isAuthenticated={!!user}>
-        <div className="add-news-container">
+        <div className="content-editor-container">
           <p>Загрузка...</p>
         </div>
       </MainLayout>
@@ -132,7 +132,7 @@ const EditNewsPage: React.FC = () => {
   if (!user || !news) {
     return (
       <MainLayout isAuthenticated={false}>
-        <div className="add-news-container">
+        <div className="content-editor-container">
           <p>Ошибка загрузки данных</p>
         </div>
       </MainLayout>
@@ -141,13 +141,13 @@ const EditNewsPage: React.FC = () => {
 
   return (
     <MainLayout isAuthenticated={!!user}>
-      <div className="add-news-container">
+      <div className="content-editor-container">
         <button onClick={() => navigate(-1)} className="back-btn">
           &larr; Назад
         </button>
         <h1>Редактировать новость</h1>
         
-        <div className="add-news-form">
+        <div className="content-editor-form">
           <div className="form-group">
             <label htmlFor="title">Заголовок новости</label>
             <input
