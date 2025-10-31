@@ -13,6 +13,7 @@ interface PublicProfileData {
   bio: string | null;
   date_of_birth: string | null;
   friends_count?: number;
+  avatar?: string | null;
 }
 
 interface FriendUser {
@@ -204,7 +205,11 @@ const PublicAccountPage: React.FC = () => {
 
           <div className="profile-info">
             <div className="profile-avatar">
-              <FontAwesomeIcon icon={faUserCircle} />
+              {profile.avatar ? (
+                <img src={profile.avatar} alt="Аватар пользователя" />
+              ) : (
+                <FontAwesomeIcon icon={faUserCircle} className="profile-avatar-icon" />
+              )}
             </div>
             <div className="profile-details">
               <h2>{profile.nickname || "Не установлено"}</h2>

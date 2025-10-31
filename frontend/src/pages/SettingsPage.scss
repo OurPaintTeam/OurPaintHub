@@ -37,6 +37,83 @@
 .form-group {
   margin-bottom: 20px;
 
+  &.avatar-group {
+    .avatar-preview {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: #f3f4f6;
+      border: 2px dashed #d1d5db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      margin-bottom: 12px;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .avatar-placeholder {
+        color: #9ca3af;
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 0 10px;
+      }
+    }
+
+    .avatar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+
+      .avatar-upload-btn,
+      .avatar-remove-btn {
+        border: none;
+        border-radius: 6px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+      }
+
+      .avatar-upload-btn {
+        background: #4a90e2;
+        color: #fff;
+
+        &:hover:not(:disabled) {
+          background: #377bd0;
+        }
+      }
+
+      .avatar-remove-btn {
+        background: #f87171;
+        color: #fff;
+
+        &:hover:not(:disabled) {
+          background: #ef4444;
+        }
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    .avatar-file-input {
+      display: none;
+    }
+
+    .avatar-error {
+      color: #dc2626;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+  }
+
   label {
     display: block;
     margin-bottom: 8px;

@@ -15,6 +15,7 @@ interface AccountData {
   friends_count?: number;
   projects_count?: number;
   received_count?: number;
+  avatar?: string | null;
 }
 
 const AccountPage: React.FC = () => {
@@ -53,7 +54,8 @@ const AccountPage: React.FC = () => {
           date_of_birth: profileData.date_of_birth,
           friends_count: profileData.friends_count,
           projects_count: profileData.projects_count,
-          received_count: profileData.received_count
+          received_count: profileData.received_count,
+          avatar: profileData.avatar
         } : null);
       }
 
@@ -91,7 +93,11 @@ const AccountPage: React.FC = () => {
 
           <div className="profile-info">
             <div className="profile-avatar">
-              <FontAwesomeIcon icon={faUserCircle} />
+              {account.avatar ? (
+                <img src={account.avatar} alt="Аватар пользователя" />
+              ) : (
+                <FontAwesomeIcon icon={faUserCircle} className="profile-avatar-icon" />
+              )}
             </div>
             <div className="profile-details">
               <h2>{account.nickname || "Не установлено"}</h2>
