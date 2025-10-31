@@ -10,7 +10,11 @@ interface QAItem {
   created_at?: string;
 }
 
-const QAPage: React.FC = () => {
+interface QAPageProps {
+  isAuthenticated?: boolean;
+}
+
+const QAPage: React.FC<QAPageProps> = ({ isAuthenticated = false }) => {
   const [qa, setQA] = useState<QAItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +32,7 @@ const QAPage: React.FC = () => {
   }, []);
 
   return (
-    <MainLayout isAuthenticated={true}>
+    <MainLayout isAuthenticated={isAuthenticated}>
       <div className="qa-container">
         <div className="qa-header">
           <h1>Вопросы и ответы</h1>

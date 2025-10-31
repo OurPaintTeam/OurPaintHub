@@ -11,7 +11,11 @@ interface DownloadItem {
   file_url?: string;
 }
 
-const DownloadPage: React.FC = () => {
+interface DownloadPageProps {
+  isAuthenticated?: boolean;
+}
+
+const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) => {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +33,7 @@ const DownloadPage: React.FC = () => {
   }, []);
 
   return (
-    <MainLayout isAuthenticated={true}>
+    <MainLayout isAuthenticated={isAuthenticated}>
       <div className="download-container">
         <div className="download-header">
           <h1>Версии для скачивания</h1>
