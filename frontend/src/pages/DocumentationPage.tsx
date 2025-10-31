@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
+import MarkdownText from "../components/MarkdownText";
+import { DOCUMENTATION_CATEGORIES, DocumentationCategory } from "../constants/documentation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDotCircle,
   faCircle,
-  faDrawPolygon,
   faKeyboard,
   faNetworkWired,
   faSave,
   faTerminal,
   faShapes
 } from "@fortawesome/free-solid-svg-icons";
+import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import "./DocumentationPage.scss";
 
 interface DocumentationPageProps {
@@ -24,19 +27,29 @@ interface DocItem {
   category: string;
 }
 
+const CATEGORY_ICONS: Record<DocumentationCategory, IconDefinition> = {
+  "Примитивы": faDotCircle,
+  "Требования": faShapes,
+  "Горячие клавиши": faKeyboard,
+  "Работа по сети": faNetworkWired,
+  "Сохранение": faSave,
+  "Консольные команды": faTerminal,
+};
+
 const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated = false }) => {
+  const navigate = useNavigate();
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>("Примитивы");
+  const [activeCategory, setActiveCategory] = useState<string>(DOCUMENTATION_CATEGORIES[0] ?? "");
 
-const categories: { name: string; icon: any }[] = [
-  { name: "Примитивы", icon: faDotCircle },
-  { name: "Требования", icon: faShapes },
-  { name: "Горячие клавиши", icon: faKeyboard },
-  { name: "Работа по сети", icon: faNetworkWired },
-  { name: "Сохранение", icon: faSave },
-  { name: "Консольные команды", icon: faTerminal },
-];
+  const categories = useMemo(
+    () =>
+      DOCUMENTATION_CATEGORIES.map((name) => ({
+        name,
+        icon: CATEGORY_ICONS[name as DocumentationCategory] ?? faCircle,
+      })),
+    []
+  );
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/documentation/")
@@ -52,6 +65,9 @@ const categories: { name: string; icon: any }[] = [
   }, []);
 
   const filteredDocs = docs.filter(doc => doc.category === activeCategory);
+  const handleAddDocs = () => {
+    navigate('/docs/add', { state: { defaultCategory: activeCategory } });
+  };
 
   return (
     <MainLayout isAuthenticated={isAuthenticated}>
@@ -69,6 +85,11 @@ const categories: { name: string; icon: any }[] = [
                 <span>{cat.name}</span>
               </button>
             ))}
+            {isAuthenticated && (
+              <button onClick={handleAddDocs} className="add-docs-btn">
+                + Добавить документацию
+              </button>
+            )}
           </nav>
 
           <div className="doc-content">
@@ -80,7 +101,7 @@ const categories: { name: string; icon: any }[] = [
               filteredDocs.map(doc => (
                 <div key={doc.id} className="doc-section">
                   <h2>{doc.title}</h2>
-                  <p>{doc.content}</p>
+                  <MarkdownText text={doc.content} />
                 </div>
               ))
             )}
