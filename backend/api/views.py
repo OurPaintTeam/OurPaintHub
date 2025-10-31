@@ -1,10 +1,10 @@
-from django.http import HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Q
 from django.db import connection
 from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta, Friendship
 from decimal import Decimal
+import re
 
 @api_view(["POST"])
 def register_user(request):
@@ -207,9 +207,116 @@ def create_news(request):
 
 @api_view(["GET"])
 def documentation_view(request):
-    return Response([
-        {"id": 1, "title": "Документация будет добавлена позже", "content": "Пока раздел находится в разработке."}
-    ])
+    try:
+        docs = Documentation.objects.filter(type='reference').order_by('-id')
+        documentation_data = []
+
+        for item in docs:
+            raw_text = item.text or ""
+
+            category_match = re.search(r'<!--\s*CATEGORY:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            category = category_match.group(1).strip() if category_match else "Примитивы"
+
+            created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            updated_match = re.search(r'<!--\s*UPDATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            created_at = created_match.group(1).strip() if created_match else None
+            updated_at = updated_match.group(1).strip() if updated_match else None
+
+            clean_text = re.sub(r'<!--\s*(CATEGORY|CREATED|UPDATED):.*?-->', '', raw_text, flags=re.IGNORECASE).strip()
+            text_lines = clean_text.split('\n') if clean_text else []
+
+            if text_lines and text_lines[0].startswith('# '):
+                title = text_lines[0][2:].strip()
+                content = '\n'.join(text_lines[1:]).strip()
+            else:
+                title = clean_text[:50] + "..." if clean_text and len(clean_text) > 50 else clean_text
+                content = clean_text
+
+            documentation_data.append({
+                "id": item.id,
+                "title": title or "Без названия",
+                "content": content or "",
+                "category": category,
+                "author_id": item.admin.id,
+                "author_email": item.admin.email,
+                "created_at": created_at,
+                "updated_at": updated_at,
+            })
+
+        if not documentation_data:
+            documentation_data = [{
+                "id": 1,
+                "title": "Документация будет добавлена позже",
+                "content": "Пока раздел находится в разработке.",
+                "category": "Примитивы",
+            }]
+
+        return Response(documentation_data)
+    except Exception as e:
+        return Response({"error": f"Ошибка при загрузке документации: {str(e)}"}, status=500)
+
+
+@api_view(["POST"])
+def create_documentation(request):
+    user_id = request.data.get('user_id')
+    title = request.data.get('title')
+    content = request.data.get('content')
+    category = request.data.get('category')
+
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    if not title or not content:
+        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
+
+    if not category or not isinstance(category, str):
+        return Response({"error": "Категория обязательна"}, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+
+        try:
+            Role.objects.get(user=user, role='admin')
+        except Role.DoesNotExist:
+            return Response({"error": "Недостаточно прав. Только администраторы могут создавать документацию."}, status=403)
+
+        from datetime import datetime
+        now = datetime.now()
+        full_content = (
+            f"# {title}\n\n" \
+            f"{content}\n\n" \
+            f"<!-- CATEGORY: {category} -->\n" \
+            f"<!-- CREATED: {now.isoformat()} -->"
+        )
+
+        documentation = Documentation.objects.create(
+            type='reference',
+            admin=user,
+            text=full_content.strip()
+        )
+
+        from datetime import datetime as dt
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='add',
+            id_user=user,
+            type='documentation',
+            id_entity=documentation.id
+        )
+
+        return Response({
+            "message": "Документация успешно создана",
+            "id": documentation.id,
+            "title": title,
+            "content": content,
+            "category": category,
+            "author_id": documentation.admin.id,
+        }, status=201)
+
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при создании документации: {str(e)}"}, status=500)
 
 @api_view(["GET"])
 def download_view(request):
@@ -267,13 +374,16 @@ def update_user_profile(request):
         "user_id": 1,
         "nickname": "новый_nickname",
         "bio": "описание",
-        "date_of_birth": "1990-01-01"
+        "date_of_birth": "1990-01-01",
+        "avatar": "data:image/png;base64,..."
     }
     """
     user_id = request.data.get('user_id')
     nickname = request.data.get('nickname')
     bio = request.data.get('bio')
     date_of_birth = request.data.get('date_of_birth')
+    avatar_provided = 'avatar' in request.data
+    avatar = request.data.get('avatar') if avatar_provided else None
     
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
@@ -282,6 +392,24 @@ def update_user_profile(request):
         user = User.objects.get(id=user_id)
         profile, created = UserProfile.objects.get_or_create(user=user)
         
+        avatar_changed = False
+        if avatar_provided:
+            new_avatar = None
+            if isinstance(avatar, str):
+                trimmed_avatar = avatar.strip()
+                if trimmed_avatar:
+                    if not trimmed_avatar.startswith('data:image'):
+                        return Response({"error": "Аватар должен быть изображением в формате base64"}, status=400)
+                    if len(trimmed_avatar) > 7 * 1024 * 1024:
+                        return Response({"error": "Размер аватара слишком большой"}, status=400)
+                    new_avatar = trimmed_avatar
+            elif avatar is not None:
+                return Response({"error": "Некорректный формат аватара"}, status=400)
+
+            if profile.avatar != new_avatar:
+                profile.avatar = new_avatar
+                avatar_changed = True
+
         if nickname:
             profile.name = nickname
         if bio is not None:
@@ -291,11 +419,20 @@ def update_user_profile(request):
             
         profile.save()
         
+        if avatar_changed:
+            EntityLog.objects.create(
+                action='change',
+                id_user=user,
+                type='user_profile',
+                id_entity=user.id
+            )
+        
         return Response({
             "message": "Профиль успешно обновлен",
             "nickname": profile.name,
             "bio": profile.bio,
-            "date_of_birth": profile.date_of_birth
+            "date_of_birth": profile.date_of_birth,
+            "avatar": profile.avatar
         }, status=200)
         
     except User.DoesNotExist:

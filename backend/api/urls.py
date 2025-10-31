@@ -9,6 +9,7 @@ urlpatterns = [
     path("news/<int:news_id>/", views.update_news, name="update_news"),
     path("news/<int:news_id>/delete/", views.delete_news, name="delete_news"),
     path("documentation/", views.documentation_view, name="documentation"),
+    path("documentation/create/", views.create_documentation, name="create_documentation"),
     path("download/", views.download_view, name="download"),
     path("profile/", views.get_user_profile, name="get_user_profile"),
     path("profile/update/", views.update_user_profile, name="update_user_profile"),
