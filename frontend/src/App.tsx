@@ -50,14 +50,15 @@ function App() {
   }
 
   return (
+      <ToastProvider>
     <Router>
       <Routes>
         <Route path="/" element={<Navigate to="/news" />} />
         <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
-        <Route path="/news/:id" element={<NewsDetailPage />} />
-        <Route path="/docs" element={<DocumentationPage />} />
-        <Route path="/download" element={<DownloadPage />} />
-        <Route path="/QA" element={<QAPage />} />
+        <Route path="/news/:id" element={<NewsDetailPage  isAuthenticated={isAuthenticated}/>} />
+        <Route path="/docs" element={<DocumentationPage  isAuthenticated={isAuthenticated}/>} />
+        <Route path="/download" element={<DownloadPage  isAuthenticated={isAuthenticated}/>} />
+        <Route path="/QA" element={<QAPage  isAuthenticated={isAuthenticated}/>} />
         <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
         <Route path="/account/id/:id" element={<PublicAccountPage />} />
         <Route path="/settings" element={isAuthenticated ? <SettingsPage /> : <Navigate to="/login" />} />
@@ -70,6 +71,7 @@ function App() {
         <Route path="/friends" element={isAuthenticated ? <FriendsPage /> : <Navigate to="/login" />} />
       </Routes>
     </Router>
+    </ToastProvider>
   );
 }
 
