@@ -2,9 +2,11 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Q
 from django.db import connection
+from django.http import FileResponse
 from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta, Friendship
 from decimal import Decimal
 import re
+import os
 
 @api_view(["POST"])
 def register_user(request):
@@ -318,11 +320,410 @@ def create_documentation(request):
     except Exception as e:
         return Response({"error": f"Ошибка при создании документации: {str(e)}"}, status=500)
 
+
+@api_view(["PUT"])
+def update_documentation(request, doc_id):
+    """
+    PUT /api/documentation/{id}/
+    Обновить документацию (только для админов)
+    {
+        "user_id": 1,
+        "title": "Новый заголовок",
+        "content": "Новое содержание",
+        "category": "Примитивы"
+    }
+    """
+    user_id = request.data.get('user_id')
+    title = request.data.get('title')
+    content = request.data.get('content')
+    category = request.data.get('category')
+    
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    
+    if not title or not content:
+        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
+    
+    if not category or not isinstance(category, str):
+        return Response({"error": "Категория обязательна"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        try:
+            Role.objects.get(user=user, role='admin')
+        except Role.DoesNotExist:
+            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать документацию."}, status=403)
+        
+        try:
+            doc = Documentation.objects.get(id=doc_id, type='reference')
+        except Documentation.DoesNotExist:
+            return Response({"error": "Документация не найдена"}, status=404)
+        
+        from datetime import datetime
+        now = datetime.now()
+        
+        # Извлекаем дату создания из существующего контента
+        created_date = None
+        if doc.text and '<!-- CREATED:' in doc.text:
+            try:
+                created_start = doc.text.find('<!-- CREATED:') + 13
+                created_end = doc.text.find(' -->', created_start)
+                created_date = doc.text[created_start:created_end]
+            except:
+                pass
+        
+        # Обновляем контент с сохранением даты создания
+        if created_date:
+            full_content = (
+                f"# {title}\n\n" \
+                f"{content}\n\n" \
+                f"<!-- CATEGORY: {category} -->\n" \
+                f"<!-- CREATED: {created_date} -->\n" \
+                f"<!-- UPDATED: {now.isoformat()} -->"
+            )
+        else:
+            full_content = (
+                f"# {title}\n\n" \
+                f"{content}\n\n" \
+                f"<!-- CATEGORY: {category} -->\n" \
+                f"<!-- CREATED: {now.isoformat()} -->\n" \
+                f"<!-- UPDATED: {now.isoformat()} -->"
+            )
+        
+        doc.text = full_content.strip()
+        doc.save()
+        
+        EntityLog.objects.create(
+            action='change',
+            id_user=user,
+            type='documentation',
+            id_entity=doc.id
+        )
+        
+        return Response({
+            "message": "Документация успешно обновлена",
+            "id": doc.id,
+            "title": title,
+            "content": content,
+            "category": category,
+            "author_id": doc.admin.id,
+        }, status=200)
+        
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при обновлении документации: {str(e)}"}, status=500)
+
+
+@api_view(["DELETE"])
+def delete_documentation(request, doc_id):
+    """
+    DELETE /api/documentation/{id}/delete/
+    Удалить документацию (только для админов)
+    """
+    user_id = request.data.get('user_id')
+    
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        try:
+            Role.objects.get(user=user, role='admin')
+        except Role.DoesNotExist:
+            return Response({"error": "Недостаточно прав. Только администраторы могут удалять документацию."}, status=403)
+        
+        try:
+            doc = Documentation.objects.get(id=doc_id, type='reference')
+        except Documentation.DoesNotExist:
+            return Response({"error": "Документация не найдена"}, status=404)
+        
+        doc.delete()
+        
+        EntityLog.objects.create(
+            action='remove',
+            id_user=user,
+            type='documentation',
+            id_entity=doc_id
+        )
+        
+        return Response({
+            "message": "Документация успешно удалена"
+        }, status=200)
+        
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при удалении документации: {str(e)}"}, status=500)
+
 @api_view(["GET"])
 def download_view(request):
-    return Response([
-        {"id": 1, "title": "Скачивание будет добавлено позже", "content": "Пока раздел находится в разработке."}
-    ])
+    """
+    GET /api/download/
+    Получить список доступных версий приложения
+    """
+    try:
+        # Используем Documentation с типом 'api' для версий приложения
+        versions = Documentation.objects.filter(type='api').order_by('-id')
+        versions_data = []
+        
+        for version in versions:
+            raw_text = version.text or ""
+            
+            # Парсим структурированные данные из текста
+            version_match = re.search(r'<!--\s*VERSION:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            version_num = version_match.group(1).strip() if version_match else "1.0.0"
+            
+            file_path_match = re.search(r'<!--\s*FILE_PATH:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            file_path = file_path_match.group(1).strip() if file_path_match else None
+            
+            file_size_match = re.search(r'<!--\s*FILE_SIZE:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            file_size = file_size_match.group(1).strip() if file_size_match else None
+            
+            platform_match = re.search(r'<!--\s*PLATFORM:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            platform = platform_match.group(1).strip() if platform_match else "Все платформы"
+            
+            created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
+            created_at = created_match.group(1).strip() if created_match else None
+            
+            # Очищаем текст от комментариев
+            clean_text = re.sub(r'<!--\s*(VERSION|FILE_PATH|FILE_SIZE|PLATFORM|CREATED):.*?-->', '', raw_text, flags=re.IGNORECASE).strip()
+            text_lines = clean_text.split('\n') if clean_text else []
+            
+            if text_lines and text_lines[0].startswith('# '):
+                title = text_lines[0][2:].strip()
+                content = '\n'.join(text_lines[1:]).strip()
+            else:
+                title = f"OurPaint CAD v{version_num}"
+                content = clean_text or f"Версия {version_num} приложения OurPaint CAD"
+            
+            versions_data.append({
+                "id": version.id,
+                "title": title,
+                "content": content,
+                "version": version_num,
+                "platform": platform,
+                "file_path": file_path,
+                "file_size": file_size,
+                "release_date": created_at,
+                "author_id": version.admin.id,
+                "author_email": version.admin.email,
+            })
+        
+        if not versions_data:
+            versions_data = [{
+                "id": 1,
+                "title": "Версии будут добавлены позже",
+                "content": "Пока раздел находится в разработке.",
+                "version": "1.0.0",
+                "platform": "Все платформы",
+            }]
+        
+        return Response(versions_data)
+    except Exception as e:
+        return Response({"error": f"Ошибка при загрузке версий: {str(e)}"}, status=500)
+
+
+@api_view(["GET"])
+def download_file(request, version_id):
+    """
+    GET /api/download/{version_id}/
+    Скачать файл версии приложения
+    """
+    try:
+        version = Documentation.objects.get(id=version_id, type='api')
+        
+        # Извлекаем путь к файлу из комментариев
+        file_path = None
+        if version.text and '<!-- FILE_PATH:' in version.text:
+            try:
+                path_start = version.text.find('<!-- FILE_PATH:') + 15
+                path_end = version.text.find(' -->', path_start)
+                file_path = version.text[path_start:path_end].strip()
+            except:
+                pass
+        
+        if not file_path:
+            return Response({"error": "Файл версии не найден"}, status=404)
+        
+        if not os.path.exists(file_path):
+            return Response({"error": "Файл не существует на сервере"}, status=404)
+        
+        # Получаем имя файла для заголовка Content-Disposition
+        filename = os.path.basename(file_path)
+        
+        # Используем FileResponse с автоматическим закрытием файла
+        file_handle = open(file_path, 'rb')
+        response = FileResponse(file_handle, content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Логируем скачивание
+        try:
+            user_id = request.GET.get('user_id')
+            if user_id:
+                user = User.objects.get(id=int(user_id))
+                EntityLog.objects.create(
+                    action='add',
+                    id_user=user,
+                    type='documentation',
+                    id_entity=version.id
+                )
+        except:
+            pass
+        
+        return response
+        
+    except Documentation.DoesNotExist:
+        return Response({"error": "Версия не найдена"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при скачивании файла: {str(e)}"}, status=500)
+
+
+@api_view(["POST"])
+def create_version(request):
+    """
+    POST /api/download/create/
+    Создать новую версию приложения (только для админов)
+    """
+    user_id = request.data.get('user_id')
+    title = request.data.get('title')
+    content = request.data.get('content')
+    version = request.data.get('version')
+    platform = request.data.get('platform')
+    file_path = request.data.get('file_path')
+    file_size = request.data.get('file_size')
+    
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    
+    if not title or not content:
+        return Response({"error": "Заголовок и описание обязательны"}, status=400)
+    
+    if not version:
+        return Response({"error": "Версия обязательна"}, status=400)
+    
+    if not file_path:
+        return Response({"error": "Путь к файлу обязателен"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        try:
+            Role.objects.get(user=user, role='admin')
+        except Role.DoesNotExist:
+            return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."}, status=403)
+        
+        # Проверяем существование файла
+        if not os.path.exists(file_path):
+            return Response({"error": "Файл не существует по указанному пути"}, status=400)
+        
+        # Вычисляем размер файла, если не указан
+        if not file_size:
+            file_size = str(os.path.getsize(file_path))
+        
+        from datetime import datetime
+        now = datetime.now()
+        
+        full_content = (
+            f"# {title}\n\n"
+            f"{content}\n\n"
+            f"<!-- VERSION: {version} -->\n"
+            f"<!-- FILE_PATH: {file_path} -->\n"
+            f"<!-- FILE_SIZE: {file_size} -->\n"
+            f"<!-- PLATFORM: {platform or 'Все платформы'} -->\n"
+            f"<!-- CREATED: {now.isoformat()} -->"
+        )
+        
+        version_doc = Documentation.objects.create(
+            type='api',
+            admin=user,
+            text=full_content.strip()
+        )
+        
+        from datetime import datetime as dt
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='add',
+            id_user=user,
+            type='documentation',
+            id_entity=version_doc.id
+        )
+        
+        return Response({
+            "message": "Версия приложения успешно создана",
+            "id": version_doc.id,
+            "title": title,
+            "version": version,
+            "platform": platform,
+        }, status=201)
+        
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при создании версии: {str(e)}"}, status=500)
+
+
+@api_view(["DELETE"])
+def delete_version(request, version_id):
+    """
+    DELETE /api/download/{version_id}/delete/
+    Удалить версию приложения (только для админов)
+    """
+    user_id = request.data.get('user_id')
+    
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        try:
+            Role.objects.get(user=user, role='admin')
+        except Role.DoesNotExist:
+            return Response({"error": "Недостаточно прав. Только администраторы могут удалять версии приложения."}, status=403)
+        
+        try:
+            version = Documentation.objects.get(id=version_id, type='api')
+        except Documentation.DoesNotExist:
+            return Response({"error": "Версия не найдена"}, status=404)
+        
+        # Извлекаем путь к файлу и удаляем его (опционально)
+        file_path = None
+        if version.text and '<!-- FILE_PATH:' in version.text:
+            try:
+                path_start = version.text.find('<!-- FILE_PATH:') + 15
+                path_end = version.text.find(' -->', path_start)
+                file_path = version.text[path_start:path_end].strip()
+            except:
+                pass
+        
+        # Удаляем запись из БД
+        version.delete()
+        
+        # Опционально: удаляем физический файл (раскомментируйте если нужно)
+        # if file_path and os.path.exists(file_path):
+        #     try:
+        #         os.remove(file_path)
+        #     except:
+        #         pass
+        
+        EntityLog.objects.create(
+            action='remove',
+            id_user=user,
+            type='documentation',
+            id_entity=version_id
+        )
+        
+        return Response({
+            "message": "Версия приложения успешно удалена"
+        }, status=200)
+        
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": f"Ошибка при удалении версии: {str(e)}"}, status=500)
 
 @api_view(["GET"])
 def get_user_profile(request):
