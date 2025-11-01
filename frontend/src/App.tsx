@@ -13,6 +13,9 @@ import PublicAccountPage from "./pages/PublicAccountPage";
 import ContentEditorPage from "./pages/ContentEditorPage";
 import EditNewsPage from "./pages/EditNewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
+import DocumentationDetailPage from "./pages/DocumentationDetailPage";
+import EditDocumentationPage from "./pages/EditDocumentationPage";
+import AddVersionPage from "./pages/AddVersionPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
@@ -57,6 +60,7 @@ function App() {
         <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
         <Route path="/news/:id" element={<NewsDetailPage  isAuthenticated={isAuthenticated}/>} />
         <Route path="/docs" element={<DocumentationPage  isAuthenticated={isAuthenticated}/>} />
+        <Route path="/docs/:id" element={<DocumentationDetailPage />} />
         <Route path="/download" element={<DownloadPage  isAuthenticated={isAuthenticated}/>} />
         <Route path="/QA" element={<QAPage  isAuthenticated={isAuthenticated}/>} />
         <Route path="/account" element={isAuthenticated ? <AccountPage /> : <Navigate to="/login" />} />
@@ -65,7 +69,8 @@ function App() {
         <Route path="/news/add" element={isAuthenticated ? <ContentEditorPage /> : <Navigate to="/login" />} />
         <Route path="/docs/add" element={isAuthenticated ? <ContentEditorPage /> : <Navigate to="/login" />} />
         <Route path="/news/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
-        <Route path="/docs/edit/:id" element={isAuthenticated ? <EditNewsPage /> : <Navigate to="/login" />} />
+        <Route path="/docs/edit/:id" element={isAuthenticated ? <EditDocumentationPage /> : <Navigate to="/login" />} />
+        <Route path="/download/add" element={isAuthenticated ? <AddVersionPage /> : <Navigate to="/login" />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/account" /> : <LoginPage />} />
         <Route path="/registration" element={isAuthenticated ? <Navigate to="/account" /> : <RegistrationPage />} />
         <Route path="/projects" element={isAuthenticated ? <ProjectsPage /> : <Navigate to="/login" />} />
