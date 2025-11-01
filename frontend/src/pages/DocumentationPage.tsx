@@ -25,6 +25,16 @@ interface DocItem {
   title: string;
   content: string;
   category: string;
+  author_id?: number;
+  author_email?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface UserData {
+  id: number;
+  email: string;
+  nickname?: string;
 }
 
 const CATEGORY_ICONS: Record<DocumentationCategory, IconDefinition> = {
@@ -41,6 +51,8 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>(DOCUMENTATION_CATEGORIES[0] ?? "");
+  const [user, setUser] = useState<UserData | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const categories = useMemo(
     () =>
@@ -52,6 +64,19 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
   );
 
   useEffect(() => {
+    // Загружаем данные пользователя
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUser(user);
+        checkAdminRole(user.id);
+      } catch (error) {
+        console.error("Ошибка при парсинге данных пользователя:", error);
+      }
+    }
+
+    // Загружаем документацию
     fetch("http://127.0.0.1:8000/api/documentation/")
       .then(res => res.json())
       .then(data => {
@@ -64,9 +89,58 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
       });
   }, []);
 
+  const checkAdminRole = async (userId: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      if (response.ok) {
+        const roleData = await response.json();
+        setIsAdmin(roleData.is_admin);
+      }
+    } catch (error) {
+      console.error("Ошибка при проверке роли:", error);
+    }
+  };
+
   const filteredDocs = docs.filter(doc => doc.category === activeCategory);
   const handleAddDocs = () => {
     navigate('/docs/add', { state: { defaultCategory: activeCategory } });
+  };
+
+  const handleEditDoc = (docId: number) => {
+    navigate(`/docs/edit/${docId}`);
+  };
+
+  const handleDeleteDoc = async (docId: number) => {
+    if (!user) return;
+    
+    const confirmed = window.confirm('Вы уверены, что хотите удалить эту документацию?');
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/documentation/${docId}/delete/`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
+        return;
+      }
+
+      alert("Документация успешно удалена!");
+      // Перезагружаем список документации
+      window.location.reload();
+      
+    } catch (error) {
+      alert("Ошибка сети: " + error);
+    }
+  };
+
+  const handleDocClick = (docId: number) => {
+    navigate(`/docs/${docId}`);
   };
 
   return (
@@ -100,8 +174,70 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
             ) : (
               filteredDocs.map(doc => (
                 <div key={doc.id} className="doc-section">
-                  <h2>{doc.title}</h2>
-                  <MarkdownText text={doc.content} />
+                  <div className="doc-header-item">
+                    <h2 
+                      className="doc-title"
+                      onClick={() => handleDocClick(doc.id)}
+                      title="Нажмите для просмотра полной документации"
+                    >
+                      {doc.title}
+                    </h2>
+                    {isAuthenticated && isAdmin && (
+                      <div className="doc-actions">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditDoc(doc.id);
+                          }} 
+                          className="edit-btn"
+                          title="Редактировать документацию"
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDoc(doc.id);
+                          }} 
+                          className="delete-btn"
+                          title="Удалить документацию"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div 
+                    className="doc-preview"
+                    onClick={() => handleDocClick(doc.id)}
+                    title="Нажмите для просмотра полной документации"
+                  >
+                    <MarkdownText text={doc.content} preview={true} maxLength={150} />
+                  </div>
+                  {doc.author_email && (
+                    <div className="doc-meta">
+                      <small>Автор: {doc.author_email}</small>
+                      {doc.created_at && (
+                        <small> • {(() => {
+                          try {
+                            const date = new Date(doc.created_at);
+                            if (isNaN(date.getTime())) {
+                              return 'Дата недоступна';
+                            }
+                            return date.toLocaleString('ru-RU', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                          } catch (error) {
+                            return 'Дата недоступна';
+                          }
+                        })()}</small>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
