@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPalette, faBell } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faBell, faBars, faTimes } from "@fortawesome/free-solid-svg-icons";
 import IconMenuButton from "../IconMenuButton/IconMenuButton";
 import "./NavigationBox.scss";
 
@@ -14,6 +14,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
   const navigate = useNavigate();
   const location = useLocation();
   const [requestsCount, setRequestsCount] = useState<number>(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -29,6 +30,11 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
       // ignore
     }
   }, [isAuthenticated, location.pathname]);
+
+  // Закрываем мобильное меню при изменении маршрута
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -52,6 +58,11 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
         { label: "Регистрация", path: "/registration" },
       ];
 
+  const handleNavClick = (path: string) => {
+    navigate(path);
+    setMobileMenuOpen(false);
+  };
+
   return (
     <nav className="navbar">
       <div className="nav-container">
@@ -60,43 +71,48 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
           <span>OurPaintHUB</span>
         </div>
 
-        <div className="nav-menu">
-          {menuItems.map((item) => (
-            <button
-              key={item.path}
-              className={`nav-link ${location.pathname === item.path ? "active" : ""}`}
-              onClick={() => navigate(item.path)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <button 
+          className="mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          <FontAwesomeIcon icon={mobileMenuOpen ? faTimes : faBars} />
+        </button>
 
-        {isAuthenticated && (
-          <div className="nav-user">
+        <div className={`nav-menu-wrapper ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          <div className="nav-menu">
+            {menuItems.map((item) => (
+              <button
+                key={item.path}
+                className={`nav-link ${location.pathname === item.path ? "active" : ""}`}
+                onClick={() => handleNavClick(item.path)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {isAuthenticated && (
+            <div className="nav-user">
             <button
               className="nav-link"
-              onClick={() => navigate('/friends')}
+              onClick={() => {
+                handleNavClick('/friends');
+              }}
               title={requestsCount > 0 ? `Заявки: ${requestsCount}` : 'Заявок нет'}
             >
               <FontAwesomeIcon icon={faBell} />
               {requestsCount > 0 && (
-                <span style={{
-                  marginLeft: '6px',
-                  background: '#ef4444',
-                  borderRadius: '999px',
-                  padding: '0 8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700
-                }}>{requestsCount}</span>
+                <span className="notification-badge">{requestsCount}</span>
               )}
             </button>
             <IconMenuButton isAuthenticated={true} userName={userName} />
             <button className="btn-logout" onClick={handleLogout}>
-              <i className="fas fa-sign-out-alt"></i> Выход
+              <i className="fas fa-sign-out-alt"></i> <span className="logout-text">Выход</span>
             </button>
           </div>
-        )}
+          )}
+        </div>
       </div>
     </nav>
   );
