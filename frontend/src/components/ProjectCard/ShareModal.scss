@@ -1,0 +1,166 @@
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow-x: hidden; // предотвращаем горизонтальный скролл
+  animation: fadeIn 0.2s ease-in-out;
+
+  .share-modal {
+    background: #fff;
+    padding: 20px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 380px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.25s ease-in-out;
+    box-sizing: border-box; // чтобы padding не увеличивал ширину
+
+    .share-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        word-break: break-word; // перенос длинного текста
+      }
+
+      .btn-close {
+        background: transparent;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: #ff4c4c;
+        }
+      }
+    }
+
+    .share-modal-body {
+      .friends-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+
+        .friend-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee;
+          flex-wrap: wrap; // чтобы кнопка переносилась при узком экране
+
+          .friend-name {
+            font-weight: 500;
+            color: #333;
+            word-break: break-word; // перенос длинного текста
+            flex: 1 1 auto;
+            margin-right: 8px;
+          }
+
+          .btn-send {
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            flex-shrink: 0;
+
+            &:hover {
+              background-color: #43a047;
+              transform: scale(1.05);
+            }
+
+            &.selected {
+              background-color: #2196f3;
+            }
+
+            &:disabled {
+              background-color: #9e9e9e;
+              cursor: default;
+            }
+          }
+        }
+      }
+
+      textarea.comment-input {
+        width: 100%;
+        min-height: 60px;
+        margin-top: 12px;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 14px;
+        resize: vertical;
+        box-sizing: border-box; // учитываем padding
+      }
+
+      .btn-submit {
+        display: block;
+        width: 100%;
+        margin-top: 12px;
+        padding: 10px;
+        background-color: #1976d2;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+          background-color: #1565c0;
+        }
+
+        &:disabled {
+          background-color: #9e9e9e;
+          cursor: default;
+        }
+      }
+
+      p {
+        text-align: center;
+        color: #888;
+      }
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
