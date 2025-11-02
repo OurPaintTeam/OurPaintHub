@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import "./AddNewsPage.scss";
+import { DOCUMENTATION_CATEGORIES } from "../constants/documentation";
+import "./ContentEditorPage.scss";
 
 interface UserData {
   id: number;
@@ -9,15 +10,27 @@ interface UserData {
   nickname?: string;
 }
 
-const AddNewsPage: React.FC = () => {
+interface DocData {
+  id: number;
+  title: string;
+  content: string;
+  category: string;
+  author_id: number;
+  author_email: string;
+}
+
+const EditDocumentationPage: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const [user, setUser] = useState<UserData | null>(null);
+  const [doc, setDoc] = useState<DocData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [category, setCategory] = useState<string>(DOCUMENTATION_CATEGORIES[0] ?? "");
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -25,6 +38,9 @@ const AddNewsPage: React.FC = () => {
       try {
         const user = JSON.parse(userData);
         setUser(user);
+        if (id) {
+          loadDocumentation(parseInt(id));
+        }
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);
         navigate('/login');
@@ -32,14 +48,44 @@ const AddNewsPage: React.FC = () => {
     } else {
       navigate('/login');
     }
-    setLoading(false);
-  }, [navigate]);
+  }, [navigate, id]);
+
+  const loadDocumentation = async (docId: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/documentation/`);
+      if (response.ok) {
+        const docData = await response.json();
+        const docItem = docData.find((item: DocData) => item.id === docId);
+        
+        if (docItem) {
+          setDoc(docItem);
+          setTitle(docItem.title);
+          setContent(docItem.content);
+          setCategory(docItem.category || DOCUMENTATION_CATEGORIES[0]);
+        } else {
+          setMessage("Документация не найдена");
+        }
+      } else {
+        setMessage("Ошибка при загрузке документации");
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке документации:", error);
+      setMessage("Ошибка сети при загрузке документации");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !id) return;
     
     if (!title.trim() || !content.trim()) {
       setMessage("Заголовок и содержание обязательны");
+      return;
+    }
+
+    if (!category) {
+      setMessage("Категория обязательна");
       return;
     }
     
@@ -47,13 +93,14 @@ const AddNewsPage: React.FC = () => {
     setMessage("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/news/create/", {
-        method: "POST",
+      const response = await fetch(`http://localhost:8000/api/documentation/${id}/`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           user_id: user.id, 
           title: title.trim(),
-          content: content.trim()
+          content: content.trim(),
+          category: category
         }),
       });
 
@@ -64,14 +111,9 @@ const AddNewsPage: React.FC = () => {
         return;
       }
 
-      setMessage("Новость успешно создана!");
+      setMessage("Документация успешно обновлена!");
       
-      // Очищаем форму
-      setTitle("");
-      setContent("");
-      
-      // Переходим на страницу новостей через 2 секунды
-      setTimeout(() => navigate("/news"), 2000);
+      setTimeout(() => navigate("/docs"), 2000);
       
     } catch (error) {
       setMessage("Ошибка сети: " + error);
@@ -81,24 +123,24 @@ const AddNewsPage: React.FC = () => {
   };
 
   const handleCancel = () => {
-    navigate('/news');
+    navigate('/docs');
   };
 
   if (loading) {
     return (
       <MainLayout isAuthenticated={!!user}>
-        <div className="add-news-container">
+        <div className="content-editor-container">
           <p>Загрузка...</p>
         </div>
       </MainLayout>
     );
   }
 
-  if (!user) {
+  if (!user || !doc) {
     return (
       <MainLayout isAuthenticated={false}>
-        <div className="add-news-container">
-          <p>Ошибка загрузки пользователя</p>
+        <div className="content-editor-container">
+          <p>Ошибка загрузки данных</p>
         </div>
       </MainLayout>
     );
@@ -106,21 +148,21 @@ const AddNewsPage: React.FC = () => {
 
   return (
     <MainLayout isAuthenticated={!!user}>
-      <div className="add-news-container">
+      <div className="content-editor-container">
         <button onClick={() => navigate(-1)} className="back-btn">
           &larr; Назад
         </button>
-        <h1>Добавить новость</h1>
+        <h1>Редактировать документацию</h1>
         
-        <div className="add-news-form">
+        <div className="content-editor-form">
           <div className="form-group">
-            <label htmlFor="title">Заголовок новости</label>
+            <label htmlFor="title">Заголовок документации</label>
             <input
               id="title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Введите заголовок новости"
+              placeholder="Введите заголовок документации"
               className="form-input"
               maxLength={255}
             />
@@ -128,7 +170,23 @@ const AddNewsPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="content">Содержание новости</label>
+            <label htmlFor="category">Категория документации</label>
+            <select
+              id="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="form-input"
+            >
+              {DOCUMENTATION_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="content">Содержание документации</label>
             <div className="markdown-hint">
               <small>💡 Поддерживается Markdown форматирование: **жирный**, *курсив*, [ссылки](url), # заголовки, - списки</small>
             </div>
@@ -136,7 +194,7 @@ const AddNewsPage: React.FC = () => {
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Введите содержание новости..."
+              placeholder="Введите содержание документации..."
               rows={8}
               className="form-textarea"
             />
@@ -148,7 +206,7 @@ const AddNewsPage: React.FC = () => {
               disabled={saving || !title.trim() || !content.trim()}
               className="save-btn"
             >
-              {saving ? "Создание..." : "Создать новость"}
+              {saving ? "Сохранение..." : "Сохранить изменения"}
             </button>
             
             <button 
@@ -171,4 +229,5 @@ const AddNewsPage: React.FC = () => {
   );
 };
 
-export default AddNewsPage;
+export default EditDocumentationPage;
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import "./SettingsPage.scss";
@@ -9,6 +9,7 @@ interface ProfileData {
   nickname: string;
   bio: string | null;
   date_of_birth: string | null;
+  avatar: string | null;
 }
 
 const SettingsPage: React.FC = () => {
@@ -17,10 +18,15 @@ const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [avatarError, setAvatarError] = useState("");
 
   const [nickname, setNickname] = useState("");
   const [bio, setBio] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [avatarChanged, setAvatarChanged] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -46,6 +52,9 @@ const SettingsPage: React.FC = () => {
         setNickname(profileData.nickname || "");
         setBio(profileData.bio || "");
         setDateOfBirth(profileData.date_of_birth || "");
+        setAvatarData(profileData.avatar || null);
+        setAvatarChanged(false);
+        setAvatarError("");
       } else {
         setMessage("Ошибка при загрузке профиля");
       }
@@ -62,17 +71,24 @@ const SettingsPage: React.FC = () => {
     
     setSaving(true);
     setMessage("");
+    setAvatarError("");
 
     try {
+      const payload: Record<string, unknown> = {
+        user_id: profile.id,
+        nickname: nickname.trim(),
+        bio: bio.trim(),
+        date_of_birth: dateOfBirth
+      };
+
+      if (avatarChanged) {
+        payload.avatar = avatarData ?? "";
+      }
+
       const response = await fetch("http://localhost:8000/api/profile/update/", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          user_id: profile.id, 
-          nickname: nickname.trim(),
-          bio: bio.trim(),
-          date_of_birth: dateOfBirth
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -88,20 +104,66 @@ const SettingsPage: React.FC = () => {
       if (userData) {
         const user = JSON.parse(userData);
         user.nickname = nickname.trim();
+        if (avatarChanged) {
+          user.avatar = data.avatar || null;
+        }
         localStorage.setItem('user', JSON.stringify(user));
+        
+        // Отправляем событие для обновления аватара в верхней панели
+        if (avatarChanged) {
+          window.dispatchEvent(new Event('avatarUpdated'));
+        }
       }
 
       setProfile(prev => prev ? {
         ...prev,
         nickname: nickname.trim(),
         bio: bio.trim() || null,
-        date_of_birth: dateOfBirth || null
+        date_of_birth: dateOfBirth || null,
+        avatar: data.avatar ?? prev.avatar
       } : null);
+      setAvatarData((data.avatar ?? null) as string | null);
+      setAvatarChanged(false);
       
     } catch (error) {
       setMessage("Ошибка сети: " + error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      setAvatarError("Размер файла не должен превышать 3 МБ");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAvatarData(result);
+      setAvatarChanged(true);
+      setAvatarError("");
+    };
+    reader.onerror = () => {
+      setAvatarError("Не удалось прочитать файл");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarRemove = () => {
+    setAvatarData(null);
+    setAvatarChanged(true);
+    setAvatarError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -136,6 +198,45 @@ const SettingsPage: React.FC = () => {
         <h1>Настройки профиля</h1>
         
         <div className="settings-form">
+          <div className="form-group avatar-group">
+            <label>Аватар</label>
+            <div className="avatar-preview" aria-label="Предпросмотр аватара">
+              {avatarData ? (
+                <img src={avatarData} alt="Текущий аватар" />
+              ) : (
+                <div className="avatar-placeholder">Нет аватара</div>
+              )}
+            </div>
+            <div className="avatar-actions">
+              <button
+                type="button"
+                className="avatar-upload-btn"
+                onClick={handleAvatarUploadClick}
+                disabled={saving}
+              >
+                Загрузить изображение
+              </button>
+              {avatarData && (
+                <button
+                  type="button"
+                  className="avatar-remove-btn"
+                  onClick={handleAvatarRemove}
+                  disabled={saving}
+                >
+                  Удалить
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="avatar-file-input"
+                onChange={handleAvatarSelect}
+              />
+            </div>
+            {avatarError && <p className="avatar-error">{avatarError}</p>}
+          </div>
+
           <div className="form-group">
             <label htmlFor="nickname">Имя пользователя (nickname)</label>
             <input
