@@ -5,12 +5,6 @@ import "./MainPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faNewspaper, faUsers, faFolder } from "@fortawesome/free-solid-svg-icons";
 
-interface DashboardItem {
-  id: number;
-  title: string;
-  content?: string;
-}
-
 interface UserData {
   id: number;
   email: string;

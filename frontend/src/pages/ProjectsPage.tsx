@@ -29,7 +29,7 @@ const ProjectsPage: React.FC = () => {
       try {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
-        fetchUserProjects(parsedUser.id);
+        void fetchUserProjects(parsedUser.id);
       } catch {
         console.error("Ошибка парсинга данных пользователя");
       }
@@ -37,14 +37,17 @@ const ProjectsPage: React.FC = () => {
   }, []);
 
   const fetchUserProjects = async (userId: number) => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
-      if (!response.ok) throw new Error("Ошибка при загрузке проектов");
-      const data = await response.json();
-      setMyProjects(data.projects);
-    } catch (error) {
-      console.error(error);
-    }
+      try {
+          const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
+          if (!response.ok) {
+              console.error("Ошибка при загрузке проектов:", response.statusText);
+              return;
+          }
+          const data = await response.json();
+          setMyProjects(data.projects);
+      } catch (error) {
+          console.error("Ошибка сети:", error);
+      }
   };
 
   const showUploadProjectModal = async () => {
@@ -85,7 +88,7 @@ const ProjectsPage: React.FC = () => {
 
         if (response.ok) {
           alert("Проект успешно добавлен!");
-          fetchUserProjects(user.id);
+          void fetchUserProjects(user.id);
         } else {
           alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
         }
@@ -178,8 +181,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_name: newName, private: isPrivate }),
       });
-      if (!response.ok) throw new Error("Ошибка при обновлении проекта");
-
+      if (!response.ok){
+          console.error("Ошибка при обновлении проектов:", response.statusText);
+          return;
+      }
       const result = await response.json();
       setIsEditing(false);
 
@@ -201,7 +206,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => 
       const response = await fetch(`http://localhost:8000/api/project/delete/${project.id}/`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Ошибка при удалении проекта");
+      if (!response.ok) {
+          console.error("Ошибка при удалении проектов:", response.statusText);
+          return;
+      }
       fetchProjects();
     } catch (error) {
       console.error("Ошибка удаления проекта:", error);

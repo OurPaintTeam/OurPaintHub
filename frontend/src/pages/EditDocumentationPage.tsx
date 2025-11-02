@@ -39,7 +39,7 @@ const EditDocumentationPage: React.FC = () => {
         const user = JSON.parse(userData);
         setUser(user);
         if (id) {
-          loadDocumentation(parseInt(id));
+          void loadDocumentation(parseInt(id));
         }
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);

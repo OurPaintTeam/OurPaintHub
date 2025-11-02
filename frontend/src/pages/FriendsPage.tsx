@@ -33,9 +33,9 @@ const FriendsPage: React.FC = () => {
     try {
       const parsed = JSON.parse(userData);
       setUser(parsed);
-      loadFriends(parsed.id);
-      loadRequests(parsed.id);
-      loadSentRequests(parsed.id);
+      void loadFriends(parsed.id);
+      void loadRequests(parsed.id);
+      void loadSentRequests(parsed.id);
     } catch (error) {
       console.error("Ошибка при парсинге данных пользователя:", error);
       navigate("/login");
@@ -53,7 +53,7 @@ const FriendsPage: React.FC = () => {
         const data = await response.json();
         setFriends(data);
         // После загрузки друзей, перезагружаем список всех пользователей
-        loadAllUsers(userId, data);
+        void loadAllUsers(userId, data);
       }
     } catch (error) {
       console.error("Ошибка при загрузке друзей:", error);
@@ -86,7 +86,7 @@ const FriendsPage: React.FC = () => {
     if (!user || activeTab !== "all-users") return;
     
     const timeoutId = setTimeout(() => {
-      loadAllUsers(user.id, friends, searchQuery);
+      void loadAllUsers(user.id, friends, searchQuery);
     }, 300);
 
     return () => clearTimeout(timeoutId);
@@ -243,13 +243,13 @@ const FriendsPage: React.FC = () => {
     // Перезагружаем данные при переключении вкладки
     if (user) {
       if (tab === "all-users") {
-        loadAllUsers(user.id, friends, searchQuery);
+        void loadAllUsers(user.id, friends, searchQuery);
       } else if (tab === "requests") {
-        loadRequests(user.id);
+        void loadRequests(user.id);
       } else if (tab === "sent-requests") {
-        loadSentRequests(user.id);
+        void loadSentRequests(user.id);
       } else {
-        loadFriends(user.id, friendsSearch);
+        void loadFriends(user.id, friendsSearch);
       }
     }
   };
@@ -258,7 +258,7 @@ const FriendsPage: React.FC = () => {
   useEffect(() => {
     if (!user || activeTab !== "my-friends") return;
     const timeoutId = setTimeout(() => {
-      loadFriends(user.id, friendsSearch);
+      void loadFriends(user.id, friendsSearch);
     }, 300);
     return () => clearTimeout(timeoutId);
   }, [friendsSearch, user, activeTab]);

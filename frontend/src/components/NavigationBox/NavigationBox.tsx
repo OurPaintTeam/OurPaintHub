@@ -10,7 +10,7 @@ interface NavigationBoxProps {
   userName?: string;
 }
 
-const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, userName }) => {
+const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [requestsCount, setRequestsCount] = useState<number>(0);
@@ -106,7 +106,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false, 
                 <span className="notification-badge">{requestsCount}</span>
               )}
             </button>
-            <IconMenuButton isAuthenticated={true} userName={userName} />
+            <IconMenuButton isAuthenticated={true} />
             <button className="btn-logout" onClick={handleLogout}>
               <i className="fas fa-sign-out-alt"></i> <span className="logout-text">Выход</span>
             </button>

@@ -33,7 +33,7 @@ const AccountPage: React.FC = () => {
     try {
       const parsed = JSON.parse(userData);
       setAccount(parsed);
-      loadUserProfile(parsed.id);
+      void loadUserProfile(parsed.id);
     } catch (error) {
       console.error("Ошибка при парсинге данных пользователя:", error);
       navigate("/login");

@@ -38,7 +38,7 @@ const EditNewsPage: React.FC = () => {
         const user = JSON.parse(userData);
         setUser(user);
         if (id) {
-          loadNews(parseInt(id));
+          void loadNews(parseInt(id));
         }
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);

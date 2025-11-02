@@ -89,7 +89,7 @@ const PublicAccountPage: React.FC = () => {
               setError("Для просмотра профиля необходимо быть друзьями. Сначала добавьте пользователя в друзья.");
             } else {
               // Загружаем друзей этого пользователя
-              loadFriendFriends(fid);
+                void loadFriendFriends(fid);
             }
           }
         } catch (e) {
@@ -102,7 +102,7 @@ const PublicAccountPage: React.FC = () => {
       }
     };
 
-    load();
+      void load();
   }, [id]);
 
 
@@ -141,7 +141,7 @@ const PublicAccountPage: React.FC = () => {
       if (data.status === 'accepted') {
         setIsFriend(true);
         if (id) {
-          loadFriendFriends(parseInt(id, 10));
+            void loadFriendFriends(parseInt(id, 10));
         }
       }
     } catch (e) {

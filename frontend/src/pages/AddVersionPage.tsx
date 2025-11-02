@@ -31,7 +31,7 @@ const AddVersionPage: React.FC = () => {
       try {
         const user = JSON.parse(userData);
         setUser(user);
-        checkAdminRole(user.id);
+        void checkAdminRole(user.id);
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);
         setLoading(false);

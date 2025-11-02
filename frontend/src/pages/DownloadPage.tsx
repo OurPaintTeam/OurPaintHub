@@ -36,7 +36,7 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
       try {
         const user = JSON.parse(userData);
         setUser(user);
-        checkAdminRole(user.id);
+          void checkAdminRole(user.id);
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);
       }

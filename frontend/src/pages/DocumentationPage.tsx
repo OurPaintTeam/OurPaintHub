@@ -70,7 +70,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
       try {
         const user = JSON.parse(userData);
         setUser(user);
-        checkAdminRole(user.id);
+        void checkAdminRole(user.id);
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);
       }
@@ -197,7 +197,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteDoc(doc.id);
+                              void handleDeleteDoc(doc.id);
                           }} 
                           className="delete-btn"
                           title="Удалить документацию"
