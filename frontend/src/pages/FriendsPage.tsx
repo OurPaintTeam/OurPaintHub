@@ -52,9 +52,10 @@ const FriendsPage: React.FC = () => {
             const response = await fetch(`http://localhost:8000/api/friends/?user_id=${userId}${searchParam}`);
             if (response.ok) {
                 const data = await response.json();
-                setFriends(data);
+                const enriched = await enrichUsersWithAvatar(data);
+                setFriends(enriched);
                 // После загрузки друзей, перезагружаем список всех пользователей
-                void loadAllUsers(userId, data);
+                void loadAllUsers(userId, enriched);
             }
         } catch (error) {
             console.error("Ошибка при загрузке друзей:", error);
@@ -70,7 +71,8 @@ const FriendsPage: React.FC = () => {
                 // Фильтруем пользователей - убираем тех, кто уже в друзьях
                 const friendIds = friendsList.map(f => f.id);
                 const usersNotFriends = data.filter((user: UserData) => !friendIds.includes(user.id));
-                setAllUsers(usersNotFriends);
+                const enriched = await enrichUsersWithAvatar(usersNotFriends);
+                setAllUsers(enriched);
             }
         } catch (error) {
             console.error("Ошибка при загрузке всех пользователей:", error);
@@ -98,7 +100,8 @@ const FriendsPage: React.FC = () => {
             const response = await fetch(`http://localhost:8000/api/friends/requests/?user_id=${userId}`);
             if (response.ok) {
                 const data = await response.json();
-                setRequests(data);
+                const enriched = await enrichUsersWithAvatar(data);
+                setRequests(enriched);
             }
         } catch (error) {
             console.error("Ошибка при загрузке заявок:", error);
@@ -110,7 +113,8 @@ const FriendsPage: React.FC = () => {
             const response = await fetch(`http://localhost:8000/api/friends/requests/sent/?user_id=${userId}`);
             if (response.ok) {
                 const data = await response.json();
-                setSentRequests(data);
+                const enriched = await enrichUsersWithAvatar(data);
+                setSentRequests(enriched);
             }
         } catch (error) {
             console.error("Ошибка при загрузке отправленных заявок:", error);
@@ -272,10 +276,27 @@ const FriendsPage: React.FC = () => {
         );
     }
 
-    const Avatar: React.FC<{ user: UserData }> = ({ user }) => (
+    const enrichUsersWithAvatar = async (users: UserData[]) => {
+        const enriched = await Promise.all(users.map(async (u) => {
+            try {
+                const res = await fetch(`http://localhost:8000/api/profile/?user_id=${u.id}`);
+                if (res.ok) {
+                    const profile = await res.json();
+                    return {...u, avatar: profile.avatar || null};
+                }
+            } catch (e) {
+                console.error("Ошибка загрузки аватара:", e);
+            }
+            return u;
+        }));
+        return enriched;
+    };
+
+
+    const Avatar: React.FC<{ user: UserData }> = ({user}) => (
         <div className="user-avatar">
             {user.avatar ? (
-                <img src={user.avatar} alt="Аватар пользователя" />
+                <img src={user.avatar} alt="Аватар пользователя"/>
             ) : (
                 user.nickname ? user.nickname[0].toUpperCase() : user.email[0].toUpperCase()
             )}
