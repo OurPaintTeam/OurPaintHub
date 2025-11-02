@@ -33,7 +33,7 @@ const SettingsPage: React.FC = () => {
     if (userData) {
       try {
         const user = JSON.parse(userData);
-        loadUserProfile(user.id);
+          void  loadUserProfile(user.id);
       } catch (error) {
         console.error("Ошибка при парсинге данных пользователя:", error);
         navigate('/login');
