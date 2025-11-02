@@ -20,7 +20,11 @@ interface UserData {
   nickname?: string;
 }
 
-const NewsDetailPage: React.FC = () => {
+interface NewsDetailPage {
+    isAuthenticated?: boolean;
+}
+
+const NewsDetailPage: React.FC<NewsDetailPage> = ({ isAuthenticated = false }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [news, setNews] = useState<NewsItem | null>(null);
@@ -117,8 +121,6 @@ const NewsDetailPage: React.FC = () => {
       alert("Ошибка сети: " + error);
     }
   };
-
-  const isAuthenticated = !!user;
 
   return (
     <MainLayout isAuthenticated={isAuthenticated}>
