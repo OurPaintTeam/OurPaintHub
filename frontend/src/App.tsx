@@ -17,7 +17,6 @@ import DocumentationDetailPage from "./pages/DocumentationDetailPage";
 import EditDocumentationPage from "./pages/EditDocumentationPage";
 import AddVersionPage from "./pages/AddVersionPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
 import FriendsPage from "./pages/FriendsPage";
 import "./styles/toast.scss";

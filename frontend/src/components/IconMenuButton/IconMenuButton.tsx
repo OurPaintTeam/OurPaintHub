@@ -83,13 +83,6 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    // Принудительно обновляем состояние авторизации
-    window.dispatchEvent(new Event('storage'));
-    navigate('/login');
-    setMenuOpen(false);
-  };
 
   return (
     <div className="icon-menu-button">
@@ -106,7 +99,6 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
     <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Профиль</button>
     <button onClick={() => { navigate("/projects"); setMenuOpen(false); }}>Проекты</button>
     <button onClick={() => { navigate("/friends"); setMenuOpen(false); }}>Контакты</button>
-    <button onClick={() => { navigate("/chats"); setMenuOpen(false); }}>Чаты</button>
   </div>
 )}
     </div>
