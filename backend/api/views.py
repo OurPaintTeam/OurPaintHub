@@ -1,12 +1,14 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.db.models import Q
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import FileResponse
-from .models import User, UserProfile, Role, Documentation, EntityLog , Project, ProjectMeta, Friendship
+from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared
 from decimal import Decimal
 import re
 import os
+from django.http import HttpResponse
+from rest_framework import status
 
 @api_view(["POST"])
 def register_user(request):
@@ -1176,6 +1178,95 @@ def download_project(request, project_id):
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
 
+@api_view(["POST"])
+def share_project(request, project_id):
+    """
+    POST /api/project/share/<project_id>/
+   {
+   "recipient_id": int,
+   "comment": "..."
+    }
+    """
+    try:
+        recipient_id = request.data.get("recipient_id")
+        comment = request.data.get("comment", "")
+
+        if not recipient_id:
+            return Response({"error": "Не указан получатель"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return Response({"error": "Проект не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            receiver = User.objects.get(id=recipient_id)
+        except User.DoesNotExist:
+            return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        shared_obj = Shared(project=project, receiver=receiver, comment=comment)
+        shared_obj.clean()  # нельзя самому себе
+        shared_obj.save()
+
+        return Response({"success": "Проект успешно передан!"}, status=status.HTTP_201_CREATED)
+
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Ошибка share_project:", e)
+        return Response({"error": "Ошибка при передаче проекта"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+def get_shared_projects(request, user_id):
+    """
+    GET /api/project/shared/<user_id>/
+    Получить список проектов, которые были переданы пользователю
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    shared_records = Shared.objects.filter(receiver=user).select_related("project", "project__user")
+
+    result = []
+    for record in shared_records:
+        project = record.project
+        try:
+            project_meta = ProjectMeta.objects.get(project=project)
+        except ProjectMeta.DoesNotExist:
+            continue  # если метаданных нет, пропускаем
+
+        result.append({
+            "shared_id": record.id,
+            "project_id": project.id,
+            "project_name": project_meta.project_name,
+            "type": project_meta.type,
+            "weight": str(project_meta.weight) if project_meta.weight is not None else None,
+            "sender_id": project.user.id,
+            "sender_email": project.user.email,
+            "comment": record.comment,
+        })
+
+    return Response(result, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+def delete_received(request, shared_id: int):
+    """
+    DELETE /api/project/delete_received/<shared_id>/
+    Удаляет запись о полученном проекте для пользователя
+    """
+    try:
+        shared_obj = Shared.objects.get(id=shared_id)
+        shared_obj.delete()
+        return Response({"success": "Запись о полученном проекте удалена"}, status=status.HTTP_200_OK)
+    except Shared.DoesNotExist:
+        return Response({"error": "Запись не найдена"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print("Ошибка delete_received:", e)
+        return Response({"error": "Ошибка при удалении записи"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(["GET"])
 def get_all_users(request):
     """
@@ -1680,3 +1771,5 @@ def cancel_friend_request(request):
         )
         
         return Response({"message": "Заявка отменена"}, status=200)
+
+
