@@ -13,7 +13,7 @@
     "frontend:build": "cd frontend && npx vite build",
     "frontend:preview": "cd frontend && npx vite preview",
     "frontend:lint": "cd frontend && npx eslint .",
-    "frontend": "cd frontend && npx vite",
+    "frontend::host": "cd frontend && npx vite --host",
     "backend": "cross-env-shell \"python backend/manage.py runserver\"",
     "dev": "concurrently \"npm run frontend\" \"npm run backend\""
   }
