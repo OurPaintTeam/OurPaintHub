@@ -14,7 +14,6 @@ import AddNewsPage from "./pages/AddNewsPage";
 import EditNewsPage from "./pages/EditNewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import ContactsPage from "./pages/ContactsPage";
 import MainPage from "./pages/MainPage";
 import FriendsPage from "./pages/FriendsPage";
 import "./styles/toast.scss";
