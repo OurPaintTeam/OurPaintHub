@@ -277,7 +277,7 @@ const FriendsPage: React.FC = () => {
     }
 
     const enrichUsersWithAvatar = async (users: UserData[]) => {
-        const enriched = await Promise.all(users.map(async (u) => {
+        return Promise.all(users.map(async (u) => {
             try {
                 const res = await fetch(`http://localhost:8000/api/profile/?user_id=${u.id}`);
                 if (res.ok) {
@@ -289,7 +289,6 @@ const FriendsPage: React.FC = () => {
             }
             return u;
         }));
-        return enriched;
     };
 
 
