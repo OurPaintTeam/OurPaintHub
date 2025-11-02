@@ -1,292 +1,239 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
 import "./ProjectsPage.scss";
+import ProjectCard from "../components/ProjectCard/ProjectCard";
+import FriendProjectCard from "../components/ProjectCard/FriendProjectCard";
+import ReceivedProjectCard, { ReceivedProjectData } from "../components/ProjectCard/ReceivedProjectCard";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload, faEdit, faTrash, faDownload, faShare } from "@fortawesome/free-solid-svg-icons";
+import { faUpload } from "@fortawesome/free-solid-svg-icons";
 
-interface UserData {
-  id: number;
-  email: string;
-  nickname?: string;
+export interface UserData {
+    id: number;
+    email: string;
+    nickname?: string;
 }
 
-interface ProjectData {
-  id: number;
-  project_name: string;
-  type: string;
-  weight: string;
-  private: boolean;
+export interface ProjectData {
+    id: number;
+    project_name: string;
+    type: string;
+    weight: string;
+    private: boolean;
+    author?: string;
 }
 
-const ProjectsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"my-projects" | "friends-projects" | "received-projects">("my-projects");
-  const [user, setUser] = useState<UserData | null>(null);
-  const [myProjects, setMyProjects] = useState<ProjectData[]>([]);
-
-  useEffect(() => {
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        void fetchUserProjects(parsedUser.id);
-      } catch {
-        console.error("Ошибка парсинга данных пользователя");
-      }
-    }
-  }, []);
-
-  const fetchUserProjects = async (userId: number) => {
-      try {
-          const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
-          if (!response.ok) {
-              console.error("Ошибка при загрузке проектов:", response.statusText);
-              return;
-          }
-          const data = await response.json();
-          setMyProjects(data.projects);
-      } catch (error) {
-          console.error("Ошибка сети:", error);
-      }
-  };
-
-  const showUploadProjectModal = async () => {
-    if (!user) {
-      alert("Сначала авторизуйтесь");
-      return;
-    }
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".zip,.rar,.png,.jpg,.jpeg,.pdf,.txt,.md";
-    input.onchange = async () => {
-      if (!input.files || input.files.length === 0) return;
-
-      const file = input.files[0];
-      const ext = file.name.split('.').pop()?.toLowerCase() || "txt";
-      const allowedTypes = ['ourp','json','pdf','tiff','jpg','md','txt','png','jpeg','svg','bmp'];
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-      const type = allowedTypes.includes(ext) ? ext : 'txt';
-      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("project_name", nameWithoutExt);
-      formData.append("weight", fileSizeMB);
-      formData.append("type", type);
-      formData.append("private", "false");
-
-      try {
-        const response = await fetch(`http://localhost:8000/api/project/add/${user.id}/`, {
-          method: "POST",
-          body: formData,
-        });
-
-        let result;
-        try { result = await response.json(); }
-        catch { result = { error: 'Сервер вернул не JSON' }; }
-
-        if (response.ok) {
-          alert("Проект успешно добавлен!");
-          void fetchUserProjects(user.id);
-        } else {
-          alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
-        }
-      } catch (error) {
-        console.error("Ошибка запроса:", error);
-        alert("Ошибка при добавлении проекта");
-      }
-    };
-    input.click();
-  };
-
-  const showProjectTab = (tab: typeof activeTab) => setActiveTab(tab);
-
-  return (
-    <MainLayout isAuthenticated={!!user}>
-      <div className="projects-page page">
-        <div className="page-header">
-          <h1>Мои проекты</h1>
-          <button className="btn-primary" onClick={showUploadProjectModal}>
-            <FontAwesomeIcon icon={faUpload} /> Загрузить проект
-          </button>
-        </div>
-
-        <div className="projects-tabs">
-          <button
-            className={`tab-btn ${activeTab === "my-projects" ? "active" : ""}`}
-            onClick={() => showProjectTab("my-projects")}
-          >
-            Мои проекты
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "friends-projects" ? "active" : ""}`}
-            onClick={() => showProjectTab("friends-projects")}
-          >
-            Проекты друзей
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "received-projects" ? "active" : ""}`}
-            onClick={() => showProjectTab("received-projects")}
-          >
-            Полученные
-          </button>
-        </div>
-
-        <div id="my-projects" className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
-          {myProjects.length === 0 ? (
-            <p>Проекты отсутствуют</p>
-          ) : (
-            <div className="projects-grid">
-              {myProjects.map((p) => (
-                <ProjectCard key={p.id} project={p} fetchProjects={() => user && fetchUserProjects(user.id)} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div id="friends-projects" className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
-          <div id="friends-projects-list">{/* Проекты друзей */}</div>
-        </div>
-
-        <div id="received-projects" className={`projects-content ${activeTab === "received-projects" ? "active" : ""}`}>
-          <div id="received-projects-list">{/* Полученные проекты */}</div>
-        </div>
-      </div>
-    </MainLayout>
-  );
+export const handleDownload = (projectId: number, projectName: string) => {
+    const link = document.createElement("a");
+    link.href = `http://localhost:8000/api/project/download/${projectId}/`;
+    link.download = projectName;
+    link.click();
 };
 
-interface ProjectCardProps {
-  project: ProjectData;
-  fetchProjects: () => void;
-}
+const ProjectsPage: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<"my-projects" | "friends-projects" | "received-projects">("my-projects");
+    const [user, setUser] = useState<UserData | null>(null);
+    const [myProjects, setMyProjects] = useState<ProjectData[]>([]);
+    const [friends, setFriends] = useState<UserData[]>([]);
+    const [friendsProjects, setFriendsProjects] = useState<ProjectData[]>([]);
+    const [receivedProjects, setReceivedProjects] = useState<ReceivedProjectData[]>([]);
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, fetchProjects }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState(project.project_name);
-  const [isPrivate, setIsPrivate] = useState(project.private);
+    useEffect(() => {
+        const userData = localStorage.getItem("user");
+        if (userData) {
+            try {
+                const parsedUser = JSON.parse(userData);
+                setUser(parsedUser);
+                void fetchUserProjects(parsedUser.id);
+                void fetchFriends(parsedUser.id);
+                void fetchReceivedProjects(parsedUser.id);
+            } catch {
+                console.error("Ошибка парсинга данных пользователя");
+            }
+        }
+    }, []);
 
-  useEffect(() => {
-    if (isEditing) {
-      setIsPrivate(project.private);
-      setNewName(project.project_name);
-    }
-  }, [isEditing, project.private, project.project_name]);
+    const fetchUserProjects = async (userId: number) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
+            if (!response.ok) return;
+            const data = await response.json();
+            setMyProjects(data.projects);
+        } catch (error) {
+            console.error("Ошибка сети:", error);
+        }
+    };
 
-  const handleSave = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/project/change/${project.id}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_name: newName, private: isPrivate }),
-      });
-      if (!response.ok){
-          console.error("Ошибка при обновлении проектов:", response.statusText);
-          return;
-      }
-      const result = await response.json();
-      setIsEditing(false);
+    const fetchFriends = async (userId: number) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${userId}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            setFriends(data);
+            void fetchFriendsProjects(data);
+        } catch (error) {
+            console.error("Ошибка при загрузке друзей:", error);
+        }
+    };
 
-      if (result.project && typeof result.project.private === "boolean") {
-        setIsPrivate(result.project.private);
-      }
+    const fetchFriendsProjects = async (friendsList: UserData[]) => {
+        try {
+            const allProjects = await Promise.all(
+                friendsList.map(async (friend) => {
+                    const res = await fetch(`http://localhost:8000/api/project/get_user_projects/${friend.id}/`);
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    return data.projects
+                        .filter((p: ProjectData) => !p.private)
+                        .map((p: ProjectData) => ({ ...p, author: friend.nickname || friend.email }));
+                })
+            );
+            setFriendsProjects(allProjects.flat());
+        } catch (error) {
+            console.error("Ошибка при загрузке проектов друзей:", error);
+        }
+    };
 
-      fetchProjects();
-    } catch (error) {
-      console.error("Ошибка обновления проекта:", error);
-      alert("Не удалось сохранить изменения");
-    }
-  };
+    const fetchReceivedProjects = async (userId: number) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/project/shared/${userId}/`);
+            if (!response.ok) return;
+            const data = await response.json();
+            setReceivedProjects(data);
+        } catch (error) {
+            console.error("Ошибка при загрузке полученных проектов:", error);
+        }
+    };
 
+    const showUploadProjectModal = async () => {
+        if (!user) return alert("Сначала авторизуйтесь");
 
-  const handleDelete = async () => {
-    if (!window.confirm("Удалить проект?")) return;
-    try {
-      const response = await fetch(`http://localhost:8000/api/project/delete/${project.id}/`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-          console.error("Ошибка при удалении проектов:", response.statusText);
-          return;
-      }
-      fetchProjects();
-    } catch (error) {
-      console.error("Ошибка удаления проекта:", error);
-      alert("Не удалось удалить проект");
-    }
-  };
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".zip,.rar,.png,.jpg,.jpeg,.pdf,.txt,.md";
+        input.onchange = async () => {
+            if (!input.files || input.files.length === 0) return;
 
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = `http://localhost:8000/api/project/download/${project.id}/`;
-    link.download = project.project_name;
-    link.click();
-  };
+            const file = input.files[0];
+            const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
+            const allowedTypes = ["ourp", "json", "pdf", "tiff", "jpg", "md", "txt", "png", "jpeg", "svg", "bmp"];
+            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+            const type = allowedTypes.includes(ext) ? ext : "txt";
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
 
-  const handleShare = () => {
-    console.log("Поделиться проектом:", project.id);
-  };
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("project_name", nameWithoutExt);
+            formData.append("weight", fileSizeMB);
+            formData.append("type", type);
+            formData.append("private", "false");
 
-  return (
-    <div className="project-card">
-      <div className="project-card-header">
-        {isEditing ? (
-          <input
-            className="project-name-input"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-        ) : (
-          <span className="project-name">{project.project_name}</span>
-        )}
+            try {
+                const response = await fetch(`http://localhost:8000/api/project/add/${user.id}/`, {
+                    method: "POST",
+                    body: formData,
+                });
+                if (response.ok) {
+                    alert("Проект успешно добавлен!");
+                    void fetchUserProjects(user.id);
+                } else {
+                    const result = await response.json().catch(() => ({ error: "Сервер вернул не JSON" }));
+                    alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
+                }
+            } catch (error) {
+                console.error("Ошибка запроса:", error);
+                alert("Ошибка при добавлении проекта");
+            }
+        };
+        input.click();
+    };
 
-        <div className="project-card-header-buttons">
-          {isEditing ? (
-            <button className="btn-save" onClick={handleSave}>Сохранить</button>
-          ) : (
-            <>
-              <button className="btn-edit-mini" onClick={() => setIsEditing(true)}>
-                <FontAwesomeIcon icon={faEdit} />
-              </button>
-              <button className="btn-delete-mini" onClick={handleDelete}>
-                <FontAwesomeIcon icon={faTrash} />
-              </button>
-              <button className="btn-download-mini" onClick={handleDownload}>
-                <FontAwesomeIcon icon={faDownload} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+    const handleDeleteReceived = async (sharedId: number) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/project/delete_received/${sharedId}/`, {
+                method: "DELETE",
+            });
+            if (response.ok && user) {
+                void fetchReceivedProjects(user.id); // обновляем список
+            } else {
+                alert("Не удалось удалить запись");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Ошибка при удалении записи");
+        }
+    };
 
-      <div className="project-card-body">
-        <p>Тип: {project.type}</p>
-        <p>Вес: {project.weight}</p>
+    return (
+        <MainLayout isAuthenticated={!!user}>
+            <div className="projects-page page">
+                <div className="page-header">
+                    <h1>Мои проекты</h1>
+                    <button className="btn-primary" onClick={showUploadProjectModal}>
+                        <FontAwesomeIcon icon={faUpload} /> Загрузить проект
+                    </button>
+                </div>
 
-        {isEditing ? (
-          <div className="edit-private-checkbox">
-            <label>
-              Приватный:&nbsp;
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => setIsPrivate(e.target.checked)}
-              />
-            </label>
-          </div>
-        ) : (
-          <p>Статус: {project.private ? "Приватный" : "Публичный"}</p>
-        )}
-      </div>
+                <div className="projects-tabs">
+                    <button className={`tab-btn ${activeTab === "my-projects" ? "active" : ""}`} onClick={() => setActiveTab("my-projects")}>
+                        Мои проекты
+                    </button>
+                    <button className={`tab-btn ${activeTab === "friends-projects" ? "active" : ""}`} onClick={() => setActiveTab("friends-projects")}>
+                        Проекты друзей
+                    </button>
+                    <button className={`tab-btn ${activeTab === "received-projects" ? "active" : ""}`} onClick={() => setActiveTab("received-projects")}>
+                        Полученные
+                    </button>
+                </div>
 
-      <div className="project-card-footer">
-        <button className="btn-share" onClick={handleShare}>
-          <FontAwesomeIcon icon={faShare} /> Поделиться
-        </button>
-      </div>
-    </div>
-  );
+                {/* Мои проекты */}
+                <div className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
+                    {myProjects.length === 0 ? <p>Проекты отсутствуют</p> : (
+                        <div className="projects-grid">
+                            {myProjects.map((p) => (
+                                <ProjectCard
+                                    key={p.id}
+                                    project={p}
+                                    fetchProjects={() => user && fetchUserProjects(user.id)}
+                                    onDownload={() => handleDownload(p.id, p.project_name)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Проекты друзей */}
+                <div className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
+                    <div className="projects-grid">
+                        {friendsProjects.map((p) => (
+                            <FriendProjectCard
+                                key={p.id}
+                                project={p}
+                                onDownload={() => handleDownload(p.id, p.project_name)}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Полученные */}
+                <div className={`projects-content ${activeTab === "received-projects" ? "active" : ""}`}>
+                    {receivedProjects.length === 0 ? (
+                        <p>Вы не получали проекты</p>
+                    ) : (
+                        <div className="projects-grid">
+                            {receivedProjects.map((p) => (
+                                <ReceivedProjectCard
+                                    key={p.shared_id}
+                                    project={p}
+                                    onDownload={() => handleDownload(p.project_id, p.project_name)}
+                                    onDelete={handleDeleteReceived}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </MainLayout>
+    );
 };
 
 export default ProjectsPage;
