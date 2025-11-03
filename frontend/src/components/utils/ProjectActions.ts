@@ -5,7 +5,7 @@ export const handleDownload = async (
 ) => {
     try {
         const response = await fetch(`http://localhost:8000/api/project/download/${projectId}/`);
-        if (!response.ok) throw new Error("Ошибка при скачивании проекта");
+        if (!response.ok) console.error("Ошибка при скачивании проекта");
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
