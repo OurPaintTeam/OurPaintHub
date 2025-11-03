@@ -3,12 +3,13 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import FileResponse
-from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared
+from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, ProjectChanges
 from decimal import Decimal
 import re
 import os
 from django.http import HttpResponse
 from rest_framework import status
+import mimetypes
 
 @api_view(["POST"])
 def register_user(request):
@@ -1002,26 +1003,23 @@ def check_user_role(request):
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
 
-@api_view(["GET"])
-def QA_view(request):
-    return Response([
-        {"id": 1, "title": "Данные будут добавлены позже", "content": "Пока раздел находится в разработке."}
-    ])
-
 
 @api_view(["POST"])
 def add_project(request, user_id):
     """
     POST /api/project/add/<int:user_id>/
     Добавить проект для пользователя.
+
+    Тело запроса:
     {
         "project_name": "Новый проект",
         "weight": "1.5",
         "type": "txt",
         "private": "true",
-        "file": <файл>
+        "file": <файл>,
+        "description": "Описание проекта"
     }
-        """
+    """
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
@@ -1031,6 +1029,7 @@ def add_project(request, user_id):
     weight = request.data.get("weight")
     type_ = request.data.get("type")
     private = request.data.get("private", "false").lower() == "true"
+    description = (request.data.get("description") or "").strip()
     uploaded_file = request.FILES.get("file")
 
     if not uploaded_file:
@@ -1045,7 +1044,7 @@ def add_project(request, user_id):
 
     allowed_types = [choice[0] for choice in ProjectMeta.TYPE_CHOICES]
     if type_ not in allowed_types:
-        type_ = 'txt'
+        type_ = "txt"
 
     try:
         project = Project.objects.create(user=user, private=private)
@@ -1055,45 +1054,101 @@ def add_project(request, user_id):
             project_name=project_name,
             weight=weight,
             type=type_,
-            data=file_data
+            data=file_data,
         )
+
+        change_text = f"Добавлен проект '{project_name}'"
+        if description:
+            change_text += f". {description}"
+
+        ProjectChanges.objects.create(
+            project=project,
+            changer=user,
+            description=change_text
+        )
+
     except Exception as e:
         return Response({"error": f"Ошибка при сохранении проекта: {str(e)}"}, status=500)
 
-    return Response({"message": "Проект успешно создан", "project_id": project.id}, status=201)
+    return Response(
+        {"message": "Проект успешно создан", "project_id": project.id},
+        status=201
+    )
+
+@api_view(["GET"])
+def get_project_versions(request, project_id):
+    """
+    GET /api/project/get_project_versions/<int:project_id>/
+    Возвращает все версии проекта
+    """
+    from .models import Project, ProjectChanges, ProjectMeta
+
+    try:
+        project = Project.objects.get(pk=project_id)
+    except Project.DoesNotExist:
+        return Response({"error": "Проект не найден"}, status=404)
+
+    meta = ProjectMeta.objects.filter(project=project).first()
+    changes = ProjectChanges.objects.filter(project=project).select_related("changer").order_by("-id")
+
+    result = []
+    for ch in changes:
+        result.append({
+            "id": ch.id,
+            "changer": getattr(ch.changer, "username", ch.changer.email),
+            "description": ch.description,
+            "project_name": meta.project_name if meta else "Без имени",
+            "type": meta.type if meta else "N/A",
+            "weight": str(meta.weight) if meta else "0",
+        })
+
+    return Response(result, status=200)
 
 @api_view(["GET"])
 def get_user_projects(request, user_id):
     """
     GET /api/project/get_user_projects/<int:user_id>/
     Получить список проектов пользователя
+    Возвращает:
     {
         "projects": [
             {
                 "id": 1,
                 "project_name": "Проект 1",
                 "weight": "1.50",
-                "type": "txt"
+                "type": "txt",
+                "private": false,
+                "description": "Описание последнего изменения"
             },
             ...
         ]
     }
-        """
+    """
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
         return Response({"projects": []})
 
-    projects = ProjectMeta.objects.filter(project__user=user)
+    projects = ProjectMeta.objects.filter(project__user=user).select_related("project")
     data = []
     for p in projects:
         try:
+            last_change = (
+                ProjectChanges.objects
+                .filter(project=p.project)
+                .order_by("-id")
+                .first()
+            )
+
+            description = last_change.description if last_change and last_change.description else "Без описания"
+
             data.append({
                 "id": p.id,
                 "project_name": p.project_name,
                 "weight": str(p.weight) if p.weight is not None else "0",
                 "type": p.type or "",
                 "private": p.project.private,
+                "description": description,
             })
         except Exception as e:
             print(f"Ошибка сериализации проекта {p.id}: {e}")
@@ -1111,51 +1166,96 @@ def delete_project(request, project_id):
         project = ProjectMeta.objects.get(pk=project_id)
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
-
+    ProjectChanges.objects.filter(project_id=project_id).delete()
     project.delete()
     return Response({"success": "Проект удалён"}, status=200)
 
 @api_view(["PATCH"])
 def change_project(request, project_id):
     """
-    PATCH /api/project/change/<int:project_id>/
-    Изменить проект по ID.
-
-    Пример тела запроса (JSON):
+    PATCH /api/project/change/<project_id>/
+    Изменить проект по ID
     {
-        "project_name": "Новое название",
-        "private": "false"
+        "project_name": "Новое имя",
+        "description": "Описание изменений",
+        "private": true/false,
+        "file": (binary),
+        "changer_id": 123
     }
-       """
+    """
     try:
-        project_meta = ProjectMeta.objects.get(pk=project_id)
+        project_meta = ProjectMeta.objects.select_related("project").get(pk=project_id)
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
 
     data = request.data
     project_name = data.get("project_name")
     private = data.get("private")
+    description = data.get("description")
+    changer_id = data.get("changer_id") or data.get("user_id")
+    file_uploaded = request.FILES.get("file")
 
-    if project_name is not None:
+    changed_fields = []
+
+    if project_name and project_name != project_meta.project_name:
+        old_name = project_meta.project_name
         project_meta.project_name = project_name
+        changed_fields.append(f"Название: '{old_name}' → '{project_name}'")
 
     if private is not None:
         if isinstance(private, str):
             private = private.lower() == "true"
-        project_meta.project.private = private
-        project_meta.project.save()
+        if private != project_meta.project.private:
+            old_privacy = "Приватный" if project_meta.project.private else "Публичный"
+            new_privacy = "Приватный" if private else "Публичный"
+            project_meta.project.private = private
+            project_meta.project.save()
+            changed_fields.append(f"Приватность: {old_privacy} → {new_privacy}")
+
+    if file_uploaded:
+        file_bytes = file_uploaded.read()
+        project_meta.data = file_bytes
+        weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
+        project_meta.weight = round(weight_mb, 2)
+        project_meta.type = file_uploaded.name.split(".")[-1].lower()
+        changed_fields.append(f"Файл обновлён (Вес: {project_meta.weight} MB, Тип: {project_meta.type})")
 
     project_meta.save()
+
+    changer = None
+    if changer_id:
+        try:
+            changer = User.objects.get(pk=changer_id)
+        except User.DoesNotExist:
+            changer = None
+    elif request.user.is_authenticated:
+        changer = request.user
+
+    change_description = ""
+    if changer and (description or changed_fields):
+        if description:
+            change_description = description
+        else:
+            change_description = "Изменены данные проекта:\n" + "\n".join(changed_fields)
+
+        ProjectChanges.objects.create(
+            project=project_meta.project,
+            changer=changer,
+            description=change_description
+        )
+
     return Response({
         "success": True,
+        "message": "Проект успешно обновлён",
         "project": {
             "id": project_meta.id,
             "project_name": project_meta.project_name,
             "weight": str(project_meta.weight),
             "type": project_meta.type,
-            "private": project_meta.project.private
+            "private": project_meta.project.private,
+            "description": change_description,
         }
-    })
+    }, status=200)
 
 @api_view(["GET"])
 def download_project(request, project_id):
@@ -1171,7 +1271,8 @@ def download_project(request, project_id):
         ext = project_meta.type if project_meta.type else "txt"
         filename = f"{project_meta.project_name}.{ext}"
 
-        response = HttpResponse(project_meta.data, content_type="application/octet-stream")
+        mime_type, _ = mimetypes.guess_type(filename)
+        response = HttpResponse(project_meta.data, content_type=mime_type or "application/octet-stream")
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
@@ -1238,6 +1339,10 @@ def get_shared_projects(request, user_id):
         except ProjectMeta.DoesNotExist:
             continue  # если метаданных нет, пропускаем
 
+        # берём последнее изменение проекта для описания
+        last_change = ProjectChanges.objects.filter(project=project).order_by('-id').first()
+        description = last_change.description if last_change else ""
+
         result.append({
             "shared_id": record.id,
             "project_id": project.id,
@@ -1247,6 +1352,7 @@ def get_shared_projects(request, user_id):
             "sender_id": project.user.id,
             "sender_email": project.user.email,
             "comment": record.comment,
+            "description": description,
         })
 
     return Response(result, status=status.HTTP_200_OK)
@@ -1771,5 +1877,76 @@ def cancel_friend_request(request):
         )
         
         return Response({"message": "Заявка отменена"}, status=200)
+
+
+@api_view(["GET"])
+def get_QA_list(request):
+    faqs = FAQ.objects.select_related("user", "admin").all().order_by("-id")
+    result = []
+    for faq in faqs:
+        result.append({
+            "id": faq.id,
+            "text_question": faq.text_question,
+            "answered": faq.answered,
+            "answer_text": faq.answer_text,
+            "user_email": faq.user.email if faq.user else None,
+            "admin_email": faq.admin.email if faq.admin else None,
+            "created_at": faq.created_at.isoformat() if hasattr(faq, 'created_at') else None,
+        })
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+def create_QA(request):
+    text_question = request.data.get("text_question", "").strip()
+    user_id = request.data.get("user_id")
+    if user_id is None:
+        return Response({"error": "Не указан пользователь"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Неверный ID пользователя"}, status=status.HTTP_400_BAD_REQUEST)
+    if not text_question:
+        return Response({"error": "Вопрос не может быть пустым"}, status=status.HTTP_400_BAD_REQUEST)
+    if not user_id:
+        return Response({"error": "Не указан пользователь"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    faq = FAQ(user=user, admin=None, text_question=text_question, answered=False)
+    try:
+        faq.clean()
+        faq.save()
+        return Response({"success": "Вопрос добавлен"}, status=status.HTTP_201_CREATED)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["PATCH"])
+def answer_QA(request, qa_id):
+    try:
+        faq = FAQ.objects.get(id=qa_id)
+    except FAQ.DoesNotExist:
+        return Response({"error": "Вопрос не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not request.user.is_staff:  # проверка, что админ
+        return Response({"error": "Нет прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    answer_text = request.data.get("answer_text", "").strip()
+    if not answer_text:
+        return Response({"error": "Ответ не может быть пустым"}, status=status.HTTP_400_BAD_REQUEST)
+
+    faq.answer_text = answer_text
+    faq.answered = True
+    faq.admin = request.user
+    try:
+        faq.clean()
+        faq.save()
+        return Response({"success": "Ответ сохранён"}, status=status.HTTP_200_OK)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
