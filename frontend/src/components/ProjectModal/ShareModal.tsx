@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useState} from "react";
 import "./ShareModal.scss";
 
 interface Friend {
@@ -15,7 +15,7 @@ interface ShareModalProps {
     projectName: string;
 }
 
-const ShareModal: React.FC<ShareModalProps> = ({ friends, projectName, onClose, onSend }) => {
+const ShareModal: React.FC<ShareModalProps> = ({friends, projectName, onClose, onSend}) => {
     const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
     const [comment, setComment] = useState("");
     const [sending, setSending] = useState(false);
