@@ -4,8 +4,16 @@ import "./ProjectsPage.scss";
 import ProjectCard from "../components/ProjectCard/ProjectCard";
 import FriendProjectCard from "../components/ProjectCard/FriendProjectCard";
 import ReceivedProjectCard, { ReceivedProjectData } from "../components/ProjectCard/ReceivedProjectCard";
+import UploadProjectModal from "../components/ProjectModal/UploadProjectModal";
+import EditProjectModal from "../components/ProjectModal/EditProjectModal";
+import VersionModal from "../components/ProjectModal/VersionModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import {
+    handleDownload,
+    handleDelete,
+} from "../components/utils/ProjectActions";
+import ShareModal from "../components/ProjectModal/ShareModal";
 
 export interface UserData {
     id: number;
@@ -18,24 +26,24 @@ export interface ProjectData {
     project_name: string;
     type: string;
     weight: string;
+    description: string;
     private: boolean;
     author?: string;
 }
 
-export const handleDownload = (projectId: number, projectName: string) => {
-    const link = document.createElement("a");
-    link.href = `http://localhost:8000/api/project/download/${projectId}/`;
-    link.download = projectName;
-    link.click();
-};
-
 const ProjectsPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<"my-projects" | "friends-projects" | "received-projects">("my-projects");
+    const [activeTab, setActiveTab] = useState<
+        "my-projects" | "friends-projects" | "received-projects"
+    >("my-projects");
     const [user, setUser] = useState<UserData | null>(null);
     const [myProjects, setMyProjects] = useState<ProjectData[]>([]);
     const [friends, setFriends] = useState<UserData[]>([]);
     const [friendsProjects, setFriendsProjects] = useState<ProjectData[]>([]);
     const [receivedProjects, setReceivedProjects] = useState<ReceivedProjectData[]>([]);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [editingProject, setEditingProject] = useState<ProjectData | ReceivedProjectData | null>(null);
+    const [viewingVersionsProjectId, setViewingVersionsProjectId] = useState<number | null>(null);
+    const [sharingProject, setSharingProject] = useState<ProjectData | null>(null);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -104,62 +112,72 @@ const ProjectsPage: React.FC = () => {
         }
     };
 
-    const showUploadProjectModal = async () => {
+    const handleUploadProject = async (file: File, projectName: string, description: string, isPrivate: boolean) => {
         if (!user) return alert("Сначала авторизуйтесь");
 
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".zip,.rar,.png,.jpg,.jpeg,.pdf,.txt,.md";
-        input.onchange = async () => {
-            if (!input.files || input.files.length === 0) return;
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        const fileType = file.name.split('.').pop() || "txt";
 
-            const file = input.files[0];
-            const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
-            const allowedTypes = ["ourp", "json", "pdf", "tiff", "jpg", "md", "txt", "png", "jpeg", "svg", "bmp"];
-            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-            const type = allowedTypes.includes(ext) ? ext : "txt";
-            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("project_name", projectName);
+        formData.append("weight", fileSizeMB);
+        formData.append("type", fileType);
+        formData.append("private", String(isPrivate));
+        formData.append("description", description);
 
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("project_name", nameWithoutExt);
-            formData.append("weight", fileSizeMB);
-            formData.append("type", type);
-            formData.append("private", "false");
-
-            try {
-                const response = await fetch(`http://localhost:8000/api/project/add/${user.id}/`, {
-                    method: "POST",
-                    body: formData,
-                });
-                if (response.ok) {
-                    alert("Проект успешно добавлен!");
-                    void fetchUserProjects(user.id);
-                } else {
-                    const result = await response.json().catch(() => ({ error: "Сервер вернул не JSON" }));
-                    alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
-                }
-            } catch (error) {
-                console.error("Ошибка запроса:", error);
-                alert("Ошибка при добавлении проекта");
+        try {
+            const response = await fetch(`http://localhost:8000/api/project/add/${user.id}/`, {
+                method: "POST",
+                body: formData,
+            });
+            if (response.ok) {
+                alert("Проект успешно добавлен!");
+                await fetchUserProjects(user.id);
+            } else {
+                const result = await response.json().catch(() => ({ error: "Сервер вернул не JSON" }));
+                alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
             }
-        };
-        input.click();
+        } catch (error) {
+            console.error("Ошибка запроса:", error);
+            alert("Ошибка при добавлении проекта");
+        }
     };
 
-    const handleDeleteReceived = async (sharedId: number) => {
+    const handleEditProject = (project: ProjectData | ReceivedProjectData) => {
+        setEditingProject(project);
+    };
+
+    const handleViewVersions = (project: ProjectData | ReceivedProjectData) => {
+        const projectId = "id" in project ? project.id : project.project_id;
+        setViewingVersionsProjectId(projectId);
+    };
+
+    const handleShareProject = (project: ProjectData) => {
+        setSharingProject(project);
+    };
+
+    const sendProjectToFriend = async (friendId: number, comment: string) => {
+        if (!sharingProject) return;
         try {
-            const response = await fetch(`http://localhost:8000/api/project/delete_received/${sharedId}/`, {
-                method: "DELETE",
+            const response = await fetch(`http://localhost:8000/api/project/share/${sharingProject.id}/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    recipient_id: friendId,
+                    comment,
+                }),
             });
-            if (response.ok && user) {
-                void fetchReceivedProjects(user.id); // обновляем список
-            } else {
-                alert("Не удалось удалить запись");
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Ошибка при отправке проекта:", errorText);
             }
+
+            alert("Проект успешно отправлен!");
         } catch (err) {
             console.error(err);
-            alert("Ошибка при удалении записи");
+            alert("Не удалось отправить проект");
         }
     };
 
@@ -168,7 +186,7 @@ const ProjectsPage: React.FC = () => {
             <div className="projects-page page">
                 <div className="page-header">
                     <h1>Мои проекты</h1>
-                    <button className="btn-primary" onClick={showUploadProjectModal}>
+                    <button className="btn-primary" onClick={() => setShowUploadModal(true)}>
                         <FontAwesomeIcon icon={faUpload} /> Загрузить проект
                     </button>
                 </div>
@@ -189,12 +207,15 @@ const ProjectsPage: React.FC = () => {
                 <div className={`projects-content ${activeTab === "my-projects" ? "active" : ""}`}>
                     {myProjects.length === 0 ? <p>Проекты отсутствуют</p> : (
                         <div className="projects-grid">
-                            {myProjects.map((p) => (
+                            {myProjects.slice().reverse().map((p) => (
                                 <ProjectCard
                                     key={p.id}
                                     project={p}
-                                    fetchProjects={() => user && fetchUserProjects(user.id)}
-                                    onDownload={() => handleDownload(p.id, p.project_name)}
+                                    onDownload={() => handleDownload(p.id, p.project_name, p.type)}
+                                    onDelete={() => handleDelete(p.id, () => user && fetchUserProjects(user.id))}
+                                    onEdit={() => handleEditProject(p)}
+                                    onVersion={() => handleViewVersions(p)}
+                                    onShare={() => handleShareProject(p)}
                                 />
                             ))}
                         </div>
@@ -204,11 +225,13 @@ const ProjectsPage: React.FC = () => {
                 {/* Проекты друзей */}
                 <div className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
                     <div className="projects-grid">
-                        {friendsProjects.map((p) => (
+                        {friendsProjects.slice().reverse().map((p) => (
                             <FriendProjectCard
                                 key={p.id}
                                 project={p}
-                                onDownload={() => handleDownload(p.id, p.project_name)}
+                                onDownload={() => handleDownload(p.id, p.project_name, p.type)}
+                                onEdit={() => handleEditProject(p)}
+                                onVersion={() => handleViewVersions(p)}
                             />
                         ))}
                     </div>
@@ -220,18 +243,73 @@ const ProjectsPage: React.FC = () => {
                         <p>Вы не получали проекты</p>
                     ) : (
                         <div className="projects-grid">
-                            {receivedProjects.map((p) => (
+                            {receivedProjects.slice().reverse().map((p) => (
                                 <ReceivedProjectCard
                                     key={p.shared_id}
                                     project={p}
-                                    onDownload={() => handleDownload(p.project_id, p.project_name)}
-                                    onDelete={handleDeleteReceived}
+                                    onDownload={() => handleDownload(p.project_id, p.project_name, p.type || "txt")}
+                                    onDelete={() => handleDelete(
+                                        p.project_id,
+                                        () => fetchReceivedProjects(user!.id),
+                                        true,
+                                        p.shared_id,
+                                        () => fetchReceivedProjects(user!.id)
+                                    )}
+                                    onEdit={() => handleEditProject(p)}
+                                    onVersion={() => handleViewVersions(p)}
                                 />
                             ))}
                         </div>
                     )}
                 </div>
             </div>
+
+            {showUploadModal && (
+                <UploadProjectModal
+                    onClose={() => setShowUploadModal(false)}
+                    onUpload={handleUploadProject}
+                />
+            )}
+
+            {editingProject && (
+                <EditProjectModal
+                    projectId={"id" in editingProject ? editingProject.id : editingProject.project_id}
+                    projectName={editingProject.project_name}
+                    description={"description" in editingProject ? editingProject.description : ""}
+                    isPrivate={"private" in editingProject ? editingProject.private : false}
+                    onClose={() => setEditingProject(null)}
+                    onSave={() => {
+                        if (!user) return;
+
+                        // Обновляем список проектов
+                        if ("id" in editingProject) {
+                            // Мой проект
+                            void fetchUserProjects(user.id);
+                        } else {
+                            // Полученный проект
+                            void fetchReceivedProjects(user.id);
+                        }
+
+                        setEditingProject(null);
+                    }}
+                />
+            )}
+
+            {viewingVersionsProjectId !== null && (
+                <VersionModal
+                    projectId={viewingVersionsProjectId}
+                    onClose={() => setViewingVersionsProjectId(null)}
+                />
+            )}
+            {sharingProject && (
+                <ShareModal
+                    friends={friends}
+                    projectName={sharingProject.project_name}
+                    sendingTo={null}
+                    onSend={sendProjectToFriend}
+                    onClose={() => setSharingProject(null)}
+                />
+            )}
         </MainLayout>
     );
 };
