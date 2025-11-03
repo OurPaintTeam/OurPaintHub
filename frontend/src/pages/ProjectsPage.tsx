@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from "react";
 import MainLayout from "../layout/MainLayout";
 import "./ProjectsPage.scss";
 import ProjectCard from "../components/ProjectCard/ProjectCard";
 import FriendProjectCard from "../components/ProjectCard/FriendProjectCard";
-import ReceivedProjectCard, { ReceivedProjectData } from "../components/ProjectCard/ReceivedProjectCard";
+import ReceivedProjectCard, {ReceivedProjectData} from "../components/ProjectCard/ReceivedProjectCard";
 import UploadProjectModal from "../components/ProjectModal/UploadProjectModal";
 import EditProjectModal from "../components/ProjectModal/EditProjectModal";
 import VersionModal from "../components/ProjectModal/VersionModal";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload } from "@fortawesome/free-solid-svg-icons";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import {faUpload} from "@fortawesome/free-solid-svg-icons";
 import {
     handleDownload,
     handleDelete,
@@ -92,7 +92,7 @@ const ProjectsPage: React.FC = () => {
                     const data = await res.json();
                     return data.projects
                         .filter((p: ProjectData) => !p.private)
-                        .map((p: ProjectData) => ({ ...p, author: friend.nickname || friend.email }));
+                        .map((p: ProjectData) => ({...p, author: friend.nickname || friend.email}));
                 })
             );
             setFriendsProjects(allProjects.flat());
@@ -135,7 +135,7 @@ const ProjectsPage: React.FC = () => {
                 alert("Проект успешно добавлен!");
                 await fetchUserProjects(user.id);
             } else {
-                const result = await response.json().catch(() => ({ error: "Сервер вернул не JSON" }));
+                const result = await response.json().catch(() => ({error: "Сервер вернул не JSON"}));
                 alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
             }
         } catch (error) {
@@ -162,7 +162,7 @@ const ProjectsPage: React.FC = () => {
         try {
             const response = await fetch(`http://localhost:8000/api/project/share/${sharingProject.id}/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     recipient_id: friendId,
                     comment,
@@ -187,18 +187,21 @@ const ProjectsPage: React.FC = () => {
                 <div className="page-header">
                     <h1>Мои проекты</h1>
                     <button className="btn-primary" onClick={() => setShowUploadModal(true)}>
-                        <FontAwesomeIcon icon={faUpload} /> Загрузить проект
+                        <FontAwesomeIcon icon={faUpload}/> Загрузить проект
                     </button>
                 </div>
 
                 <div className="projects-tabs">
-                    <button className={`tab-btn ${activeTab === "my-projects" ? "active" : ""}`} onClick={() => setActiveTab("my-projects")}>
+                    <button className={`tab-btn ${activeTab === "my-projects" ? "active" : ""}`}
+                            onClick={() => setActiveTab("my-projects")}>
                         Мои проекты
                     </button>
-                    <button className={`tab-btn ${activeTab === "friends-projects" ? "active" : ""}`} onClick={() => setActiveTab("friends-projects")}>
+                    <button className={`tab-btn ${activeTab === "friends-projects" ? "active" : ""}`}
+                            onClick={() => setActiveTab("friends-projects")}>
                         Проекты друзей
                     </button>
-                    <button className={`tab-btn ${activeTab === "received-projects" ? "active" : ""}`} onClick={() => setActiveTab("received-projects")}>
+                    <button className={`tab-btn ${activeTab === "received-projects" ? "active" : ""}`}
+                            onClick={() => setActiveTab("received-projects")}>
                         Полученные
                     </button>
                 </div>
