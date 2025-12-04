@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPalette, faBell, faBars, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faPenRuler, faBell, faBars, faTimes } from "@fortawesome/free-solid-svg-icons";
 import IconMenuButton from "../IconMenuButton/IconMenuButton";
 import "./NavigationBox.scss";
 
@@ -67,7 +67,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false }
     <nav className="navbar">
       <div className="nav-container">
         <div className="nav-logo">
-          <FontAwesomeIcon icon={faPalette} />
+          <FontAwesomeIcon icon={faPenRuler} />
           <span>OurPaintHUB</span>
         </div>
 
