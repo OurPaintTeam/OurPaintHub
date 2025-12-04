@@ -219,7 +219,7 @@ class FAQ(models.Model):
     text_question = models.TextField()
     answered = models.BooleanField(default=False)
     answer_text = models.TextField(null=True, blank=True)
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='faq_admin', db_column='admin_id')
+    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='faq_admin', db_column='admin_id',null=True,blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='faq_user', db_column='user_id')
     
     class Meta:
