@@ -1878,7 +1878,6 @@ def cancel_friend_request(request):
         
         return Response({"message": "Заявка отменена"}, status=200)
 
-
 @api_view(["GET"])
 def get_QA_list(request):
     faqs = FAQ.objects.select_related("user", "admin").all().order_by("-id")
@@ -1898,55 +1897,77 @@ def get_QA_list(request):
 
 @api_view(["POST"])
 def create_QA(request):
-    text_question = request.data.get("text_question", "").strip()
+    """
+    POST /api/QA/create/
+    Создать новый вопрос
+    {
+        "user_id": 1,
+        "text_question": "Ваш вопрос"
+    }
+    """
     user_id = request.data.get("user_id")
-    if user_id is None:
-        return Response({"error": "Не указан пользователь"}, status=status.HTTP_400_BAD_REQUEST)
+    text_question = request.data.get("text_question", "").strip()
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный ID пользователя"}, status=status.HTTP_400_BAD_REQUEST)
-    if not text_question:
-        return Response({"error": "Вопрос не может быть пустым"}, status=status.HTTP_400_BAD_REQUEST)
     if not user_id:
-        return Response({"error": "Не указан пользователь"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+    if not text_question:
+        return Response({"error": "Вопрос не может быть пустым"}, status=400)
 
     try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+        user = User.objects.get(id=int(user_id))
+    except (ValueError, User.DoesNotExist):
+        return Response({"error": "Пользователь не найден"}, status=404)
 
-    faq = FAQ(user=user, admin=None, text_question=text_question, answered=False)
     try:
+        faq = FAQ(user=user, admin=None, text_question=text_question, answered=False)
         faq.clean()
         faq.save()
-        return Response({"success": "Вопрос добавлен"}, status=status.HTTP_201_CREATED)
+        return Response({
+            "message": "Вопрос успешно добавлен"
+        }, status=201)
     except ValidationError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": str(e)}, status=400)
+    except Exception as e:
+        return Response({"error": f"Ошибка при создании вопроса: {str(e)}"}, status=500)
 
 @api_view(["PATCH"])
 def answer_QA(request, qa_id):
+    """
+    PATCH /api/QA/<qa_id>/answer/
+    Ответ на вопрос (только для админов)
+    {
+        "answer_text": "Ваш ответ"
+    }
+    """
     try:
         faq = FAQ.objects.get(id=qa_id)
     except FAQ.DoesNotExist:
-        return Response({"error": "Вопрос не найден"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Вопрос не найден"}, status=404)
 
-    if not request.user.is_staff:  # проверка, что админ
-        return Response({"error": "Нет прав"}, status=status.HTTP_403_FORBIDDEN)
+    user_id = request.data.get('user_id')
+
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    user = User.objects.get(id=user_id)
+
+    # Проверяем, является ли пользователь администратором
+    try:
+        role = Role.objects.get(user=user, role='admin')
+    except Role.DoesNotExist:
+        return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
 
     answer_text = request.data.get("answer_text", "").strip()
     if not answer_text:
-        return Response({"error": "Ответ не может быть пустым"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Ответ не может быть пустым"}, status=400)
 
-    faq.answer_text = answer_text
-    faq.answered = True
-    faq.admin = request.user
     try:
-        faq.clean()
+        faq.answer_text = answer_text
+        faq.answered = True
+        faq.admin = user
         faq.save()
-        return Response({"success": "Ответ сохранён"}, status=status.HTTP_200_OK)
-    except ValidationError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
+        return Response({
+            "message": "Ответ успешно сохранён"
+        }, status=200)
+    except Exception as e:
+        return Response({"error": f"Ошибка при сохранении ответа: {str(e)}"}, status=500)
