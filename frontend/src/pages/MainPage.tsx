@@ -47,7 +47,7 @@ const MainPage: React.FC = () => {
       <div className="main-page page">
         <div className="page-header">
           <h1>Добро пожаловать в OurPaintHUB!</h1>
-          <p>Ваш центр креативности и вдохновения</p>
+          <p>Ваша платформа для обмена проектами</p>
         </div>
 
         <div className="dashboard-grid">
