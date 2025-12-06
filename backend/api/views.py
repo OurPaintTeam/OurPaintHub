@@ -10,6 +10,7 @@ import os
 from django.http import HttpResponse
 from rest_framework import status
 import mimetypes
+import datetime as dt
 
 @api_view(["POST"])
 def register_user(request):
@@ -1067,6 +1068,14 @@ def add_project(request, user_id):
             description=change_text
         )
 
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='add',
+            id_user=project.user,
+            type='project',
+            id_entity=project.id
+        )
+
     except Exception as e:
         return Response({"error": f"Ошибка при сохранении проекта: {str(e)}"}, status=500)
 
@@ -1166,6 +1175,15 @@ def delete_project(request, project_id):
         project = ProjectMeta.objects.get(pk=project_id)
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
+
+    EntityLog.objects.create(
+        time=dt.now().time(),
+        action='delete',
+        id_user=project.user,
+        type='project',
+        id_entity=project
+    )
+
     ProjectChanges.objects.filter(project_id=project_id).delete()
     project.delete()
     return Response({"success": "Проект удалён"}, status=200)
@@ -1192,7 +1210,7 @@ def change_project(request, project_id):
     project_name = data.get("project_name")
     private = data.get("private")
     description = data.get("description")
-    changer_id = data.get("changer_id") or data.get("user_id")
+    changer_id = data.get("changer_id")
     file_uploaded = request.FILES.get("file")
 
     changed_fields = []
@@ -1243,6 +1261,14 @@ def change_project(request, project_id):
             changer=changer,
             description=change_description
         )
+
+    EntityLog.objects.create(
+        time=dt.now().time(),
+        action='change',
+        id_user=changer_id,
+        type='project',
+        id_entity=project_meta.project.id
+    )
 
     return Response({
         "success": True,
@@ -1309,6 +1335,14 @@ def share_project(request, project_id):
         shared_obj.clean()  # нельзя самому себе
         shared_obj.save()
 
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='add',
+            id_user=Project.objects.get(id=project_id).user,
+            type='shared',
+            id_entity=shared_obj.id
+        )
+
         return Response({"success": "Проект успешно передан!"}, status=status.HTTP_201_CREATED)
 
     except ValidationError as e:
@@ -1365,7 +1399,17 @@ def delete_received(request, shared_id: int):
     """
     try:
         shared_obj = Shared.objects.get(id=shared_id)
+        id = shared_obj.receiver
         shared_obj.delete()
+
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='delete',
+            id_user=id,
+            type='shared',
+            id_entity=shared_id
+        )
+
         return Response({"success": "Запись о полученном проекте удалена"}, status=status.HTTP_200_OK)
     except Shared.DoesNotExist:
         return Response({"error": "Запись не найдена"}, status=status.HTTP_404_NOT_FOUND)
@@ -1922,6 +1966,15 @@ def create_QA(request):
         faq = FAQ(user=user, admin=None, text_question=text_question, answered=False)
         faq.clean()
         faq.save()
+
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='add',
+            id_user=user,
+            type='FAQ',
+            id_entity=faq.id
+        )
+
         return Response({
             "message": "Вопрос успешно добавлен"
         }, status=201)
@@ -1966,6 +2019,15 @@ def answer_QA(request, qa_id):
         faq.answered = True
         faq.admin = user
         faq.save()
+
+        EntityLog.objects.create(
+            time=dt.now().time(),
+            action='change',
+            id_user=user,
+            type='FAQ',
+            id_entity=faq.id
+        )
+
         return Response({
             "message": "Ответ успешно сохранён"
         }, status=200)
