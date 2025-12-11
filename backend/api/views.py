@@ -26,11 +26,9 @@ def register_user(request):
     if not password or not email:
         return Response({"error": "Все поля обязательны"}, status=400)
 
-    # Проверяем валидность email
     if not User.validate_email(email):
         return Response({"error": "Неверный формат email"}, status=400)
 
-    # Проверяем, существует ли пользователь
     if User.objects.filter(email=email).exists():
         return Response({"error": "Пользователь с таким email уже существует"}, status=400)
 
@@ -81,16 +79,10 @@ def news_view(request):
     Получить список всех новостей (используем Documentation с типом 'guide')
     """
     try:
-        # Используем Documentation с типом 'guide' для новостей
         news = Documentation.objects.filter(type='guide').order_by('-id')
         news_data = []
         for item in news:
-            # Извлекаем заголовок и содержание из поля text
-            text_lines = item.text.split('\n')
-            title = ""
-            content = ""
             
-            # Удаляем HTML комментарии из текста для отображения
             clean_text = item.text
             import re
             clean_text = re.sub(r'<!-- CREATED:.*?-->', '', clean_text)
@@ -100,17 +92,15 @@ def news_view(request):
             text_lines = clean_text.split('\n')
             
             if text_lines and text_lines[0].startswith('# '):
-                title = text_lines[0][2:].strip()  # Убираем "# "
+                title = text_lines[0][2:].strip()
                 content = '\n'.join(text_lines[2:]).strip() if len(text_lines) > 2 else ""
             else:
                 title = clean_text[:50] + "..." if len(clean_text) > 50 else clean_text
                 content = clean_text
-            
-            # Получаем даты из HTML комментариев в тексте
+
             created_at = None
             updated_at = None
-            
-            # Извлекаем дату создания из HTML комментариев
+
             if item.text and '<!-- CREATED:' in item.text:
                 try:
                     created_start = item.text.find('<!-- CREATED:') + 13
@@ -118,8 +108,7 @@ def news_view(request):
                     created_at = item.text[created_start:created_end].strip()
                 except:
                     pass
-            
-            # Извлекаем дату обновления из HTML комментариев
+
             if item.text and '<!-- UPDATED:' in item.text:
                 try:
                     updated_start = item.text.find('<!-- UPDATED:') + 13
@@ -168,15 +157,12 @@ def create_news(request):
     
     try:
         user = User.objects.get(id=user_id)
-        
-        # Проверяем, является ли пользователь администратором
+
         try:
             role = Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
-        
-        # Создаем новость в Documentation с типом 'guide'
-        # Объединяем заголовок и содержание в поле text
+
         from datetime import datetime
         now = datetime.now()
         full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {now.isoformat()} -->"
@@ -185,8 +171,7 @@ def create_news(request):
             admin=user,
             text=full_content.strip()
         )
-        
-        # Создаем запись в EntityLog о создании новости
+
         from datetime import datetime
         EntityLog.objects.create(
             time=datetime.now().time(),
@@ -375,8 +360,7 @@ def update_documentation(request, doc_id):
                 created_date = doc.text[created_start:created_end]
             except:
                 pass
-        
-        # Обновляем контент с сохранением даты создания
+
         if created_date:
             full_content = (
                 f"# {title}\n\n" \
@@ -468,14 +452,12 @@ def download_view(request):
     Получить список доступных версий приложения
     """
     try:
-        # Используем Documentation с типом 'api' для версий приложения
         versions = Documentation.objects.filter(type='api').order_by('-id')
         versions_data = []
         
         for version in versions:
             raw_text = version.text or ""
-            
-            # Парсим структурированные данные из текста
+
             version_match = re.search(r'<!--\s*VERSION:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             version_num = version_match.group(1).strip() if version_match else "1.0.0"
             
@@ -537,8 +519,7 @@ def download_file(request, version_id):
     """
     try:
         version = Documentation.objects.get(id=version_id, type='api')
-        
-        # Извлекаем путь к файлу из комментариев
+
         file_path = None
         if version.text and '<!-- FILE_PATH:' in version.text:
             try:
@@ -553,16 +534,13 @@ def download_file(request, version_id):
         
         if not os.path.exists(file_path):
             return Response({"error": "Файл не существует на сервере"}, status=404)
-        
-        # Получаем имя файла для заголовка Content-Disposition
+
         filename = os.path.basename(file_path)
-        
-        # Используем FileResponse с автоматическим закрытием файла
+
         file_handle = open(file_path, 'rb')
         response = FileResponse(file_handle, content_type='application/octet-stream')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        # Логируем скачивание
+
         try:
             user_id = request.GET.get('user_id')
             if user_id:
@@ -617,12 +595,10 @@ def create_version(request):
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."}, status=403)
-        
-        # Проверяем существование файла
+
         if not os.path.exists(file_path):
             return Response({"error": "Файл не существует по указанному пути"}, status=400)
-        
-        # Вычисляем размер файла, если не указан
+
         if not file_size:
             file_size = str(os.path.getsize(file_path))
         
@@ -691,8 +667,7 @@ def delete_version(request, version_id):
             version = Documentation.objects.get(id=version_id, type='api')
         except Documentation.DoesNotExist:
             return Response({"error": "Версия не найдена"}, status=404)
-        
-        # Извлекаем путь к файлу и удаляем его (опционально)
+
         file_path = None
         if version.text and '<!-- FILE_PATH:' in version.text:
             try:
@@ -701,17 +676,9 @@ def delete_version(request, version_id):
                 file_path = version.text[path_start:path_end].strip()
             except:
                 pass
-        
-        # Удаляем запись из БД
+
         version.delete()
-        
-        # Опционально: удаляем физический файл (раскомментируйте если нужно)
-        # if file_path and os.path.exists(file_path):
-        #     try:
-        #         os.remove(file_path)
-        #     except:
-        #         pass
-        
+
         EntityLog.objects.create(
             action='remove',
             id_user=user,
@@ -867,24 +834,19 @@ def update_news(request, news_id):
     
     try:
         user = User.objects.get(id=user_id)
-        
-        # Проверяем, является ли пользователь администратором
+
         try:
             role = Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
             return Response({"error": "Недостаточно прав. Только администраторы могут редактировать новости."}, status=403)
-        
-        # Получаем новость из Documentation
+
         try:
             news = Documentation.objects.get(id=news_id, type='guide')
         except Documentation.DoesNotExist:
             return Response({"error": "Новость не найдена"}, status=404)
-        
-        # Обновляем новость
+
         from datetime import datetime
         now = datetime.now()
-        
-        # Извлекаем дату создания из существующего контента
         created_date = None
         if news.text and '<!-- CREATED:' in news.text:
             try:
@@ -893,8 +855,7 @@ def update_news(request, news_id):
                 created_date = news.text[created_start:created_end]
             except:
                 pass
-        
-        # Обновляем контент с сохранением даты создания
+
         if created_date:
             full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {created_date} -->\n<!-- UPDATED: {now.isoformat()} -->"
         else:
@@ -902,8 +863,7 @@ def update_news(request, news_id):
         
         news.text = full_content.strip()
         news.save()
-        
-        # Создаем запись в EntityLog об изменении новости
+
         from datetime import datetime
         EntityLog.objects.create(
             time=datetime.now().time(),
@@ -940,23 +900,19 @@ def delete_news(request, news_id):
     
     try:
         user = User.objects.get(id=user_id)
-        
-        # Проверяем, является ли пользователь администратором
+
         try:
             role = Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
             return Response({"error": "Недостаточно прав. Только администраторы могут удалять новости."}, status=403)
-        
-        # Получаем новость из Documentation
+
         try:
             news = Documentation.objects.get(id=news_id, type='guide')
         except Documentation.DoesNotExist:
             return Response({"error": "Новость не найдена"}, status=404)
-        
-        # Удаляем новость
+
         news.delete()
-        
-        # Создаем запись в EntityLog об удалении новости
+
         from datetime import datetime
         EntityLog.objects.create(
             time=datetime.now().time(),
@@ -1769,8 +1725,7 @@ def remove_friend(request):
         friend = User.objects.get(id=friend_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
-    
-    # Удаляем дружбу через сырой SQL
+
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -1839,8 +1794,7 @@ def cancel_friend_request(request):
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
-    
-    # Отменяем заявку через сырой SQL
+
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -1951,7 +1905,6 @@ def answer_QA(request, qa_id):
 
     user = User.objects.get(id=user_id)
 
-    # Проверяем, является ли пользователь администратором
     try:
         role = Role.objects.get(user=user, role='admin')
     except Role.DoesNotExist:
