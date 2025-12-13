@@ -116,3 +116,37 @@
     }
   }
 }
+
+.answer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.answer-actions button {
+  min-height: 36px; /* одинаковая высота */
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: background 0.2s;
+}
+
+.answer-actions button:first-child {
+  background-color: #2196f3;
+  color: white;
+
+  &:hover {
+    background-color: #1976d2;
+  }
+}
+
+.delete-btn {
+  background-color: #f44336 !important;
+  color: white;
+
+  &:hover {
+    background-color: #d32f2f !important;
+  }
+}

@@ -147,11 +147,37 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
         }
     };
 
+    const handleDelete = async (qaId: number) => {
+        if (!isAdmin) return;
+
+        const confirmDelete = window.confirm("Удалить вопрос?");
+        if (!confirmDelete) return;
+
+        try {
+            const res = await fetch(`http://localhost:8000/api/QA/${qaId}/delete/`, {
+                method: "DELETE",
+            });
+
+            const text = await res.text();
+            if (!res.ok) {
+                setMessage("Ошибка при удалении");
+                console.error(text);
+                return;
+            }
+
+            setQA(prev => prev.filter(item => item.id !== qaId));
+            setMessage("Вопрос удалён");
+        } catch (err) {
+            console.error(err);
+            setMessage("Ошибка при удалении");
+        }
+    };
+
     const handleAnswer = async (qaId: number) => {
         const answer = adminAnswers[qaId];
         if (!answer || !answer.trim() || !user) return;
 
-        setSavingAnswerIds((prev) => ({...prev, [qaId]: true}));
+        setSavingAnswerIds(prev => ({...prev, [qaId]: true}));
         setMessage("");
 
         try {
@@ -183,14 +209,14 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                 return;
             }
 
-            setAdminAnswers((prev) => ({...prev, [qaId]: ""}));
+            setAdminAnswers(prev => ({...prev, [qaId]: ""}));
             void fetchQA();
             setMessage("Ответ успешно сохранен!");
         } catch (err) {
             console.error(err);
             setMessage("Ошибка сети при сохранении ответа");
         } finally {
-            setSavingAnswerIds((prev) => ({...prev, [qaId]: false}));
+            setSavingAnswerIds(prev => ({...prev, [qaId]: false}));
         }
     };
 
@@ -206,7 +232,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
             <textarea
                 placeholder="Задайте свой вопрос..."
                 value={newQuestion}
-                onChange={(e) => setNewQuestion(e.target.value)}
+                onChange={e => setNewQuestion(e.target.value)}
             />
                         <button onClick={handleAskQuestion} disabled={savingQuestion}>
                             {savingQuestion ? "Отправка..." : "Отправить вопрос"}
@@ -214,13 +240,17 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                     </div>
                 )}
 
-                {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
+                {message && (
+                    <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
+                        {message}
+                    </p>
+                )}
 
                 <div className="qa-content">
                     {loading ? (
                         <p>Загрузка данных...</p>
                     ) : (
-                        qa.map((item) => (
+                        qa.map(item => (
                             <div key={item.id} className={`qa-item ${!item.answered ? "unanswered" : ""}`}>
                                 <h2 className="qa-title">{item.text_question}</h2>
 
@@ -232,16 +262,28 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                       <textarea
                           placeholder="Введите ответ..."
                           value={adminAnswers[item.id] || ""}
-                          onChange={(e) =>
-                              setAdminAnswers((prev) => ({...prev, [item.id]: e.target.value}))
+                          onChange={e =>
+                              setAdminAnswers(prev => ({...prev, [item.id]: e.target.value}))
                           }
                       />
-                                            <button
-                                                onClick={() => handleAnswer(item.id)}
-                                                disabled={savingAnswerIds[item.id]}
-                                            >
-                                                {savingAnswerIds[item.id] ? "Сохранение..." : "Ответить"}
-                                            </button>
+                                            <div className="answer-actions">
+                                                <button
+                                                    onClick={() => handleAnswer(item.id)}
+                                                    disabled={savingAnswerIds[item.id]}
+                                                >
+                                                    {savingAnswerIds[item.id] ? "Сохранение..." : "Ответить"}
+                                                </button>
+                                                <button
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        void handleDelete(item.id);
+                                                    }}
+                                                    className="delete-btn"
+                                                    title="Удалить вопрос"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : null}
                                 </div>
