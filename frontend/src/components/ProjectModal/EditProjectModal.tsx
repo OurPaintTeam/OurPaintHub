@@ -40,20 +40,18 @@ const EditProjectModal: React.FC<EditProjectModalProps> = ({
             return;
         }
 
-        const token = localStorage.getItem("token");
         const formData = new FormData();
-
+        formData.append("user_id", userId.toString());
         formData.append("project_name", newName);
         formData.append("description", newDescription);
         formData.append("private", privateStatus ? "true" : "false");
-        formData.append("changer_id", userId.toString());
         if (file) formData.append("file", file);
 
         try {
             setSaving(true);
             const response = await fetch(`http://localhost:8000/api/project/change/${projectId}/`, {
                 method: "PATCH",
-                headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+                headers: {"Content-Type": "application/json"},
                 body: formData,
             });
 

@@ -148,28 +148,30 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
     };
 
     const handleDelete = async (qaId: number) => {
-        if (!isAdmin) return;
+        if (!isAdmin || !user) return;
 
-        const confirmDelete = window.confirm("Удалить вопрос?");
-        if (!confirmDelete) return;
+        const confirmed = window.confirm("Вы уверены, что хотите удалить этот вопрос?");
+        if (!confirmed) return;
 
         try {
-            const res = await fetch(`http://localhost:8000/api/QA/${qaId}/delete/`, {
+            const response = await fetch(`http://localhost:8000/api/QA/${qaId}/delete/`, {
                 method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: user.id }),
             });
 
-            const text = await res.text();
-            if (!res.ok) {
-                setMessage("Ошибка при удалении");
-                console.error(text);
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
                 return;
             }
 
-            setQA(prev => prev.filter(item => item.id !== qaId));
-            setMessage("Вопрос удалён");
-        } catch (err) {
-            console.error(err);
-            setMessage("Ошибка при удалении");
+            alert("Вопрос успешно удалён!");
+            void fetchQA();
+
+        } catch (error) {
+            alert("Ошибка: " + error);
         }
     };
 

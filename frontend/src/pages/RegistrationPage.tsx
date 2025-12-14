@@ -5,7 +5,7 @@ import {
   faUser,
   faEnvelope,
   faLock,
-  faPalette,
+  faPenRuler,
 } from "@fortawesome/free-solid-svg-icons";
 import "./RegistrationPage.scss";
 
@@ -77,7 +77,7 @@ const RegistrationPage: React.FC = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <FontAwesomeIcon icon={faPalette} />
+          <FontAwesomeIcon icon={faPenRuler} />
           <h1>OurPaintHUB</h1>
           <p>Платформа для обмена проектами</p>
         </div>

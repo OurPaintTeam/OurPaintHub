@@ -9,13 +9,14 @@ interface Friend {
 
 interface ShareModalProps {
     friends: Friend[];
+    userId: number;
     sendingTo: number | null;
-    onSend: (friendId: number, comment: string) => Promise<void>;
+    onSend: (userId:number,friendId: number, comment: string) => Promise<void>;
     onClose: () => void;
     projectName: string;
 }
 
-const ShareModal: React.FC<ShareModalProps> = ({friends, projectName, onClose, onSend}) => {
+const ShareModal: React.FC<ShareModalProps> = ({friends, projectName, onClose, onSend,userId}) => {
     const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
     const [comment, setComment] = useState("");
     const [sending, setSending] = useState(false);
@@ -30,7 +31,7 @@ const ShareModal: React.FC<ShareModalProps> = ({friends, projectName, onClose, o
         if (selectedFriends.length === 0) return alert("Выберите хотя бы одного друга!");
         setSending(true);
         try {
-            await Promise.all(selectedFriends.map(id => onSend(id, comment))); // отправляем всем выбранным друзьям
+            await Promise.all(selectedFriends.map(id => onSend(userId,id, comment))); // отправляем всем выбранным друзьям
             onClose();
         } catch (err) {
             console.error(err);

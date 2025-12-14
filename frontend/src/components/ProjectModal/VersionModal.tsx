@@ -9,20 +9,26 @@ export interface VersionData {
 }
 
 interface VersionModalProps {
+    userId: number;
     projectId: number;
     onClose: () => void;
 }
 
-const VersionModal: React.FC<VersionModalProps> = ({projectId, onClose}) => {
+const VersionModal: React.FC<VersionModalProps> = ({userId,projectId, onClose}) => {
     const [versions, setVersions] = useState<VersionData[]>([]);
     const [loading, setLoading] = useState(true);
     const [projectName, setProjectName] = useState("");
 
     useEffect(() => {
         const fetchVersions = async () => {
+            if (!userId || !projectId) return;
             try {
                 const response = await fetch(
-                    `http://localhost:8000/api/project/get_project_versions/${projectId}/`
+                    `http://localhost:8000/api/project/get_project_versions/${projectId}/`,{
+                        method: "GET",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ user_id: userId }),
+                    }
                 );
                 if (!response.ok) console.error("Произошла ошибка.");
                 const data = await response.json();
