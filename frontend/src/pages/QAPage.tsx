@@ -39,26 +39,26 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
     useEffect(() => {
         const init = async () => {
             const userData = localStorage.getItem("user");
+
             if (userData) {
                 try {
                     const parsedUser = JSON.parse(userData);
                     setUser(parsedUser);
-                    await checkAdminRole(parsedUser.id);
+                    await checkAdminRole();
                 } catch {
                     console.error("Ошибка парсинга данных пользователя");
                 }
-            } else {
-                navigate("/login");
-                return;
             }
+
             await fetchQA();
         };
         void init();
     }, [navigate]);
 
-    const checkAdminRole = async (userId: number) => {
+    const checkAdminRole = async () => {
         try {
-            const res = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+            if (!user) return;
+            const res = await fetch(`http://localhost:8000/api/user/role/?user_id=${user.id}`);
             const text = await res.text();
             let data: any = null;
             if (text) {
@@ -160,9 +160,8 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                 body: JSON.stringify({ user_id: user.id }),
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
+                const data = await response.json();
                 alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
                 return;
             }
@@ -231,11 +230,11 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
 
                 {(isAuthenticated && !isAdmin) && (
                     <div className="qa-new-question">
-            <textarea
-                placeholder="Задайте свой вопрос..."
-                value={newQuestion}
-                onChange={e => setNewQuestion(e.target.value)}
-            />
+                        <textarea
+                            placeholder="Задайте свой вопрос..."
+                            value={newQuestion}
+                            onChange={e => setNewQuestion(e.target.value)}
+                        />
                         <button onClick={handleAskQuestion} disabled={savingQuestion}>
                             {savingQuestion ? "Отправка..." : "Отправить вопрос"}
                         </button>
@@ -251,7 +250,9 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                 <div className="qa-content">
                     {loading ? (
                         <p>Загрузка данных...</p>
-                    ) : (
+                    ) : qa.length === 0 ? (
+                        <p>Раздел пуст</p>
+                        ) : (
                         qa.map(item => (
                             <div key={item.id} className={`qa-item ${!item.answered ? "unanswered" : ""}`}>
                                 <h2 className="qa-title">{item.text_question}</h2>
@@ -261,20 +262,14 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                                         <div className="qa-answer">{item.answer_text}</div>
                                     ) : isAdmin ? (
                                         <div className="answer-form">
-                      <textarea
-                          placeholder="Введите ответ..."
-                          value={adminAnswers[item.id] || ""}
-                          onChange={e =>
-                              setAdminAnswers(prev => ({...prev, [item.id]: e.target.value}))
-                          }
-                      />
+                                            <textarea
+                                                placeholder="Введите ответ..."
+                                                value={adminAnswers[item.id] || ""}
+                                                onChange={e =>
+                                                    setAdminAnswers(prev => ({ ...prev, [item.id]: e.target.value }))
+                                                }
+                                            />
                                             <div className="answer-actions">
-                                                <button
-                                                    onClick={() => handleAnswer(item.id)}
-                                                    disabled={savingAnswerIds[item.id]}
-                                                >
-                                                    {savingAnswerIds[item.id] ? "Сохранение..." : "Ответить"}
-                                                </button>
                                                 <button
                                                     onClick={e => {
                                                         e.stopPropagation();
@@ -284,6 +279,12 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                                                     title="Удалить вопрос"
                                                 >
                                                     🗑️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAnswer(item.id)}
+                                                    disabled={savingAnswerIds[item.id]}
+                                                >
+                                                    {savingAnswerIds[item.id] ? "Сохранение..." : "Ответить"}
                                                 </button>
                                             </div>
                                         </div>
@@ -303,6 +304,15 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
                                                 minute: "2-digit",
                                             })}
                                         </small>
+                                    )}
+                                    {isAdmin && item.answered  && (
+                                        <button
+                                            onClick={() => handleDelete(item.id)}
+                                            className="delete-btn"
+                                            title="Удалить вопрос"
+                                        >
+                                            🗑️
+                                        </button>
                                     )}
                                 </div>
                             </div>

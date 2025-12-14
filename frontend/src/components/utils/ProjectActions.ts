@@ -6,7 +6,7 @@ export const handleDownload = async (
 ) => {
     try {
         const response = await fetch(`http://localhost:8000/api/project/download/${projectId}/`,{
-            method: "DELETE",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: userId }),
         });

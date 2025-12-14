@@ -14,6 +14,7 @@ import {
     handleDelete,
 } from "../components/utils/ProjectActions";
 import ShareModal from "../components/ProjectModal/ShareModal";
+import {useNavigate} from "react-router-dom";
 
 export interface UserData {
     id: number;
@@ -44,6 +45,7 @@ const ProjectsPage: React.FC = () => {
     const [editingProject, setEditingProject] = useState<ProjectData | ReceivedProjectData | null>(null);
     const [viewingVersionsProjectId, setViewingVersionsProjectId] = useState<number | null>(null);
     const [sharingProject, setSharingProject] = useState<ProjectData | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -51,22 +53,28 @@ const ProjectsPage: React.FC = () => {
             try {
                 const parsedUser = JSON.parse(userData);
                 setUser(parsedUser);
-                void fetchUserProjects();
-                void fetchFriends();
-                void fetchReceivedProjects();
             } catch {
                 console.error("Ошибка парсинга данных пользователя");
             }
+        } else {
+            navigate("/login");
         }
-    }, []);
+    }, [navigate]);
+
+    useEffect(() => {
+        if (!user) return;
+        void fetchUserProjects();
+        void fetchFriends();
+        void fetchReceivedProjects();
+    }, [user]);
 
     const fetchUserProjects = async () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
             const response = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
-                method: "GET",
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id }),
+                body: JSON.stringify({ user_id: user.id,viewer_id:user.id }),
             });
             if (!response.ok) return;
             const data = await response.json();
@@ -79,11 +87,7 @@ const ProjectsPage: React.FC = () => {
     const fetchFriends = async () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/friends/`,{
-                method: "GET",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id , viewer_id: user.id }),
-            });
+            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${user.id}`);
             if (!response.ok) return;
             const data = await response.json();
             setFriends(data);
@@ -99,7 +103,7 @@ const ProjectsPage: React.FC = () => {
             const allProjects = await Promise.all(
                 friendsList.map(async (friend) => {
                     const res = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
-                        method: "GET",
+                        method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ user_id: user.id,viewer_id: friend.id }),
                     });
@@ -120,7 +124,7 @@ const ProjectsPage: React.FC = () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
             const response = await fetch(`http://localhost:8000/api/project/shared/`,{
-                method: "GET",
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id }),
             });

@@ -66,7 +66,7 @@ const AccountPage: React.FC = () => {
 
             // Мои проекты
             const projectsResponse = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
-                method: "GET",
+                method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     user_id: userId,
@@ -80,7 +80,7 @@ const AccountPage: React.FC = () => {
 
             // Полученные проекты
             const receivedResponse = await fetch(`http://localhost:8000/api/project/shared/`,{
-                method: "GET",
+                method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     user_id: userId

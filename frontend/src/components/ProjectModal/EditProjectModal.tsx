@@ -51,7 +51,6 @@ const EditProjectModal: React.FC<EditProjectModalProps> = ({
             setSaving(true);
             const response = await fetch(`http://localhost:8000/api/project/change/${projectId}/`, {
                 method: "PATCH",
-                headers: {"Content-Type": "application/json"},
                 body: formData,
             });
 
