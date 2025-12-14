@@ -1074,7 +1074,7 @@ def add_project(request):
         status=status.HTTP_201_CREATED
     )
 
-@api_view(["GET"])
+@api_view(["POST"])
 def get_project_versions(request, project_id):
     """
     GET /api/project/get_project_versions/<int:project_id>/
@@ -1142,7 +1142,7 @@ def get_project_versions(request, project_id):
 
     return Response(result, status=status.HTTP_200_OK)
 
-@api_view(["GET"])
+@api_view(["POST"])
 def get_user_projects(request):
     """
     GET /api/project/get_user_projects/
@@ -1397,7 +1397,7 @@ def change_project(request, project_id):
         }
     }, status=status.HTTP_200_OK)
 
-@api_view(["GET"])
+@api_view(["POST"])
 def download_project(request, project_id):
     """
     GET /api/project/download/<int:project_id>/
@@ -1576,7 +1576,7 @@ def share_project(request, project_id):
         )
 
 
-@api_view(["GET"])
+@api_view(["POST"])
 def get_shared_projects(request):
     """
     GET /api/project/shared/
