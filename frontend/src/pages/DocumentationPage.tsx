@@ -159,7 +159,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
                 <span>{cat.name}</span>
               </button>
             ))}
-            {isAuthenticated && (
+            {isAuthenticated && isAdmin && (
               <button onClick={handleAddDocs} className="add-docs-btn">
                 + Добавить документацию
               </button>
