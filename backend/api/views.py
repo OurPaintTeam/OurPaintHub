@@ -3,14 +3,52 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import FileResponse
-from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, ProjectChanges
+from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, \
+    ProjectChanges
 from decimal import Decimal
+from datetime import datetime
 import re
 import os
 from django.http import HttpResponse
 from rest_framework import status
 import mimetypes
-import datetime as dt
+
+
+def make_friendship_entity_id(user_a, user_b):
+    return min(user_a, user_b) * 1000000 + max(user_a, user_b)
+
+
+def get_friendship_between(user_a_id, user_b_id):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2, status
+            FROM friendship
+            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
+            LIMIT 1
+            """,
+            [user_a_id, user_b_id, user_b_id, user_a_id]
+        )
+        row = cursor.fetchone()
+    return row
+
+
+def get_friend_ids(user):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT user1, user2
+            FROM friendship
+            WHERE (user1 = %s OR user2 = %s) AND status = 'accepted'
+            """,
+            [user.id, user.id]
+        )
+        rows = cursor.fetchall()
+    ids = []
+    for u1, u2 in rows:
+        ids.append(u2 if u1 == user.id else u1)
+    return ids
+
 
 @api_view(["POST"])
 def register_user(request):
@@ -49,6 +87,7 @@ def register_user(request):
     except Exception as e:
         return Response({"error": f"Ошибка при создании пользователя: {str(e)}"}, status=500)
 
+
 @api_view(["POST"])
 def login_user(request):
     """
@@ -72,6 +111,7 @@ def login_user(request):
             return Response({"error": "Неверный пароль"}, status=400)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=400)
+
 
 @api_view(["GET"])
 def news_view(request):
@@ -129,11 +169,13 @@ def news_view(request):
             })
         
         if not news_data:
-            news_data = [{"id": 1, "title": "Новости будут добавлены позже", "content": "Пока раздел находится в разработке."}]
-        
+            news_data = [
+                {"id": 1, "title": "Новости будут добавлены позже", "content": "Пока раздел находится в разработке."}]
+
         return Response(news_data)
     except Exception as e:
         return Response({"error": f"Ошибка при загрузке новостей: {str(e)}"}, status=500)
+
 
 @api_view(["POST"])
 def create_news(request):
@@ -149,13 +191,13 @@ def create_news(request):
     user_id = request.data.get('user_id')
     title = request.data.get('title')
     content = request.data.get('content')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     if not title or not content:
         return Response({"error": "Заголовок и содержание обязательны"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
 
@@ -164,7 +206,6 @@ def create_news(request):
         except Role.DoesNotExist:
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
 
-        from datetime import datetime
         now = datetime.now()
         full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {now.isoformat()} -->"
         news = Documentation.objects.create(
@@ -173,15 +214,13 @@ def create_news(request):
             text=full_content.strip()
         )
 
-        from datetime import datetime
         EntityLog.objects.create(
-            time=datetime.now().time(),
             action='add',
             id_user=user,
             type='documentation',
             id_entity=news.id
         )
-        
+
         return Response({
             "message": "Новость успешно создана",
             "id": news.id,
@@ -190,11 +229,12 @@ def create_news(request):
             "author_id": news.admin.id,
             "created_at": None
         }, status=201)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при создании новости: {str(e)}"}, status=500)
+
 
 @api_view(["GET"])
 def documentation_view(request):
@@ -269,9 +309,9 @@ def create_documentation(request):
         try:
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут создавать документацию."}, status=403)
+            return Response({"error": "Недостаточно прав. Только администраторы могут создавать документацию."},
+                            status=403)
 
-        from datetime import datetime
         now = datetime.now()
         full_content = (
             f"# {title}\n\n" \
@@ -286,9 +326,7 @@ def create_documentation(request):
             text=full_content.strip()
         )
 
-        from datetime import datetime as dt
         EntityLog.objects.create(
-            time=dt.now().time(),
             action='add',
             id_user=user,
             type='documentation',
@@ -326,32 +364,32 @@ def update_documentation(request, doc_id):
     title = request.data.get('title')
     content = request.data.get('content')
     category = request.data.get('category')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     if not title or not content:
         return Response({"error": "Заголовок и содержание обязательны"}, status=400)
-    
+
     if not category or not isinstance(category, str):
         return Response({"error": "Категория обязательна"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
-        
+
         try:
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать документацию."}, status=403)
-        
+            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать документацию."},
+                            status=403)
+
         try:
             doc = Documentation.objects.get(id=doc_id, type='reference')
         except Documentation.DoesNotExist:
             return Response({"error": "Документация не найдена"}, status=404)
-        
-        from datetime import datetime
+
         now = datetime.now()
-        
+
         # Извлекаем дату создания из существующего контента
         created_date = None
         if doc.text and '<!-- CREATED:' in doc.text:
@@ -378,17 +416,17 @@ def update_documentation(request, doc_id):
                 f"<!-- CREATED: {now.isoformat()} -->\n" \
                 f"<!-- UPDATED: {now.isoformat()} -->"
             )
-        
+
         doc.text = full_content.strip()
         doc.save()
-        
+
         EntityLog.objects.create(
             action='change',
             id_user=user,
             type='documentation',
             id_entity=doc.id
         )
-        
+
         return Response({
             "message": "Документация успешно обновлена",
             "id": doc.id,
@@ -397,7 +435,7 @@ def update_documentation(request, doc_id):
             "category": category,
             "author_id": doc.admin.id,
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
@@ -411,40 +449,42 @@ def delete_documentation(request, doc_id):
     Удалить документацию (только для админов)
     """
     user_id = request.data.get('user_id')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
-        
+
         try:
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут удалять документацию."}, status=403)
-        
+            return Response({"error": "Недостаточно прав. Только администраторы могут удалять документацию."},
+                            status=403)
+
         try:
             doc = Documentation.objects.get(id=doc_id, type='reference')
         except Documentation.DoesNotExist:
             return Response({"error": "Документация не найдена"}, status=404)
-        
+
         doc.delete()
-        
+
         EntityLog.objects.create(
             action='remove',
             id_user=user,
             type='documentation',
             id_entity=doc_id
         )
-        
+
         return Response({
             "message": "Документация успешно удалена"
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при удалении документации: {str(e)}"}, status=500)
+
 
 @api_view(["GET"])
 def download_view(request):
@@ -455,36 +495,37 @@ def download_view(request):
     try:
         versions = Documentation.objects.filter(type='api').order_by('-id')
         versions_data = []
-        
+
         for version in versions:
             raw_text = version.text or ""
 
             version_match = re.search(r'<!--\s*VERSION:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             version_num = version_match.group(1).strip() if version_match else "1.0.0"
-            
+
             file_path_match = re.search(r'<!--\s*FILE_PATH:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             file_path = file_path_match.group(1).strip() if file_path_match else None
-            
+
             file_size_match = re.search(r'<!--\s*FILE_SIZE:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             file_size = file_size_match.group(1).strip() if file_size_match else None
-            
+
             platform_match = re.search(r'<!--\s*PLATFORM:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             platform = platform_match.group(1).strip() if platform_match else "Все платформы"
-            
+
             created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             created_at = created_match.group(1).strip() if created_match else None
-            
+
             # Очищаем текст от комментариев
-            clean_text = re.sub(r'<!--\s*(VERSION|FILE_PATH|FILE_SIZE|PLATFORM|CREATED):.*?-->', '', raw_text, flags=re.IGNORECASE).strip()
+            clean_text = re.sub(r'<!--\s*(VERSION|FILE_PATH|FILE_SIZE|PLATFORM|CREATED):.*?-->', '', raw_text,
+                                flags=re.IGNORECASE).strip()
             text_lines = clean_text.split('\n') if clean_text else []
-            
+
             if text_lines and text_lines[0].startswith('# '):
                 title = text_lines[0][2:].strip()
                 content = '\n'.join(text_lines[1:]).strip()
             else:
                 title = f"OurPaint CAD v{version_num}"
                 content = clean_text or f"Версия {version_num} приложения OurPaint CAD"
-            
+
             versions_data.append({
                 "id": version.id,
                 "title": title,
@@ -497,7 +538,7 @@ def download_view(request):
                 "author_id": version.admin.id,
                 "author_email": version.admin.email,
             })
-        
+
         if not versions_data:
             versions_data = [{
                 "id": 1,
@@ -506,7 +547,7 @@ def download_view(request):
                 "version": "1.0.0",
                 "platform": "Все платформы",
             }]
-        
+
         return Response(versions_data)
     except Exception as e:
         return Response({"error": f"Ошибка при загрузке версий: {str(e)}"}, status=500)
@@ -529,10 +570,10 @@ def download_file(request, version_id):
                 file_path = version.text[path_start:path_end].strip()
             except:
                 pass
-        
+
         if not file_path:
             return Response({"error": "Файл версии не найден"}, status=404)
-        
+
         if not os.path.exists(file_path):
             return Response({"error": "Файл не существует на сервере"}, status=404)
 
@@ -554,9 +595,9 @@ def download_file(request, version_id):
                 )
         except:
             pass
-        
+
         return response
-        
+
     except Documentation.DoesNotExist:
         return Response({"error": "Версия не найдена"}, status=404)
     except Exception as e:
@@ -576,36 +617,36 @@ def create_version(request):
     platform = request.data.get('platform')
     file_path = request.data.get('file_path')
     file_size = request.data.get('file_size')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     if not title or not content:
         return Response({"error": "Заголовок и описание обязательны"}, status=400)
-    
+
     if not version:
         return Response({"error": "Версия обязательна"}, status=400)
-    
+
     if not file_path:
         return Response({"error": "Путь к файлу обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
-        
+
         try:
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."}, status=403)
+            return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."},
+                            status=403)
 
         if not os.path.exists(file_path):
             return Response({"error": "Файл не существует по указанному пути"}, status=400)
 
         if not file_size:
             file_size = str(os.path.getsize(file_path))
-        
-        from datetime import datetime
+
         now = datetime.now()
-        
+
         full_content = (
             f"# {title}\n\n"
             f"{content}\n\n"
@@ -615,22 +656,20 @@ def create_version(request):
             f"<!-- PLATFORM: {platform or 'Все платформы'} -->\n"
             f"<!-- CREATED: {now.isoformat()} -->"
         )
-        
+
         version_doc = Documentation.objects.create(
             type='api',
             admin=user,
             text=full_content.strip()
         )
-        
-        from datetime import datetime as dt
+
         EntityLog.objects.create(
-            time=dt.now().time(),
             action='add',
             id_user=user,
             type='documentation',
             id_entity=version_doc.id
         )
-        
+
         return Response({
             "message": "Версия приложения успешно создана",
             "id": version_doc.id,
@@ -638,7 +677,7 @@ def create_version(request):
             "version": version,
             "platform": platform,
         }, status=201)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
@@ -652,18 +691,19 @@ def delete_version(request, version_id):
     Удалить версию приложения (только для админов)
     """
     user_id = request.data.get('user_id')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
-        
+
         try:
             Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут удалять версии приложения."}, status=403)
-        
+            return Response({"error": "Недостаточно прав. Только администраторы могут удалять версии приложения."},
+                            status=403)
+
         try:
             version = Documentation.objects.get(id=version_id, type='api')
         except Documentation.DoesNotExist:
@@ -686,15 +726,16 @@ def delete_version(request, version_id):
             type='documentation',
             id_entity=version_id
         )
-        
+
         return Response({
             "message": "Версия приложения успешно удалена"
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при удалении версии: {str(e)}"}, status=500)
+
 
 @api_view(["GET"])
 def get_user_profile(request):
@@ -705,12 +746,11 @@ def get_user_profile(request):
     user_id = request.GET.get('user_id')
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
         try:
             profile = UserProfile.objects.get(user=user)
-            from django.db import connection
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -737,6 +777,7 @@ def get_user_profile(request):
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
 
+
 @api_view(["PUT"])
 def update_user_profile(request):
     """
@@ -756,14 +797,14 @@ def update_user_profile(request):
     date_of_birth = request.data.get('date_of_birth')
     avatar_provided = 'avatar' in request.data
     avatar = request.data.get('avatar') if avatar_provided else None
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
-        profile, created = UserProfile.objects.get_or_create(user=user)
-        
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+
         avatar_changed = False
         if avatar_provided:
             new_avatar = None
@@ -788,9 +829,9 @@ def update_user_profile(request):
             profile.bio = bio if bio.strip() else None
         if date_of_birth is not None:
             profile.date_of_birth = date_of_birth if date_of_birth.strip() else None
-            
+
         profile.save()
-        
+
         if avatar_changed:
             EntityLog.objects.create(
                 action='change',
@@ -798,7 +839,7 @@ def update_user_profile(request):
                 type='user_profile',
                 id_entity=user.id
             )
-        
+
         return Response({
             "message": "Профиль успешно обновлен",
             "nickname": profile.name,
@@ -806,11 +847,12 @@ def update_user_profile(request):
             "date_of_birth": profile.date_of_birth,
             "avatar": profile.avatar
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при обновлении профиля: {str(e)}"}, status=500)
+
 
 @api_view(["PUT"])
 def update_news(request, news_id):
@@ -826,27 +868,27 @@ def update_news(request, news_id):
     user_id = request.data.get('user_id')
     title = request.data.get('title')
     content = request.data.get('content')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     if not title or not content:
         return Response({"error": "Заголовок и содержание обязательны"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
 
         try:
             role = Role.objects.get(user=user, role='admin')
         except Role.DoesNotExist:
-            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать новости."}, status=403)
+            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать новости."},
+                            status=403)
 
         try:
             news = Documentation.objects.get(id=news_id, type='guide')
         except Documentation.DoesNotExist:
             return Response({"error": "Новость не найдена"}, status=404)
 
-        from datetime import datetime
         now = datetime.now()
         created_date = None
         if news.text and '<!-- CREATED:' in news.text:
@@ -861,19 +903,18 @@ def update_news(request, news_id):
             full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {created_date} -->\n<!-- UPDATED: {now.isoformat()} -->"
         else:
             full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {now.isoformat()} -->\n<!-- UPDATED: {now.isoformat()} -->"
-        
+
         news.text = full_content.strip()
         news.save()
 
-        from datetime import datetime
         EntityLog.objects.create(
-            time=datetime.now().time(),
+
             action='change',
             id_user=user,
             type='documentation',
             id_entity=news.id
         )
-        
+
         return Response({
             "message": "Новость успешно обновлена",
             "id": news.id,
@@ -882,11 +923,12 @@ def update_news(request, news_id):
             "author_id": news.admin.id,
             "updated_at": None
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при обновлении новости: {str(e)}"}, status=500)
+
 
 @api_view(["DELETE"])
 def delete_news(request, news_id):
@@ -895,10 +937,10 @@ def delete_news(request, news_id):
     Удалить новость (только для админов)
     """
     user_id = request.data.get('user_id')
-    
+
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
 
@@ -914,23 +956,23 @@ def delete_news(request, news_id):
 
         news.delete()
 
-        from datetime import datetime
         EntityLog.objects.create(
-            time=datetime.now().time(),
+
             action='remove',
             id_user=user,
             type='documentation',
             id_entity=news_id
         )
-        
+
         return Response({
             "message": "Новость успешно удалена"
         }, status=200)
-        
+
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при удалении новости: {str(e)}"}, status=500)
+
 
 @api_view(["GET"])
 def check_user_role(request):
@@ -941,7 +983,7 @@ def check_user_role(request):
     user_id = request.GET.get('user_id')
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
         try:
@@ -1025,7 +1067,6 @@ def add_project(request, user_id):
         )
 
         EntityLog.objects.create(
-            time=dt.now().time(),
             action='add',
             id_user=project.user,
             type='project',
@@ -1039,6 +1080,7 @@ def add_project(request, user_id):
         {"message": "Проект успешно создан", "project_id": project.id},
         status=201
     )
+
 
 @api_view(["GET"])
 def get_project_versions(request, project_id):
@@ -1068,6 +1110,7 @@ def get_project_versions(request, project_id):
         })
 
     return Response(result, status=200)
+
 
 @api_view(["GET"])
 def get_user_projects(request, user_id):
@@ -1121,6 +1164,7 @@ def get_user_projects(request, user_id):
 
     return Response({"projects": data})
 
+
 @api_view(["DELETE"])
 def delete_project(request, project_id):
     """
@@ -1133,7 +1177,7 @@ def delete_project(request, project_id):
         return Response({"error": "Проект не найден"}, status=404)
 
     EntityLog.objects.create(
-        time=dt.now().time(),
+        
         action='delete',
         id_user=project.user,
         type='project',
@@ -1143,6 +1187,7 @@ def delete_project(request, project_id):
     ProjectChanges.objects.filter(project_id=project_id).delete()
     project.delete()
     return Response({"success": "Проект удалён"}, status=200)
+
 
 @api_view(["PATCH"])
 def change_project(request, project_id):
@@ -1219,9 +1264,8 @@ def change_project(request, project_id):
         )
 
     EntityLog.objects.create(
-        time=dt.now().time(),
         action='change',
-        id_user=changer_id,
+        id_user=changer,
         type='project',
         id_entity=project_meta.project.id
     )
@@ -1238,6 +1282,7 @@ def change_project(request, project_id):
             "description": change_description,
         }
     }, status=200)
+
 
 @api_view(["GET"])
 def download_project(request, project_id):
@@ -1260,6 +1305,7 @@ def download_project(request, project_id):
 
     except ProjectMeta.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
+
 
 @api_view(["POST"])
 def share_project(request, project_id):
@@ -1292,7 +1338,7 @@ def share_project(request, project_id):
         shared_obj.save()
 
         EntityLog.objects.create(
-            time=dt.now().time(),
+            
             action='add',
             id_user=Project.objects.get(id=project_id).user,
             type='shared',
@@ -1347,6 +1393,7 @@ def get_shared_projects(request, user_id):
 
     return Response(result, status=status.HTTP_200_OK)
 
+
 @api_view(["DELETE"])
 def delete_received(request, shared_id: int):
     """
@@ -1359,7 +1406,7 @@ def delete_received(request, shared_id: int):
         shared_obj.delete()
 
         EntityLog.objects.create(
-            time=dt.now().time(),
+            
             action='delete',
             id_user=id,
             type='shared',
@@ -1372,7 +1419,8 @@ def delete_received(request, shared_id: int):
     except Exception as e:
         print("Ошибка delete_received:", e)
         return Response({"error": "Ошибка при удалении записи"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+
 @api_view(["GET"])
 def get_all_users(request):
     """
@@ -1385,7 +1433,7 @@ def get_all_users(request):
     """
     exclude_id = request.GET.get('exclude_id')
     search = request.GET.get('search', '').strip()
-    
+
     users = User.objects.all()
     if exclude_id:
         try:
@@ -1396,7 +1444,7 @@ def get_all_users(request):
 
     if search:
         users = users.filter(email__icontains=search)
-    
+
     result = []
     for user in users:
         try:
@@ -1404,20 +1452,21 @@ def get_all_users(request):
             nickname = profile.name
         except UserProfile.DoesNotExist:
             nickname = None
-        
+
         result.append({
             "id": user.id,
             "email": user.email,
             "nickname": nickname
         })
-    
+
     return Response(result, status=200)
+
 
 @api_view(["GET"])
 def get_friends(request):
     """
     GET /api/friends/
-    Получить список друзей пользователя (статус 'accepted')
+    Получить список друзей пользователя
 
     Параметры:
     - user_id: ID пользователя
@@ -1426,28 +1475,13 @@ def get_friends(request):
     search = (request.GET.get('search') or '').strip()
     if not user_id:
         return Response({"error": "ID пользователя обязателен"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
-    
-    # Получаем друзей через сырой SQL (без pk id у friendship)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2
-            FROM friendship
-            WHERE (user1 = %s OR user2 = %s) AND status = 'accepted'
-            """,
-            [user.id, user.id]
-        )
-        rows = cursor.fetchall()
 
-    friend_ids = []
-    for u1, u2 in rows:
-        friend_ids.append(u2 if u1 == user.id else u1)
-
+    friend_ids = get_friend_ids(user)
     friends = User.objects.filter(id__in=friend_ids)
     if search:
         friends = friends.filter(email__icontains=search)
@@ -1465,6 +1499,7 @@ def get_friends(request):
         })
     return Response(result, status=200)
 
+
 @api_view(["POST"])
 def add_friend(request):
     """
@@ -1479,40 +1514,30 @@ def add_friend(request):
     """
     user_id = request.data.get('user_id')
     friend_id = request.data.get('friend_id')
-    
+
     if not user_id or not friend_id:
         return Response({"error": "ID пользователя и друга обязательны"}, status=400)
-    
+
     try:
         user_id = int(user_id)
         friend_id = int(friend_id)
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
-    
+
     if user_id == friend_id:
         return Response({"error": "Нельзя добавить себя в друзья"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
         friend = User.objects.get(id=friend_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2, status
-            FROM friendship
-            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
-            LIMIT 1
-            """,
-            [user.id, friend.id, friend.id, user.id]
-        )
-        row = cursor.fetchone()
-
-        if row:
-            u1, u2, status = row
-            if status == 'sent' and u2 == user.id:
+    row = get_friendship_between(user.id, friend.id)
+    if row:
+        u1, u2, status = row
+        if status == 'sent' and u2 == user.id:
+            with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE friendship
@@ -1521,40 +1546,37 @@ def add_friend(request):
                     """,
                     [u1, u2]
                 )
-                from datetime import datetime
-                entity_id = min(u1, u2) * 1000000 + max(u1, u2)  # Уникальный ID для пары
-                EntityLog.objects.create(
-                    time=datetime.now().time(),
-                    action='change',
-                    id_user=user,
-                    type='friendship',
-                    id_entity=entity_id
-                )
-                return Response({"message": "Запрос в друзья принят", "status": "accepted"}, status=200)
-            elif status == 'accepted':
-                return Response({"error": "Вы уже друзья"}, status=400)
-            else:
-                return Response({"error": "Запрос в друзья уже отправлен"}, status=400)
-        else:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO friendship (user1, user2, status) VALUES (%s, %s, 'sent')
-                    """,
-                    [user.id, friend.id]
-                )
-                from datetime import datetime
-                entity_id = min(user.id, friend.id) * 1000000 + max(user.id, friend.id)
-                EntityLog.objects.create(
-                    time=datetime.now().time(),
-                    action='add',
-                    id_user=user,
-                    type='friendship',
-                    id_entity=entity_id
-                )
-                return Response({"message": "Запрос в друзья отправлен", "status": "sent"}, status=201)
-            except Exception as e:
-                return Response({"error": f"Ошибка при создании дружбы: {str(e)}"}, status=500)
+            entity_id = make_friendship_entity_id(u1, u2)
+            EntityLog.objects.create(
+                action='change',
+                id_user=user,
+                type='friendship',
+                id_entity=entity_id
+            )
+            return Response({"message": "Запрос в друзья принят", "status": "accepted"}, status=200)
+        if status == 'accepted':
+            return Response({"error": "Вы уже друзья"}, status=400)
+        return Response({"error": "Запрос в друзья уже отправлен"}, status=400)
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO friendship (user1, user2, status) VALUES (%s, %s, 'sent')
+                """,
+                [user.id, friend.id]
+            )
+        entity_id = make_friendship_entity_id(user.id, friend.id)
+        EntityLog.objects.create(
+            action='add',
+            id_user=user,
+            type='friendship',
+            id_entity=entity_id
+        )
+        return Response({"message": "Запрос в друзья отправлен", "status": "sent"}, status=201)
+    except Exception as e:
+        return Response({"error": f"Ошибка при создании дружбы: {str(e)}"}, status=500)
+
 
 @api_view(["GET"])
 def get_friend_requests(request):
@@ -1602,6 +1624,7 @@ def get_friend_requests(request):
         })
     return Response(result, status=200)
 
+
 @api_view(["GET"])
 def get_sent_friend_requests(request):
     """
@@ -1648,6 +1671,7 @@ def get_sent_friend_requests(request):
         })
     return Response(result, status=200)
 
+
 @api_view(["POST"])
 def respond_friend_request(request):
     """
@@ -1677,20 +1701,14 @@ def respond_friend_request(request):
     if user_id == from_user_id:
         return Response({"error": "Некорректные участники заявки"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT 1 FROM friendship
-            WHERE user1 = %s AND user2 = %s AND status = 'sent'
-            LIMIT 1
-            """,
-            [from_user_id, user_id]
-        )
-        exists = cursor.fetchone()
-        if not exists:
-            return Response({"error": "Заявка не найдена"}, status=404)
+    exists = get_friendship_between(from_user_id, user_id)
+    if not exists or exists[2] != 'sent' or exists[0] != from_user_id or exists[1] != user_id:
+        return Response({"error": "Заявка не найдена"}, status=404)
 
-        if action == 'accept':
+    entity_id = make_friendship_entity_id(from_user_id, user_id)
+
+    if action == 'accept':
+        with connection.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE friendship
@@ -1699,43 +1717,39 @@ def respond_friend_request(request):
                 """,
                 [from_user_id, user_id]
             )
-            from datetime import datetime
-            entity_id = min(from_user_id, user_id) * 1000000 + max(from_user_id, user_id)
-            try:
-                user_obj = User.objects.get(id=user_id)
-                EntityLog.objects.create(
-                    time=datetime.now().time(),
-                    action='change',
-                    id_user=user_obj,
-                    type='friendship',
-                    id_entity=entity_id
-                )
-            except User.DoesNotExist:
-                pass
-            return Response({"message": "Заявка принята", "status": "accepted"}, status=200)
-        else:
-            from datetime import datetime
-            entity_id = min(from_user_id, user_id) * 1000000 + max(from_user_id, user_id)
-            try:
-                user_obj = User.objects.get(id=user_id)
-                EntityLog.objects.create(
-                    time=datetime.now().time(),
-                    action='remove',
-                    id_user=user_obj,
-                    type='friendship',
-                    id_entity=entity_id
-                )
-            except User.DoesNotExist:
-                pass
-            
-            cursor.execute(
-                """
-                DELETE FROM friendship
-                WHERE user1 = %s AND user2 = %s
-                """,
-                [from_user_id, user_id]
+        try:
+            user_obj = User.objects.get(id=user_id)
+            EntityLog.objects.create(
+                action='change',
+                id_user=user_obj,
+                type='friendship',
+                id_entity=entity_id
             )
-            return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
+        except User.DoesNotExist:
+            pass
+        return Response({"message": "Заявка принята", "status": "accepted"}, status=200)
+
+    try:
+        user_obj = User.objects.get(id=user_id)
+        EntityLog.objects.create(
+            action='remove',
+            id_user=user_obj,
+            type='friendship',
+            id_entity=entity_id
+        )
+    except User.DoesNotExist:
+        pass
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DELETE FROM friendship
+            WHERE user1 = %s AND user2 = %s
+            """,
+            [from_user_id, user_id]
+        )
+    return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
+
 
 @api_view(["DELETE"])
 def remove_friend(request):
@@ -1751,52 +1765,39 @@ def remove_friend(request):
     """
     user_id = request.data.get('user_id')
     friend_id = request.data.get('friend_id')
-    
+
     if not user_id or not friend_id:
         return Response({"error": "ID пользователя и друга обязательны"}, status=400)
-    
+
     try:
         user_id = int(user_id)
         friend_id = int(friend_id)
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
-    
+
     if user_id == friend_id:
         return Response({"error": "Нельзя удалить себя из друзей"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
         friend = User.objects.get(id=friend_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
 
+    row = get_friendship_between(user_id, friend_id)
+    if not row or row[2] != 'accepted':
+        return Response({"error": "Дружба не найдена или уже удалена"}, status=404)
+
+    u1, u2, _ = row
+    entity_id = make_friendship_entity_id(u1, u2)
+    EntityLog.objects.create(
+        action='remove',
+        id_user=user,
+        type='friendship',
+        id_entity=entity_id
+    )
+
     with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2, status
-            FROM friendship
-            WHERE ((user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)) AND status = 'accepted'
-            LIMIT 1
-            """,
-            [user_id, friend_id, friend_id, user_id]
-        )
-        row = cursor.fetchone()
-        
-        if not row:
-            return Response({"error": "Дружба не найдена или уже удалена"}, status=404)
-        
-        u1, u2, status = row
-
-        from datetime import datetime
-        entity_id = min(u1, u2) * 1000000 + max(u1, u2)
-        EntityLog.objects.create(
-            time=datetime.now().time(),
-            action='remove',
-            id_user=user,
-            type='friendship',
-            id_entity=entity_id
-        )
-
         cursor.execute(
             """
             DELETE FROM friendship
@@ -1804,8 +1805,9 @@ def remove_friend(request):
             """,
             [user_id, friend_id, friend_id, user_id]
         )
-        
-        return Response({"message": "Друг успешно удален"}, status=200)
+
+    return Response({"message": "Друг успешно удален"}, status=200)
+
 
 @api_view(["POST"])
 def cancel_friend_request(request):
@@ -1821,51 +1823,37 @@ def cancel_friend_request(request):
     """
     user_id = request.data.get('user_id')
     receiver_id = request.data.get('receiver_id')
-    
+
     if not user_id or not receiver_id:
         return Response({"error": "ID пользователя и получателя обязательны"}, status=400)
-    
+
     try:
         user_id = int(user_id)
         receiver_id = int(receiver_id)
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
-    
+
     if user_id == receiver_id:
         return Response({"error": "Некорректные параметры"}, status=400)
-    
+
     try:
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
         return Response({"error": "Пользователь не найден"}, status=404)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2, status
-            FROM friendship
-            WHERE user1 = %s AND user2 = %s AND status = 'sent'
-            LIMIT 1
-            """,
-            [user_id, receiver_id]
-        )
-        row = cursor.fetchone()
-        
-        if not row:
-            return Response({"error": "Заявка не найдена или уже обработана"}, status=404)
-        
-        u1, u2, status = row
-        
-        from datetime import datetime
-        entity_id = min(u1, u2) * 1000000 + max(u1, u2)
-        EntityLog.objects.create(
-            time=datetime.now().time(),
-            action='remove',
-            id_user=user,
-            type='friendship',
-            id_entity=entity_id
-        )
+    row = get_friendship_between(user_id, receiver_id)
+    if not row or row[2] != 'sent' or row[0] != user_id or row[1] != receiver_id:
+        return Response({"error": "Заявка не найдена или уже обработана"}, status=404)
 
+    entity_id = make_friendship_entity_id(row[0], row[1])
+    EntityLog.objects.create(
+        action='remove',
+        id_user=user,
+        type='friendship',
+        id_entity=entity_id
+    )
+
+    with connection.cursor() as cursor:
         cursor.execute(
             """
             DELETE FROM friendship
@@ -1873,8 +1861,9 @@ def cancel_friend_request(request):
             """,
             [user_id, receiver_id]
         )
-        
-        return Response({"message": "Заявка отменена"}, status=200)
+
+    return Response({"message": "Заявка отменена"}, status=200)
+
 
 @api_view(["GET"])
 def get_QA_list(request):
@@ -1922,7 +1911,7 @@ def create_QA(request):
         faq.save()
 
         EntityLog.objects.create(
-            time=dt.now().time(),
+            
             action='add',
             id_user=user,
             type='FAQ',
@@ -1936,6 +1925,7 @@ def create_QA(request):
         return Response({"error": str(e)}, status=400)
     except Exception as e:
         return Response({"error": f"Ошибка при создании вопроса: {str(e)}"}, status=500)
+
 
 @api_view(["PATCH"])
 def answer_QA(request, qa_id):
@@ -1974,7 +1964,6 @@ def answer_QA(request, qa_id):
         faq.save()
 
         EntityLog.objects.create(
-            time=dt.now().time(),
             action='change',
             id_user=user,
             type='FAQ',
