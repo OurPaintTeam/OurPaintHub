@@ -1,10 +1,15 @@
 export const handleDownload = async (
+    userId: number,
     projectId: number,
     projectName: string,
     fileType: string
 ) => {
     try {
-        const response = await fetch(`http://localhost:8000/api/project/download/${projectId}/`);
+        const response = await fetch(`http://localhost:8000/api/project/download/${projectId}/`,{
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId }),
+        });
         if (!response.ok) console.error("Ошибка при скачивании проекта");
 
         const blob = await response.blob();
@@ -24,6 +29,7 @@ export const handleDownload = async (
 };
 
 export const handleDelete = async (
+    userId: number,
     projectId: number,
     refreshProjects: () => void,
     isReceived = false,
@@ -36,11 +42,15 @@ export const handleDelete = async (
         if (isReceived && sharedId) {
             const response = await fetch(`http://localhost:8000/api/project/delete_received/${sharedId}/`, {
                 method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId }),
             });
             if (response.ok && refreshReceived) refreshReceived();
         } else {
             const response = await fetch(`http://localhost:8000/api/project/delete/${projectId}/`, {
                 method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId }),
             });
             if (response.ok) refreshProjects();
         }

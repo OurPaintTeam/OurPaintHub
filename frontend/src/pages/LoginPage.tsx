@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faPalette } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock, faPenRuler } from "@fortawesome/free-solid-svg-icons";
 import "./LoginPage.scss";
 
 const LoginPage: React.FC = () => {
@@ -62,7 +62,7 @@ const LoginPage: React.FC = () => {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <FontAwesomeIcon icon={faPalette} />
+          <FontAwesomeIcon icon={faPenRuler} />
           <h1>OurPaintHUB</h1>
           <p>Платформа для обмена проектами</p>
           <h2>Вход в систему</h2>

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.http import FileResponse
 from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, \
-    ProjectChanges
+    ProjectChanges, Friendship
 from decimal import Decimal
 from datetime import datetime
 import re
@@ -123,7 +123,7 @@ def news_view(request):
         news = Documentation.objects.filter(type='guide').order_by('-id')
         news_data = []
         for item in news:
-            
+
             clean_text = item.text
             import re
             clean_text = re.sub(r'<!-- CREATED:.*?-->', '', clean_text)
@@ -389,8 +389,6 @@ def update_documentation(request, doc_id):
             return Response({"error": "Документация не найдена"}, status=404)
 
         now = datetime.now()
-
-        # Извлекаем дату создания из существующего контента
         created_date = None
         if doc.text and '<!-- CREATED:' in doc.text:
             try:
@@ -514,7 +512,6 @@ def download_view(request):
             created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
             created_at = created_match.group(1).strip() if created_match else None
 
-            # Очищаем текст от комментариев
             clean_text = re.sub(r'<!--\s*(VERSION|FILE_PATH|FILE_SIZE|PLATFORM|CREATED):.*?-->', '', raw_text,
                                 flags=re.IGNORECASE).strip()
             text_lines = clean_text.split('\n') if clean_text else []
@@ -1004,9 +1001,9 @@ def check_user_role(request):
 
 
 @api_view(["POST"])
-def add_project(request, user_id):
+def add_project(request):
     """
-    POST /api/project/add/<int:user_id>/
+    POST /api/project/add/
     Добавить проект для пользователя.
 
     Тело запроса:
@@ -1019,43 +1016,71 @@ def add_project(request, user_id):
         "description": "Описание проекта"
     }
     """
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+    user_id = request.data.get("user_id")
 
-    project_name = request.data.get("project_name")
-    weight = request.data.get("weight")
-    type_ = request.data.get("type")
-    private = request.data.get("private", "false").lower() == "true"
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user_id = int(user_id)
+
+    # Пользователь
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    project_name = (request.data.get("project_name") or "").strip()
+    private = request.data.get("private", "false")
     description = (request.data.get("description") or "").strip()
     uploaded_file = request.FILES.get("file")
 
+    if isinstance(private, str):
+        private = private.lower() == "true"
+
+    if not project_name:
+        return Response({"error": "Название проекта обязательно"}, status=400)
+
     if not uploaded_file:
         return Response({"error": "Файл не выбран"}, status=400)
-    if not project_name or weight is None or not type_:
-        return Response({"error": "Недостаточно данных"}, status=400)
+
+    # Файл
+    file_bytes = uploaded_file.read()
+
+    weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
+    weight_mb = round(weight_mb, 2)
+
+    file_type = "txt"
+    if "." in uploaded_file.name:
+        file_type = uploaded_file.name.rsplit(".", 1)[-1].lower()
+
+    allowed_types = [c[0] for c in ProjectMeta.TYPE_CHOICES]
+    if file_type not in allowed_types:
+        file_type = "txt"
 
     try:
-        weight = Decimal(weight)
-    except:
-        return Response({"error": "Вес должен быть числом"}, status=400)
-
-    allowed_types = [choice[0] for choice in ProjectMeta.TYPE_CHOICES]
-    if type_ not in allowed_types:
-        type_ = "txt"
-
-    try:
-        project = Project.objects.create(user=user, private=private)
-        file_data = uploaded_file.read()
-        ProjectMeta.objects.create(
-            project=project,
-            project_name=project_name,
-            weight=weight,
-            type=type_,
-            data=file_data,
+        # Проект
+        project = Project.objects.create(
+            user=user,
+            private=private
         )
 
+        project_meta = ProjectMeta(
+            project=project,
+            project_name=project_name,
+            weight=weight_mb,
+            type=file_type,
+            data=file_bytes
+        )
+        project_meta.clean()
+        project_meta.save()
+
+        # История
         change_text = f"Добавлен проект '{project_name}'"
         if description:
             change_text += f". {description}"
@@ -1067,55 +1092,98 @@ def add_project(request, user_id):
         )
 
         EntityLog.objects.create(
-            action='add',
-            id_user=project.user,
-            type='project',
+            action="add",
+            id_user=user,
+            type="projects",
             id_entity=project.id
         )
 
     except Exception as e:
-        return Response({"error": f"Ошибка при сохранении проекта: {str(e)}"}, status=500)
+        return Response(
+            {"error": f"Ошибка при сохранении проекта: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     return Response(
-        {"message": "Проект успешно создан", "project_id": project.id},
-        status=201
+        {
+            "message": "Проект успешно создан",
+            "project_id": project.id
+        },
+        status=status.HTTP_201_CREATED
     )
 
-
-@api_view(["GET"])
+@api_view(["POST"])
 def get_project_versions(request, project_id):
     """
     GET /api/project/get_project_versions/<int:project_id>/
     Возвращает все версии проекта
     """
-    from .models import Project, ProjectChanges, ProjectMeta
+    user_id = request.data.get("user_id")
 
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Пользователь
     try:
-        project = Project.objects.get(pk=project_id)
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проект
+    try:
+        project = Project.objects.select_related("user").get(id=project_id)
     except Project.DoesNotExist:
-        return Response({"error": "Проект не найден"}, status=404)
+        return Response(
+            {"error": "Проект не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проверка прав
+    is_owner = project.user_id == user.id
+    is_shared = Shared.objects.filter(
+        project=project,
+        receiver=user
+    ).exists()
+
+    if not is_owner and not is_shared:
+        return Response(
+            {"error": "Нет прав на просмотр версий проекта"},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
     meta = ProjectMeta.objects.filter(project=project).first()
-    changes = ProjectChanges.objects.filter(project=project).select_related("changer").order_by("-id")
+
+    # Изменения
+    changes = (
+        ProjectChanges.objects
+        .filter(project=project)
+        .select_related("changer")
+        .order_by("-id")
+    )
 
     result = []
     for ch in changes:
         result.append({
             "id": ch.id,
-            "changer": getattr(ch.changer, "username", ch.changer.email),
-            "description": ch.description,
+            "changer_email": ch.changer.email,
+            "description": ch.description or "",
             "project_name": meta.project_name if meta else "Без имени",
-            "type": meta.type if meta else "N/A",
-            "weight": str(meta.weight) if meta else "0",
+            "type": meta.type if meta else "",
+            "weight": str(meta.weight) if meta and meta.weight else "0",
         })
 
-    return Response(result, status=200)
+    return Response(result, status=status.HTTP_200_OK)
 
-
-@api_view(["GET"])
-def get_user_projects(request, user_id):
+@api_view(["POST"])
+def get_user_projects(request):
     """
-    GET /api/project/get_user_projects/<int:user_id>/
+    GET /api/project/get_user_projects/
     Получить список проектов пользователя
     Возвращает:
     {
@@ -1132,37 +1200,56 @@ def get_user_projects(request, user_id):
         ]
     }
     """
+
+    user_id = request.data.get("user_id")
+    viewer_id = request.data.get("viewer_id")
+
+    if not user_id or not viewer_id:
+        return Response({"error": "user_id и viewer_id обязательны"}, status=400)
+
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
-        return Response({"projects": []})
+        return Response({"error": "Пользователь не найден"}, status=404)
 
-    projects = ProjectMeta.objects.filter(project__user=user).select_related("project")
-    data = []
-    for p in projects:
-        try:
-            last_change = (
-                ProjectChanges.objects
-                .filter(project=p.project)
-                .order_by("-id")
-                .first()
-            )
+    try:
+        viewer = User.objects.get(pk=viewer_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
 
-            description = last_change.description if last_change and last_change.description else "Без описания"
+    # Получаем проекты пользователя
+    projects_meta = ProjectMeta.objects.filter(project__user=user).select_related("project").order_by("-id")
 
-            data.append({
-                "id": p.id,
-                "project_name": p.project_name,
-                "weight": str(p.weight) if p.weight is not None else "0",
-                "type": p.type or "",
-                "private": p.project.private,
-                "description": description,
-            })
-        except Exception as e:
-            print(f"Ошибка сериализации проекта {p.id}: {e}")
+    # Последние изменения проектов
+    last_changes = {
+        pc.project_id: pc.description
+        for pc in ProjectChanges.objects.filter(project__user=user)
+        .order_by("project_id", "-id")
+        .distinct("project_id")
+    }
+
+    # Проверка дружбы
+    friends = Friendship.objects.filter(
+        ((Q(user1=user) & Q(user2=viewer)) | (Q(user1=viewer) & Q(user2=user))),
+        status="accepted"
+    ).exists()
+
+    result = []
+    for pm in projects_meta:
+        # Приватный проект
+        if pm.project.private and viewer != user and not friends:
             continue
 
-    return Response({"projects": data})
+        result.append({
+            "id": pm.project.id,
+            "project_name": pm.project_name,
+            "weight": str(pm.weight) if pm.weight is not None else "0",
+            "type": pm.type or "",
+            "private": pm.project.private,
+            "description": last_changes.get(pm.project.id, "Без описания"),
+        })
+
+    return Response({"projects": result}, status=200)
 
 
 @api_view(["DELETE"])
@@ -1171,22 +1258,57 @@ def delete_project(request, project_id):
     DELETE /api/project/delete/<int:project_id>/
     Удалить проект по ID
         """
+    user_id = request.data.get("user_id")
+
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Пользователь
     try:
-        project = ProjectMeta.objects.get(pk=project_id)
-    except ProjectMeta.DoesNotExist:
-        return Response({"error": "Проект не найден"}, status=404)
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проект
+    try:
+        project = Project.objects.get(id=project_id)
+    except Project.DoesNotExist:
+        return Response(
+            {"error": "Проект не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проверка прав
+    if project.user_id != user.id:
+        return Response(
+            {"error": "Недостаточно прав для удаления проекта"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Удаление зависимостей
+    ProjectChanges.objects.filter(project=project).delete()
+    Shared.objects.filter(project=project).delete()
+    ProjectMeta.objects.filter(project=project).delete()
 
     EntityLog.objects.create(
-        
-        action='delete',
-        id_user=project.user,
-        type='project',
-        id_entity=project
+        action="remove",
+        id_user=user,
+        type="projects",
+        id_entity=project.id
     )
 
-    ProjectChanges.objects.filter(project_id=project_id).delete()
     project.delete()
-    return Response({"success": "Проект удалён"}, status=200)
+
+    return Response(
+        {"success": "Проект успешно удалён"},
+        status=status.HTTP_200_OK
+    )
 
 
 @api_view(["PATCH"])
@@ -1195,200 +1317,358 @@ def change_project(request, project_id):
     PATCH /api/project/change/<project_id>/
     Изменить проект по ID
     {
+        "user_id" : int
         "project_name": "Новое имя",
         "description": "Описание изменений",
         "private": true/false,
         "file": (binary),
-        "changer_id": 123
     }
     """
+    data = request.data
+    user_id = data.get("user_id")
+    user_id = int(user_id)
+
+    if not user_id:
+        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    # Пользователь
     try:
-        project_meta = ProjectMeta.objects.select_related("project").get(pk=project_id)
-    except ProjectMeta.DoesNotExist:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=404)
+
+    # Проект
+    try:
+        project = Project.objects.select_related("user").get(id=project_id)
+    except Project.DoesNotExist:
         return Response({"error": "Проект не найден"}, status=404)
 
-    data = request.data
+    # Проверка прав
+    is_owner = project.user_id == user.id
+    is_shared = Shared.objects.filter(
+        project=project,
+        receiver=user
+    ).exists()
+
+    if not is_owner and not is_shared:
+        return Response(
+            {"error": "Недостаточно прав для изменения проекта"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        project_meta = ProjectMeta.objects.get(project=project)
+    except ProjectMeta.DoesNotExist:
+        return Response({"error": "Метаданные проекта не найдены"}, status=404)
+
     project_name = data.get("project_name")
     private = data.get("private")
-    description = data.get("description")
-    changer_id = data.get("changer_id")
+    description = data.get("description", "").strip()
     file_uploaded = request.FILES.get("file")
 
     changed_fields = []
 
-    if project_name and project_name != project_meta.project_name:
+    # Имя проекта
+    if project_name and project_name.strip() and project_name != project_meta.project_name:
         old_name = project_meta.project_name
-        project_meta.project_name = project_name
+        project_meta.project_name = project_name.strip()
         changed_fields.append(f"Название: '{old_name}' → '{project_name}'")
 
+    # Приватность
     if private is not None:
         if isinstance(private, str):
             private = private.lower() == "true"
-        if private != project_meta.project.private:
-            old_privacy = "Приватный" if project_meta.project.private else "Публичный"
+
+        if private != project.private:
+            old_privacy = "Приватный" if project.private else "Публичный"
             new_privacy = "Приватный" if private else "Публичный"
-            project_meta.project.private = private
-            project_meta.project.save()
+            project.private = private
+            project.save(update_fields=["private"])
             changed_fields.append(f"Приватность: {old_privacy} → {new_privacy}")
 
+    # Файл
     if file_uploaded:
         file_bytes = file_uploaded.read()
         project_meta.data = file_bytes
+
         weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
         project_meta.weight = round(weight_mb, 2)
-        project_meta.type = file_uploaded.name.split(".")[-1].lower()
-        changed_fields.append(f"Файл обновлён (Вес: {project_meta.weight} MB, Тип: {project_meta.type})")
+
+        if "." in file_uploaded.name:
+            project_meta.type = file_uploaded.name.rsplit(".", 1)[-1].lower()
+
+        changed_fields.append(
+            f"Файл обновлён (Вес: {project_meta.weight} MB, Тип: {project_meta.type})"
+        )
 
     project_meta.save()
 
-    changer = None
-    if changer_id:
-        try:
-            changer = User.objects.get(pk=changer_id)
-        except User.DoesNotExist:
-            changer = None
-    elif request.user.is_authenticated:
-        changer = request.user
-
-    change_description = ""
-    if changer and (description or changed_fields):
-        if description:
-            change_description = description
-        else:
-            change_description = "Изменены данные проекта:\n" + "\n".join(changed_fields)
-
-        ProjectChanges.objects.create(
-            project=project_meta.project,
-            changer=changer,
-            description=change_description
+    if description or changed_fields:
+        change_description = (
+            description if description
+            else "Изменены данные проекта:\n" + "\n".join(changed_fields)
         )
 
+        ProjectChanges.objects.create(
+            project=project,
+            changer=user,
+            description=change_description
+        )
+    else:
+        change_description = ""
+
     EntityLog.objects.create(
-        action='change',
-        id_user=changer,
-        type='project',
-        id_entity=project_meta.project.id
+        action="change",
+        id_user=user,
+        type="projects",
+        id_entity=project.id
     )
 
     return Response({
         "success": True,
         "message": "Проект успешно обновлён",
         "project": {
-            "id": project_meta.id,
+            "id": project.id,
             "project_name": project_meta.project_name,
             "weight": str(project_meta.weight),
             "type": project_meta.type,
-            "private": project_meta.project.private,
+            "private": project.private,
             "description": change_description,
         }
-    }, status=200)
+    }, status=status.HTTP_200_OK)
 
-
-@api_view(["GET"])
+@api_view(["POST"])
 def download_project(request, project_id):
     """
     GET /api/project/download/<int:project_id>/
     Скачать файл проекта
     """
+    user_id = request.data.get("user_id")
+
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Пользователь
     try:
-        project_meta = ProjectMeta.objects.get(pk=project_id)
-        if not project_meta.data:
-            return Response({"error": "Файл не найден"}, status=404)
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
-        ext = project_meta.type if project_meta.type else "txt"
-        filename = f"{project_meta.project_name}.{ext}"
+    # Проект
+    try:
+        project = Project.objects.select_related("user").get(id=project_id)
+    except Project.DoesNotExist:
+        return Response(
+            {"error": "Проект не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
-        mime_type, _ = mimetypes.guess_type(filename)
-        response = HttpResponse(project_meta.data, content_type=mime_type or "application/octet-stream")
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        return response
+    # Проверка прав
+    is_owner = project.user_id == user.id
+    is_shared = Shared.objects.filter(project=project, receiver=user).exists()
 
+    if not is_owner and not is_shared:
+        return Response(
+            {"error": "Нет прав на скачивание проекта"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        project_meta = ProjectMeta.objects.get(project=project)
     except ProjectMeta.DoesNotExist:
-        return Response({"error": "Проект не найден"}, status=404)
+        return Response(
+            {"error": "Файл проекта не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
+    if not project_meta.data:
+        return Response(
+            {"error": "Файл пуст или отсутствует"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Формирование файла
+    ext = project_meta.type or "txt"
+    filename = f"{project_meta.project_name}.{ext}"
+
+    mime_type, _ = mimetypes.guess_type(filename)
+
+    response = HttpResponse(
+        project_meta.data,
+        content_type=mime_type or "application/octet-stream"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    return response
 
 @api_view(["POST"])
 def share_project(request, project_id):
     """
     POST /api/project/share/<project_id>/
    {
+   "user_id": int,"
    "recipient_id": int,
    "comment": "..."
     }
     """
     try:
+        user_id = request.data.get("user_id")
         recipient_id = request.data.get("recipient_id")
         comment = request.data.get("comment", "")
 
-        if not recipient_id:
-            return Response({"error": "Не указан получатель"}, status=status.HTTP_400_BAD_REQUEST)
+        # Проверка входных данных
+        if not user_id:
+            return Response(
+                {"error": "ID пользователя обязателен"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        if not recipient_id:
+            return Response(
+                {"error": "Не указан получатель"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проект
         try:
             project = Project.objects.get(id=project_id)
         except Project.DoesNotExist:
-            return Response({"error": "Проект не найден"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Проект не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
+        # Проверка владельца
+        if project.user_id != user_id:
+            return Response(
+                {"error": "Недостаточно прав"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Проверка приватности
+        if project.private:
+            return Response(
+                {"error": "Приватный проект нельзя передать"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Получатель
         try:
             receiver = User.objects.get(id=recipient_id)
         except User.DoesNotExist:
-            return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Пользователь не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        shared_obj = Shared(project=project, receiver=receiver, comment=comment)
-        shared_obj.clean()  # нельзя самому себе
+        # ПРОВЕРКА ДРУЖБЫ
+        is_friend = Friendship.objects.filter(
+            Q(user1_id=user_id, user2_id=recipient_id) |
+            Q(user1_id=recipient_id, user2_id=user_id),
+            status='accepted'
+        ).exists()
+
+        if not is_friend:
+            return Response(
+                {"error": "Проект можно передать только друзьям"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+        shared_obj = Shared(
+            project=project,
+            receiver=receiver,
+            comment=comment
+        )
+
+        shared_obj.full_clean()
         shared_obj.save()
 
         EntityLog.objects.create(
-            
-            action='add',
-            id_user=Project.objects.get(id=project_id).user,
-            type='shared',
+            action="add",
+            id_user=project.user,
+            type="shared",
             id_entity=shared_obj.id
         )
 
-        return Response({"success": "Проект успешно передан!"}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"success": "Проект успешно передан!"},
+            status=status.HTTP_201_CREATED
+        )
 
     except ValidationError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": e.message_dict if hasattr(e, "message_dict") else str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     except Exception as e:
         print("Ошибка share_project:", e)
-        return Response({"error": "Ошибка при передаче проекта"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"error": "Ошибка при передаче проекта"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
-@api_view(["GET"])
-def get_shared_projects(request, user_id):
+@api_view(["POST"])
+def get_shared_projects(request):
     """
-    GET /api/project/shared/<user_id>/
+    GET /api/project/shared/
     Получить список проектов, которые были переданы пользователю
     """
+    user_id = request.data.get("user_id")
+
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     try:
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
-    shared_records = Shared.objects.filter(receiver=user).select_related("project", "project__user")
+    last_change_subquery = ProjectChanges.objects.filter(
+        project=OuterRef("project_id")
+    ).order_by("-id").values("description")[:1]
+
+    shared_records = (
+        Shared.objects
+        .filter(receiver=user)
+        .select_related("project", "project__user")
+        .prefetch_related("project__projectmeta_set")
+        .annotate(last_description=Subquery(last_change_subquery))
+        .order_by("-id")
+    )
 
     result = []
+
     for record in shared_records:
         project = record.project
-        try:
-            project_meta = ProjectMeta.objects.get(project=project)
-        except ProjectMeta.DoesNotExist:
-            continue  # если метаданных нет, пропускаем
 
-        # берём последнее изменение проекта для описания
-        last_change = ProjectChanges.objects.filter(project=project).order_by('-id').first()
-        description = last_change.description if last_change else ""
+        project_meta = project.projectmeta_set.first()
 
         result.append({
             "shared_id": record.id,
             "project_id": project.id,
-            "project_name": project_meta.project_name,
-            "type": project_meta.type,
-            "weight": str(project_meta.weight) if project_meta.weight is not None else None,
+            "project_name": project_meta.project_name if project_meta else None,
+            "type": project_meta.type if project_meta else None,
+            "weight": str(project_meta.weight) if project_meta and project_meta.weight is not None else None,
             "sender_id": project.user.id,
             "sender_email": project.user.email,
             "comment": record.comment,
-            "description": description,
+            "description": record.last_description or "",
+            "private" : record.project.private,
         })
 
     return Response(result, status=status.HTTP_200_OK)
@@ -1401,23 +1681,60 @@ def delete_received(request, shared_id: int):
     Удаляет запись о полученном проекте для пользователя
     """
     try:
-        shared_obj = Shared.objects.get(id=shared_id)
-        id = shared_obj.receiver
+        user_id = request.data.get("user_id")
+
+        if not user_id:
+            return Response(
+                {"error": "ID пользователя обязателен"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Пользователь
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Пользователь не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Shared
+        try:
+            shared_obj = Shared.objects.get(id=shared_id)
+        except Shared.DoesNotExist:
+            return Response(
+                {"error": "Запись не найдена"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Проверка владельца
+        if shared_obj.receiver_id != user.id:
+            return Response(
+                {"error": "Пользователь не владеет этим проектом"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         shared_obj.delete()
 
         EntityLog.objects.create(
-            
-            action='delete',
-            id_user=id,
-            type='shared',
+            action="remove",
+            id_user=user,
+            type="shared",
             id_entity=shared_id
         )
 
-        return Response({"success": "Запись о полученном проекте удалена"}, status=status.HTTP_200_OK)
-    except Shared.DoesNotExist:
-        return Response({"error": "Запись не найдена"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"success": "Запись о полученном проекте удалена"},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
     except Exception as e:
         print("Ошибка delete_received:", e)
+        return Response(
+            {"error": "Ошибка при удалении записи"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
         return Response({"error": "Ошибка при удалении записи"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1750,7 +2067,6 @@ def respond_friend_request(request):
         )
     return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
 
-
 @api_view(["DELETE"])
 def remove_friend(request):
     """
@@ -1823,19 +2139,19 @@ def cancel_friend_request(request):
     """
     user_id = request.data.get('user_id')
     receiver_id = request.data.get('receiver_id')
-
+    
     if not user_id or not receiver_id:
         return Response({"error": "ID пользователя и получателя обязательны"}, status=400)
-
+    
     try:
         user_id = int(user_id)
         receiver_id = int(receiver_id)
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
-
+    
     if user_id == receiver_id:
         return Response({"error": "Некорректные параметры"}, status=400)
-
+    
     try:
         user = User.objects.get(id=user_id)
     except User.DoesNotExist:
@@ -1847,7 +2163,7 @@ def cancel_friend_request(request):
 
     entity_id = make_friendship_entity_id(row[0], row[1])
     EntityLog.objects.create(
-        action='remove',
+        action='delete',
         id_user=user,
         type='friendship',
         id_entity=entity_id
@@ -1867,18 +2183,20 @@ def cancel_friend_request(request):
 
 @api_view(["GET"])
 def get_QA_list(request):
-    faqs = FAQ.objects.select_related("user", "admin").all().order_by("-id")
-    result = []
-    for faq in faqs:
-        result.append({
+    faqs = FAQ.objects.select_related("user", "admin").order_by("-id")
+
+    result = [
+        {
             "id": faq.id,
             "text_question": faq.text_question,
             "answered": faq.answered,
             "answer_text": faq.answer_text,
-            "user_email": faq.user.email if faq.user else None,
+            "user_email": faq.user.email,
             "admin_email": faq.admin.email if faq.admin else None,
-            "created_at": faq.created_at.isoformat() if hasattr(faq, 'created_at') else None,
-        })
+        }
+        for faq in faqs
+    ]
+
     return Response(result, status=status.HTTP_200_OK)
 
 
@@ -1895,37 +2213,61 @@ def create_QA(request):
     user_id = request.data.get("user_id")
     text_question = request.data.get("text_question", "").strip()
 
+    # Валидация входных данных
     if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-    if not text_question:
-        return Response({"error": "Вопрос не может быть пустым"}, status=400)
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
+    if not text_question:
+        return Response(
+            {"error": "Вопрос не может быть пустым"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Пользователь
     try:
         user = User.objects.get(id=int(user_id))
     except (ValueError, User.DoesNotExist):
-        return Response({"error": "Пользователь не найден"}, status=404)
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     try:
-        faq = FAQ(user=user, admin=None, text_question=text_question, answered=False)
-        faq.clean()
+        faq = FAQ(
+            user=user,
+            text_question=text_question,
+            answered=False
+        )
+
+        faq.full_clean()
         faq.save()
 
         EntityLog.objects.create(
-            
-            action='add',
+            action="add",
             id_user=user,
-            type='FAQ',
+            type="faq",
             id_entity=faq.id
         )
 
-        return Response({
-            "message": "Вопрос успешно добавлен"
-        }, status=201)
-    except ValidationError as e:
-        return Response({"error": str(e)}, status=400)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании вопроса: {str(e)}"}, status=500)
+        return Response(
+            {"message": "Вопрос успешно добавлен"},
+            status=status.HTTP_201_CREATED
+        )
 
+    except ValidationError as e:
+        return Response(
+            {"error": e.message_dict if hasattr(e, "message_dict") else str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": f"Ошибка при создании вопроса: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(["PATCH"])
 def answer_QA(request, qa_id):
@@ -1936,42 +2278,115 @@ def answer_QA(request, qa_id):
         "answer_text": "Ваш ответ"
     }
     """
+    # Вопрос
     try:
         faq = FAQ.objects.get(id=qa_id)
     except FAQ.DoesNotExist:
-        return Response({"error": "Вопрос не найден"}, status=404)
-
-    user_id = request.data.get('user_id')
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    user = User.objects.get(id=user_id)
-
-    try:
-        role = Role.objects.get(user=user, role='admin')
-    except Role.DoesNotExist:
-        return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
-
-    answer_text = request.data.get("answer_text", "").strip()
-    if not answer_text:
-        return Response({"error": "Ответ не может быть пустым"}, status=400)
-
-    try:
-        faq.answer_text = answer_text
-        faq.answered = True
-        faq.admin = user
-        faq.save()
-
-        EntityLog.objects.create(
-            action='change',
-            id_user=user,
-            type='FAQ',
-            id_entity=faq.id
+        return Response(
+            {"error": "Вопрос не найден"},
+            status=status.HTTP_404_NOT_FOUND
         )
 
-        return Response({
-            "message": "Ответ успешно сохранён"
-        }, status=200)
-    except Exception as e:
-        return Response({"error": f"Ошибка при сохранении ответа: {str(e)}"}, status=500)
+    # Пользователь
+    user_id = request.data.get("user_id")
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проверка администратора
+    is_admin = Role.objects.filter(user=user, role="admin").exists()
+    if not is_admin:
+        return Response(
+            {"error": "Недостаточно прав. Только администраторы могут отвечать на вопросы."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Ответ
+    answer_text = request.data.get("answer_text", "").strip()
+    if not answer_text:
+        return Response(
+            {"error": "Ответ не может быть пустым"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    faq.answer_text = answer_text
+    faq.answered = True
+    faq.admin = user
+    faq.full_clean()
+    faq.save()
+
+    EntityLog.objects.create(
+        action="change",
+        id_user=user,
+        type="faq",
+        id_entity=faq.id
+    )
+
+    return Response(
+        {"message": "Ответ успешно сохранён"},
+        status=status.HTTP_200_OK
+    )
+
+@api_view(["DELETE"])
+def delete_QA(request, qa_id):
+    """
+    DELETE /api/QA/<qa_id>/delete/
+    Удаляет вопрос и его ответ
+    """
+    user_id = request.data.get("user_id")
+
+    if not user_id:
+        return Response(
+            {"error": "ID пользователя обязателен"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Пользователь не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Проверка прав администратора
+    is_admin = Role.objects.filter(user=user, role="admin").exists()
+    if not is_admin:
+        return Response(
+            {"error": "Недостаточно прав. Только администраторы могут удалять вопросы."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Вопрос
+    try:
+        faq = FAQ.objects.get(id=qa_id)
+    except FAQ.DoesNotExist:
+        return Response(
+            {"error": "Вопрос не найден"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    faq_id = faq.id
+    faq.delete()
+
+    EntityLog.objects.create(
+        action="remove",
+        id_user=user,
+        type="faq",
+        id_entity=faq_id
+    )
+
+    return Response(
+        {"message": "Вопрос удалён"},
+        status=status.HTTP_204_NO_CONTENT
+    )

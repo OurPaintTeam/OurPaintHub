@@ -12,6 +12,7 @@ export interface ReceivedProjectData {
     sender_email: string;
     comment?: string;
     description?: string;
+    private: boolean;
 }
 
 interface ReceivedProjectCardProps {
@@ -65,9 +66,10 @@ const ReceivedProjectCard: React.FC<ReceivedProjectCardProps> = ({
                 </div>
                 <div className="project-card-body">
                     <p>Тип: {project.type || "Не указан"}</p>
-                    <p>Вес: {project.weight || "Не указан"}</p>
-                    <p>Описание: {project.description || "Без описания"}</p>
+                    <p className="weight">Вес: {project.weight}</p>
+                    <p className="description">Описание: {project.description || "Без описания"}</p>
                     <p>От: {project.sender_email}</p>
+                    <p>Статус: {project.private ? "Приватный" : "Публичный"}</p>
                     {project.comment && <p>Комментарий: {project.comment}</p>}
                 </div>
                 <div className="project-card-footer">

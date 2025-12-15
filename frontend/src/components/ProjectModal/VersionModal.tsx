@@ -5,24 +5,30 @@ export interface VersionData {
     id: number;
     project_name: string;
     description: string;
-    changer: string;
+    changer_email: string;
 }
 
 interface VersionModalProps {
+    userId: number;
     projectId: number;
     onClose: () => void;
 }
 
-const VersionModal: React.FC<VersionModalProps> = ({projectId, onClose}) => {
+const VersionModal: React.FC<VersionModalProps> = ({userId,projectId, onClose}) => {
     const [versions, setVersions] = useState<VersionData[]>([]);
     const [loading, setLoading] = useState(true);
     const [projectName, setProjectName] = useState("");
 
     useEffect(() => {
         const fetchVersions = async () => {
+            if (!userId || !projectId) return;
             try {
                 const response = await fetch(
-                    `http://localhost:8000/api/project/get_project_versions/${projectId}/`
+                    `http://localhost:8000/api/project/get_project_versions/${projectId}/`,{
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ user_id: userId,viewer_id:userId }),
+                    }
                 );
                 if (!response.ok) console.error("Произошла ошибка.");
                 const data = await response.json();
@@ -59,7 +65,7 @@ const VersionModal: React.FC<VersionModalProps> = ({projectId, onClose}) => {
                             <div key={v.id} className="version-card">
                                 <div className="version-info">
                                     <p><b>#{versions.length - index}</b></p>
-                                    <p><b>Автор изменения:</b> {v.changer}</p>
+                                    <p><b>Автор изменения:</b> {v.changer_email}</p>
                                     <p><b>Описание:</b> {v.description || "Без описания"}</p>
                                 </div>
                             </div>

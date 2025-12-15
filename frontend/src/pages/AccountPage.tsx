@@ -65,14 +65,28 @@ const AccountPage: React.FC = () => {
             }
 
             // Мои проекты
-            const projectsResponse = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
+            const projectsResponse = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    user_id: userId,
+                    viewer_id: userId,
+                }),
+            });
             if (projectsResponse.ok) {
                 const data = await projectsResponse.json();
                 setAccount(prev => prev ? {...prev, projects_count: data.projects.length} : null);
             }
 
             // Полученные проекты
-            const receivedResponse = await fetch(`http://localhost:8000/api/project/shared/${userId}/`);
+            const receivedResponse = await fetch(`http://localhost:8000/api/project/shared/`,{
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    user_id: userId
+                }),
+            });
+
             if (receivedResponse.ok) {
                 const data = await receivedResponse.json();
                 setAccount(prev => prev ? {...prev, received_count: data.length} : null);

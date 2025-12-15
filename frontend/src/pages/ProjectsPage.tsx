@@ -14,6 +14,7 @@ import {
     handleDelete,
 } from "../components/utils/ProjectActions";
 import ShareModal from "../components/ProjectModal/ShareModal";
+import {useNavigate} from "react-router-dom";
 
 export interface UserData {
     id: number;
@@ -44,6 +45,7 @@ const ProjectsPage: React.FC = () => {
     const [editingProject, setEditingProject] = useState<ProjectData | ReceivedProjectData | null>(null);
     const [viewingVersionsProjectId, setViewingVersionsProjectId] = useState<number | null>(null);
     const [sharingProject, setSharingProject] = useState<ProjectData | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -51,18 +53,29 @@ const ProjectsPage: React.FC = () => {
             try {
                 const parsedUser = JSON.parse(userData);
                 setUser(parsedUser);
-                void fetchUserProjects(parsedUser.id);
-                void fetchFriends(parsedUser.id);
-                void fetchReceivedProjects(parsedUser.id);
             } catch {
                 console.error("Ошибка парсинга данных пользователя");
             }
+        } else {
+            navigate("/login");
         }
-    }, []);
+    }, [navigate]);
 
-    const fetchUserProjects = async (userId: number) => {
+    useEffect(() => {
+        if (!user) return;
+        void fetchUserProjects();
+        void fetchFriends();
+        void fetchReceivedProjects();
+    }, [user]);
+
+    const fetchUserProjects = async () => {
+        if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/project/get_user_projects/${userId}/`);
+            const response = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: user.id,viewer_id:user.id }),
+            });
             if (!response.ok) return;
             const data = await response.json();
             setMyProjects(data.projects);
@@ -71,9 +84,10 @@ const ProjectsPage: React.FC = () => {
         }
     };
 
-    const fetchFriends = async (userId: number) => {
+    const fetchFriends = async () => {
+        if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${userId}`);
+            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${user.id}`);
             if (!response.ok) return;
             const data = await response.json();
             setFriends(data);
@@ -84,10 +98,15 @@ const ProjectsPage: React.FC = () => {
     };
 
     const fetchFriendsProjects = async (friendsList: UserData[]) => {
+        if (!user) return alert("Сначала авторизуйтесь");
         try {
             const allProjects = await Promise.all(
                 friendsList.map(async (friend) => {
-                    const res = await fetch(`http://localhost:8000/api/project/get_user_projects/${friend.id}/`);
+                    const res = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ user_id: user.id,viewer_id: friend.id }),
+                    });
                     if (!res.ok) return [];
                     const data = await res.json();
                     return data.projects
@@ -101,9 +120,14 @@ const ProjectsPage: React.FC = () => {
         }
     };
 
-    const fetchReceivedProjects = async (userId: number) => {
+    const fetchReceivedProjects = async () => {
+        if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/project/shared/${userId}/`);
+            const response = await fetch(`http://localhost:8000/api/project/shared/`,{
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: user.id }),
+            });
             if (!response.ok) return;
             const data = await response.json();
             setReceivedProjects(data);
@@ -119,6 +143,7 @@ const ProjectsPage: React.FC = () => {
         const fileType = file.name.split('.').pop() || "txt";
 
         const formData = new FormData();
+        formData.append("user_id", String(user.id));
         formData.append("file", file);
         formData.append("project_name", projectName);
         formData.append("weight", fileSizeMB);
@@ -127,13 +152,13 @@ const ProjectsPage: React.FC = () => {
         formData.append("description", description);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/project/add/${user.id}/`, {
+            const response = await fetch(`http://localhost:8000/api/project/add/`, {
                 method: "POST",
                 body: formData,
             });
             if (response.ok) {
                 alert("Проект успешно добавлен!");
-                await fetchUserProjects(user.id);
+                await fetchUserProjects();
             } else {
                 const result = await response.json().catch(() => ({error: "Сервер вернул не JSON"}));
                 alert("Ошибка при добавлении проекта: " + JSON.stringify(result));
@@ -157,7 +182,7 @@ const ProjectsPage: React.FC = () => {
         setSharingProject(project);
     };
 
-    const sendProjectToFriend = async (friendId: number, comment: string) => {
+    const sendProjectToFriend = async (userId:number,friendId: number, comment: string) => {
         if (!sharingProject) return;
         try {
             const response = await fetch(`http://localhost:8000/api/project/share/${sharingProject.id}/`, {
@@ -165,6 +190,7 @@ const ProjectsPage: React.FC = () => {
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     recipient_id: friendId,
+                    user_id: userId,
                     comment,
                 }),
             });
@@ -214,8 +240,14 @@ const ProjectsPage: React.FC = () => {
                                 <ProjectCard
                                     key={p.id}
                                     project={p}
-                                    onDownload={() => handleDownload(p.id, p.project_name, p.type)}
-                                    onDelete={() => handleDelete(p.id, () => user && fetchUserProjects(user.id))}
+                                    onDownload={async () => {
+                                        if (!user) return alert("Сначала авторизуйтесь");
+                                        await handleDownload(user.id, p.id, p.project_name, p.type);
+                                    }}
+                                    onDelete={async () => {
+                                        if (!user) return alert("Сначала авторизуйтесь");
+                                        await handleDelete(user.id, p.id, () => fetchUserProjects());
+                                    }}
                                     onEdit={() => handleEditProject(p)}
                                     onVersion={() => handleViewVersions(p)}
                                     onShare={() => handleShareProject(p)}
@@ -225,19 +257,25 @@ const ProjectsPage: React.FC = () => {
                     )}
                 </div>
 
+
                 {/* Проекты друзей */}
                 <div className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
+                    {friendsProjects.length === 0 ? <p>Проекты отсутствуют</p> : (
                     <div className="projects-grid">
                         {friendsProjects.slice().reverse().map((p) => (
                             <FriendProjectCard
                                 key={p.id}
                                 project={p}
-                                onDownload={() => handleDownload(p.id, p.project_name, p.type)}
+                                onDownload={async () => {
+                                    if (!user) return alert("Сначала авторизуйтесь");
+                                    await handleDownload(user.id, p.id, p.project_name, p.type);
+                                }}
                                 onEdit={() => handleEditProject(p)}
                                 onVersion={() => handleViewVersions(p)}
                             />
                         ))}
                     </div>
+                        )}
                 </div>
 
                 {/* Полученные */}
@@ -250,19 +288,27 @@ const ProjectsPage: React.FC = () => {
                                 <ReceivedProjectCard
                                     key={p.shared_id}
                                     project={p}
-                                    onDownload={() => handleDownload(p.project_id, p.project_name, p.type || "txt")}
-                                    onDelete={() => handleDelete(
-                                        p.project_id,
-                                        () => fetchReceivedProjects(user!.id),
-                                        true,
-                                        p.shared_id,
-                                        () => fetchReceivedProjects(user!.id)
-                                    )}
+                                    onDownload={async () => {
+                                        if (!user) return alert("Сначала авторизуйтесь");
+                                        await handleDownload(user.id, p.project_id, p.project_name, p.type || "txt");
+                                    }}
+                                    onDelete={async () => {
+                                        if (!user) return alert("Сначала авторизуйтесь");
+                                        await handleDelete(
+                                            user.id,
+                                            p.project_id,
+                                            () => fetchReceivedProjects(),
+                                            true,
+                                            p.shared_id,
+                                            () => fetchReceivedProjects()
+                                        );
+                                    }}
                                     onEdit={() => handleEditProject(p)}
                                     onVersion={() => handleViewVersions(p)}
                                 />
                             ))}
                         </div>
+
                     )}
                 </div>
             </div>
@@ -287,10 +333,10 @@ const ProjectsPage: React.FC = () => {
                         // Обновляем список проектов
                         if ("id" in editingProject) {
                             // Мой проект
-                            void fetchUserProjects(user.id);
+                            void fetchUserProjects();
                         } else {
                             // Полученный проект
-                            void fetchReceivedProjects(user.id);
+                            void fetchReceivedProjects();
                         }
 
                         setEditingProject(null);
@@ -298,14 +344,16 @@ const ProjectsPage: React.FC = () => {
                 />
             )}
 
-            {viewingVersionsProjectId !== null && (
+            {viewingVersionsProjectId !== null && user && (
                 <VersionModal
+                    userId={user.id}
                     projectId={viewingVersionsProjectId}
                     onClose={() => setViewingVersionsProjectId(null)}
                 />
             )}
-            {sharingProject && (
+            {sharingProject && user && (
                 <ShareModal
+                    userId={user.id}
                     friends={friends}
                     projectName={sharingProject.project_name}
                     sendingTo={null}
