@@ -1,8 +1,7 @@
-from django.db.models import Q, OuterRef, Subquery
+from django.db.models import Q, OuterRef, Subquery, Count
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.http import FileResponse
 from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, \
     ProjectChanges, Friendship
@@ -20,33 +19,19 @@ def make_friendship_entity_id(user_a, user_b):
 
 
 def get_friendship_between(user_a_id, user_b_id):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2, status
-            FROM friendship
-            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
-            LIMIT 1
-            """,
-            [user_a_id, user_b_id, user_b_id, user_a_id]
-        )
-        row = cursor.fetchone()
-    return row
+    friendship = Friendship.objects.filter(
+        Q(user1_id=user_a_id, user2_id=user_b_id) | Q(user1_id=user_b_id, user2_id=user_a_id)
+    ).values_list('user1_id', 'user2_id', 'status').first()
+    return friendship
 
 
 def get_friend_ids(user):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1, user2
-            FROM friendship
-            WHERE (user1 = %s OR user2 = %s) AND status = 'accepted'
-            """,
-            [user.id, user.id]
-        )
-        rows = cursor.fetchall()
+    friendships = Friendship.objects.filter(
+        Q(user1=user) | Q(user2=user),
+        status='accepted'
+    ).values_list('user1_id', 'user2_id')
     ids = []
-    for u1, u2 in rows:
+    for u1, u2 in friendships:
         ids.append(u2 if u1 == user.id else u1)
     return ids
 
@@ -126,7 +111,6 @@ def news_view(request):
         for item in news:
 
             clean_text = item.text
-            import re
             clean_text = re.sub(r'<!-- CREATED:.*?-->', '', clean_text)
             clean_text = re.sub(r'<!-- UPDATED:.*?-->', '', clean_text)
             clean_text = clean_text.strip()
@@ -749,17 +733,10 @@ def get_user_profile(request):
         user = User.objects.get(id=user_id)
         try:
             profile = UserProfile.objects.get(user=user)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM friendship
-                    WHERE status = 'accepted' AND (user1 = %s OR user2 = %s)
-                    """,
-                    [user.id, user.id]
-                )
-                row = cursor.fetchone()
-                friends_count = int(row[0]) if row and row[0] is not None else 0
+            friends_count = Friendship.objects.filter(
+                Q(user1=user) | Q(user2=user),
+                status='accepted'
+            ).count()
 
             return Response({
                 "id": user.id,
@@ -1737,9 +1714,6 @@ def delete_received(request, shared_id: int):
             {"error": "Ошибка при удалении записи"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-    
-        return Response({"error": "Ошибка при удалении записи"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(["GET"])
 def get_all_users(request):
@@ -1855,17 +1829,9 @@ def add_friend(request):
 
     row = get_friendship_between(user.id, friend.id)
     if row:
-        u1, u2, status = row
-        if status == 'sent' and u2 == user.id:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE friendship
-                    SET status = 'accepted'
-                    WHERE user1 = %s AND user2 = %s
-                    """,
-                    [u1, u2]
-                )
+        u1, u2, friendship_status = row
+        if friendship_status == 'sent' and u2 == user.id:
+            Friendship.objects.filter(user1_id=u1, user2_id=u2).update(status='accepted')
             entity_id = make_friendship_entity_id(u1, u2)
             EntityLog.objects.create(
                 action='change',
@@ -1874,18 +1840,12 @@ def add_friend(request):
                 id_entity=entity_id
             )
             return Response({"message": "Запрос в друзья принят", "status": "accepted"}, status=200)
-        if status == 'accepted':
+        if friendship_status == 'accepted':
             return Response({"error": "Вы уже друзья"}, status=400)
         return Response({"error": "Запрос в друзья уже отправлен"}, status=400)
 
     try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO friendship (user1, user2, status) VALUES (%s, %s, 'sent')
-                """,
-                [user.id, friend.id]
-            )
+        Friendship.objects.create(user1=user, user2=friend, status='sent')
         entity_id = make_friendship_entity_id(user.id, friend.id)
         EntityLog.objects.create(
             action='add',
@@ -1916,18 +1876,7 @@ def get_friend_requests(request):
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user1
-            FROM friendship
-            WHERE user2 = %s AND status = 'sent'
-            """,
-            [user_id]
-        )
-        rows = cursor.fetchall()
-
-    sender_ids = [r[0] for r in rows]
+    sender_ids = list(Friendship.objects.filter(user2_id=user_id, status='sent').values_list('user1_id', flat=True))
     senders = User.objects.filter(id__in=sender_ids)
 
     result = []
@@ -1963,18 +1912,7 @@ def get_sent_friend_requests(request):
     except (ValueError, TypeError):
         return Response({"error": "Неверный формат ID"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT user2
-            FROM friendship
-            WHERE user1 = %s AND status = 'sent'
-            """,
-            [user_id]
-        )
-        rows = cursor.fetchall()
-
-    receiver_ids = [r[0] for r in rows]
+    receiver_ids = list(Friendship.objects.filter(user1_id=user_id, status='sent').values_list('user2_id', flat=True))
     receivers = User.objects.filter(id__in=receiver_ids)
 
     result = []
@@ -2028,15 +1966,7 @@ def respond_friend_request(request):
     entity_id = make_friendship_entity_id(from_user_id, user_id)
 
     if action == 'accept':
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE friendship
-                SET status = 'accepted'
-                WHERE user1 = %s AND user2 = %s
-                """,
-                [from_user_id, user_id]
-            )
+        Friendship.objects.filter(user1_id=from_user_id, user2_id=user_id).update(status='accepted')
         try:
             user_obj = User.objects.get(id=user_id)
             EntityLog.objects.create(
@@ -2060,14 +1990,7 @@ def respond_friend_request(request):
     except User.DoesNotExist:
         pass
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            DELETE FROM friendship
-            WHERE user1 = %s AND user2 = %s
-            """,
-            [from_user_id, user_id]
-        )
+    Friendship.objects.filter(user1_id=from_user_id, user2_id=user_id).delete()
     return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
 
 @api_view(["DELETE"])
@@ -2116,14 +2039,9 @@ def remove_friend(request):
         id_entity=entity_id
     )
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            DELETE FROM friendship
-            WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
-            """,
-            [user_id, friend_id, friend_id, user_id]
-        )
+    Friendship.objects.filter(
+        Q(user1_id=user_id, user2_id=friend_id) | Q(user1_id=friend_id, user2_id=user_id)
+    ).delete()
 
     return Response({"message": "Друг успешно удален"}, status=200)
 
@@ -2172,14 +2090,7 @@ def cancel_friend_request(request):
         id_entity=entity_id
     )
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            DELETE FROM friendship
-            WHERE user1 = %s AND user2 = %s
-            """,
-            [user_id, receiver_id]
-        )
+    Friendship.objects.filter(user1_id=user_id, user2_id=receiver_id).delete()
 
     return Response({"message": "Заявка отменена"}, status=200)
 
