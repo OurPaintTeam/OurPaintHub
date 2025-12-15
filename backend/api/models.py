@@ -151,7 +151,7 @@ class EntityLog(models.Model):
     ACTION_CHOICES = [
         ('add', 'Добавление'),
         ('change', 'Изменение'),
-        ('remove', 'Удаление'),
+        ('delete', 'Удаление'),
     ]
     
     TYPE_CHOICES = [

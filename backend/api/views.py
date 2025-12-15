@@ -468,7 +468,7 @@ def delete_documentation(request, doc_id):
         doc.delete()
 
         EntityLog.objects.create(
-            action='remove',
+            action='delete',
             id_user=user,
             type='documentation',
             id_entity=doc_id
@@ -718,7 +718,7 @@ def delete_version(request, version_id):
         version.delete()
 
         EntityLog.objects.create(
-            action='remove',
+            action='delete',
             id_user=user,
             type='documentation',
             id_entity=version_id
@@ -955,7 +955,7 @@ def delete_news(request, news_id):
 
         EntityLog.objects.create(
 
-            action='remove',
+            action='delete',
             id_user=user,
             type='documentation',
             id_entity=news_id
@@ -2049,7 +2049,7 @@ def respond_friend_request(request):
     try:
         user_obj = User.objects.get(id=user_id)
         EntityLog.objects.create(
-            action='remove',
+            action='delete',
             id_user=user_obj,
             type='friendship',
             id_entity=entity_id
@@ -2107,7 +2107,7 @@ def remove_friend(request):
     u1, u2, _ = row
     entity_id = make_friendship_entity_id(u1, u2)
     EntityLog.objects.create(
-        action='remove',
+        action='delete',
         id_user=user,
         type='friendship',
         id_entity=entity_id
