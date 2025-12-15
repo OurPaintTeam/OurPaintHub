@@ -1628,6 +1628,7 @@ def get_shared_projects(request):
             "sender_email": project.user.email,
             "comment": record.comment,
             "description": record.last_description or "",
+            "private" : record.project.private,
         })
 
     return Response(result, status=status.HTTP_200_OK)
