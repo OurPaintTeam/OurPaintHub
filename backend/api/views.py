@@ -1,3 +1,4 @@
+from django.db.models import Q, OuterRef, Subquery
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
@@ -1054,6 +1055,8 @@ def add_project(request):
 
     weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
     weight_mb = round(weight_mb, 2)
+    if weight_mb>100 :
+        return Response({"error": "Слишком большой файл"}, status=400)
 
     file_type = "txt"
     if "." in uploaded_file.name:
@@ -1061,7 +1064,7 @@ def add_project(request):
 
     allowed_types = [c[0] for c in ProjectMeta.TYPE_CHOICES]
     if file_type not in allowed_types:
-        file_type = "txt"
+        return Response({"error": "Не верный формат"}, status=400)
 
     try:
         # Проект
