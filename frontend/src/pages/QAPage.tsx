@@ -41,13 +41,9 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
             const userData = localStorage.getItem("user");
 
             if (userData) {
-                try {
-                    const parsedUser = JSON.parse(userData);
-                    setUser(parsedUser);
-                    await checkAdminRole();
-                } catch {
-                    console.error("Ошибка парсинга данных пользователя");
-                }
+                const parsedUser = JSON.parse(userData);
+                setUser(parsedUser);
+                await checkAdminRole(parsedUser);
             }
 
             await fetchQA();
@@ -55,20 +51,13 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
         void init();
     }, [navigate]);
 
-    const checkAdminRole = async () => {
+    const checkAdminRole = async (u: UserData) => {
         try {
-            if (!user) return;
-            const res = await fetch(`http://localhost:8000/api/user/role/?user_id=${user.id}`);
-            const text = await res.text();
-            let data: any = null;
-            if (text) {
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = text.trim();
-                }
-            }
-            if (res.ok && data?.is_admin) {
+            const res = await fetch(
+                `http://localhost:8000/api/user/role/?user_id=${u.id}`
+            );
+            const data = await res.json();
+            if (res.ok && data?.is_admin === true) {
                 setIsAdmin(true);
             }
         } catch (err) {

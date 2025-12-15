@@ -260,6 +260,7 @@ const ProjectsPage: React.FC = () => {
 
                 {/* Проекты друзей */}
                 <div className={`projects-content ${activeTab === "friends-projects" ? "active" : ""}`}>
+                    {friendsProjects.length === 0 ? <p>Проекты отсутствуют</p> : (
                     <div className="projects-grid">
                         {friendsProjects.slice().reverse().map((p) => (
                             <FriendProjectCard
@@ -274,6 +275,7 @@ const ProjectsPage: React.FC = () => {
                             />
                         ))}
                     </div>
+                        )}
                 </div>
 
                 {/* Полученные */}
