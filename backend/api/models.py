@@ -183,10 +183,12 @@ class MediaFile(models.Model):
         ('image', 'Изображение'),
         ('video', 'Видео'),
         ('md', 'Markdown'),
+        ('installer', 'Инсталлятор'),
     ]
     
     path = models.TextField()
     type = models.CharField(max_length=255, choices=TYPE_CHOICES)
+    data = models.BinaryField(null=True, blank=True)
     
     class Meta:
         db_table = 'media_files'

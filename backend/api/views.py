@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django.http import FileResponse
 from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, \
-    ProjectChanges, Friendship
+    ProjectChanges, Friendship, MediaFile, MediaMeta
 from decimal import Decimal
 from datetime import datetime
 import re
@@ -12,6 +12,7 @@ import os
 from django.http import HttpResponse
 from rest_framework import status
 import mimetypes
+import json
 
 
 def make_friendship_entity_id(user_a, user_b):
@@ -476,49 +477,28 @@ def download_view(request):
     Получить список доступных версий приложения
     """
     try:
-        versions = Documentation.objects.filter(type='api').order_by('-id')
+        installers = MediaFile.objects.filter(type='installer').order_by('-id')
         versions_data = []
 
-        for version in versions:
-            raw_text = version.text or ""
-
-            version_match = re.search(r'<!--\s*VERSION:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            version_num = version_match.group(1).strip() if version_match else "1.0.0"
-
-            file_path_match = re.search(r'<!--\s*FILE_PATH:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            file_path = file_path_match.group(1).strip() if file_path_match else None
-
-            file_size_match = re.search(r'<!--\s*FILE_SIZE:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            file_size = file_size_match.group(1).strip() if file_size_match else None
-
-            platform_match = re.search(r'<!--\s*PLATFORM:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            platform = platform_match.group(1).strip() if platform_match else "Все платформы"
-
-            created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            created_at = created_match.group(1).strip() if created_match else None
-
-            clean_text = re.sub(r'<!--\s*(VERSION|FILE_PATH|FILE_SIZE|PLATFORM|CREATED):.*?-->', '', raw_text,
-                                flags=re.IGNORECASE).strip()
-            text_lines = clean_text.split('\n') if clean_text else []
-
-            if text_lines and text_lines[0].startswith('# '):
-                title = text_lines[0][2:].strip()
-                content = '\n'.join(text_lines[1:]).strip()
-            else:
-                title = f"OurPaint CAD v{version_num}"
-                content = clean_text or f"Версия {version_num} приложения OurPaint CAD"
-
+        for media in installers:
+            meta = MediaMeta.objects.filter(media=media).select_related('admin').first()
+            meta_info = {}
+            if meta and meta.description:
+                try:
+                    meta_info = json.loads(meta.description)
+                except Exception:
+                    meta_info = {}
             versions_data.append({
-                "id": version.id,
-                "title": title,
-                "content": content,
-                "version": version_num,
-                "platform": platform,
-                "file_path": file_path,
-                "file_size": file_size,
-                "release_date": created_at,
-                "author_id": version.admin.id,
-                "author_email": version.admin.email,
+                "id": media.id,
+                "title": meta.name if meta else media.path,
+                "content": meta.description if meta else "",
+                "version": meta_info.get("version", "1.0.0"),
+                "platform": meta_info.get("platform", "Все платформы"),
+                "file_name": media.path,
+                "file_size": meta_info.get("file_size") or (str(len(media.data)) if media.data else None),
+                "release_date": None,
+                "author_id": meta.admin.id if meta and meta.admin_id else None,
+                "author_email": meta.admin.email if meta and meta.admin_id else None,
             })
 
         if not versions_data:
@@ -542,27 +522,16 @@ def download_file(request, version_id):
     Скачать файл версии приложения
     """
     try:
-        version = Documentation.objects.get(id=version_id, type='api')
+        media = MediaFile.objects.get(id=version_id, type='installer')
 
-        file_path = None
-        if version.text and '<!-- FILE_PATH:' in version.text:
-            try:
-                path_start = version.text.find('<!-- FILE_PATH:') + 15
-                path_end = version.text.find(' -->', path_start)
-                file_path = version.text[path_start:path_end].strip()
-            except:
-                pass
+        if not media.data:
+            return Response({"error": "Файл версии отсутствует"}, status=404)
 
-        if not file_path:
-            return Response({"error": "Файл версии не найден"}, status=404)
-
-        if not os.path.exists(file_path):
-            return Response({"error": "Файл не существует на сервере"}, status=404)
-
-        filename = os.path.basename(file_path)
-
-        file_handle = open(file_path, 'rb')
-        response = FileResponse(file_handle, content_type='application/octet-stream')
+        filename = os.path.basename(media.path or f"version_{version_id}")
+        response = HttpResponse(
+            media.data,
+            content_type='application/octet-stream'
+        )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         try:
@@ -572,8 +541,8 @@ def download_file(request, version_id):
                 EntityLog.objects.create(
                     action='add',
                     id_user=user,
-                    type='documentation',
-                    id_entity=version.id
+                    type='media_files',
+                    id_entity=media.id
                 )
         except:
             pass
@@ -597,7 +566,7 @@ def create_version(request):
     content = request.data.get('content')
     version = request.data.get('version')
     platform = request.data.get('platform')
-    file_path = request.data.get('file_path')
+    uploaded_file = request.FILES.get('file')
     file_size = request.data.get('file_size')
 
     if not user_id:
@@ -609,8 +578,8 @@ def create_version(request):
     if not version:
         return Response({"error": "Версия обязательна"}, status=400)
 
-    if not file_path:
-        return Response({"error": "Путь к файлу обязателен"}, status=400)
+    if not uploaded_file:
+        return Response({"error": "Файл обязателен"}, status=400)
 
     try:
         user = User.objects.get(id=user_id)
@@ -621,43 +590,50 @@ def create_version(request):
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."},
                             status=403)
 
-        if not os.path.exists(file_path):
-            return Response({"error": "Файл не существует по указанному пути"}, status=400)
-
+        file_bytes = uploaded_file.read()
         if not file_size:
-            file_size = str(os.path.getsize(file_path))
-
+            file_size = str(len(file_bytes))
         now = datetime.now()
 
-        full_content = (
-            f"# {title}\n\n"
-            f"{content}\n\n"
-            f"<!-- VERSION: {version} -->\n"
-            f"<!-- FILE_PATH: {file_path} -->\n"
-            f"<!-- FILE_SIZE: {file_size} -->\n"
-            f"<!-- PLATFORM: {platform or 'Все платформы'} -->\n"
-            f"<!-- CREATED: {now.isoformat()} -->"
+        media = MediaFile.objects.create(
+            path=uploaded_file.name,
+            type='installer',
+            data=file_bytes
         )
 
-        version_doc = Documentation.objects.create(
-            type='api',
+        media_meta = MediaMeta.objects.create(
             admin=user,
-            text=full_content.strip()
+            media=media,
+            description=json.dumps({
+                "version": version,
+                "platform": platform or "Все платформы",
+                "file_size": file_size
+            }),
+            name=title
         )
 
         EntityLog.objects.create(
             action='add',
             id_user=user,
-            type='documentation',
-            id_entity=version_doc.id
+            type='media_files',
+            id_entity=media.id
+        )
+        EntityLog.objects.create(
+            action='add',
+            id_user=user,
+            type='media_meta',
+            id_entity=media_meta.id
         )
 
         return Response({
             "message": "Версия приложения успешно создана",
-            "id": version_doc.id,
+            "id": media.id,
             "title": title,
             "version": version,
             "platform": platform,
+            "media_id": media.id,
+            "file_name": uploaded_file.name,
+            "file_size": file_size
         }, status=201)
 
     except User.DoesNotExist:
