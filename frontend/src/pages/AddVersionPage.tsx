@@ -22,7 +22,6 @@ const AddVersionPage: React.FC = () => {
   const [version, setVersion] = useState("");
   const [platform, setPlatform] = useState("Все платформы");
   const [file, setFile] = useState<File | null>(null);
-  const [filePath, setFilePath] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,8 +63,6 @@ const AddVersionPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      // Устанавливаем путь к файлу (можно указать вручную или загрузить на сервер)
-      setFilePath("");
     }
   };
 
@@ -77,8 +74,8 @@ const AddVersionPage: React.FC = () => {
       return;
     }
 
-    if (!file && !filePath) {
-      setMessage("Пожалуйста, выберите файл или укажите путь к файлу на сервере");
+    if (!file) {
+      setMessage("Пожалуйста, выберите файл для загрузки");
       return;
     }
 
@@ -86,7 +83,14 @@ const AddVersionPage: React.FC = () => {
     setMessage("");
 
     try {
-      let finalFilePath = filePath;
+      const formData = new FormData();
+      formData.append("user_id", user?.id?.toString() || "");
+      formData.append("title", title.trim());
+      formData.append("content", content.trim());
+      formData.append("version", version.trim());
+      formData.append("platform", platform.trim());
+      formData.append("file", file);
+      formData.append("file_size", file.size.toString());
 
       // Если файл выбран, но путь не указан, сначала нужно загрузить файл на сервер
       // Для упрощения будем требовать указать путь к уже загруженному файлу
@@ -98,18 +102,7 @@ const AddVersionPage: React.FC = () => {
 
       const response = await fetch("http://192.168.0.101:8000/api/download/create/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: user?.id,
-          title: title.trim(),
-          content: content.trim(),
-          version: version.trim(),
-          platform: platform.trim(),
-          file_path: finalFilePath,
-          file_size: file ? file.size.toString() : undefined,
-        }),
+        body: formData,
       });
 
       const responseText = await response.text();
@@ -211,13 +204,14 @@ const AddVersionPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="file">Файл приложения (для информации)</label>
+            <label htmlFor="file">Файл приложения *</label>
             <input
               type="file"
               id="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".zip,.tar.gz,.exe,.dmg,.deb,.rpm,.apk,.ipa"
+              required
             />
             {file && (
               <div className="file-info">
@@ -225,22 +219,6 @@ const AddVersionPage: React.FC = () => {
                 <p>Размер: {(file.size / 1024 / 1024).toFixed(2)} МБ</p>
               </div>
             )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="filePath">Полный путь к файлу на сервере *</label>
-            <input
-              type="text"
-              id="filePath"
-              value={filePath}
-              onChange={(e) => setFilePath(e.target.value)}
-              placeholder="/var/www/uploads/ourpaint-v1.0.0.zip"
-              required
-            />
-            <small className="help-text">
-              Укажите полный путь к файлу на сервере, который уже загружен. 
-              Файл должен быть доступен по указанному пути.
-            </small>
           </div>
 
           {message && (

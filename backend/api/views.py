@@ -488,13 +488,20 @@ def download_view(request):
                     meta_info = json.loads(meta.description)
                 except Exception:
                     meta_info = {}
+            file_name = f"{meta.name or 'version'}_{meta_info.get('version', '1.0.0')}.zip" if meta else f"version_{media.id}.zip"
+            content_text = ""
+            if meta_info:
+                content_text = meta_info.get("content", "")
+            elif meta and meta.description and not meta.description.strip().startswith('{'):
+                content_text = meta.description
+            
             versions_data.append({
                 "id": media.id,
-                "title": meta.name if meta else media.path,
-                "content": meta.description if meta else "",
+                "title": meta.name if meta else f"Версия {meta_info.get('version', '1.0.0')}",
+                "content": content_text,
                 "version": meta_info.get("version", "1.0.0"),
                 "platform": meta_info.get("platform", "Все платформы"),
-                "file_name": media.path,
+                "file_name": file_name,
                 "file_size": meta_info.get("file_size") or (str(len(media.data)) if media.data else None),
                 "release_date": None,
                 "author_id": meta.admin.id if meta and meta.admin_id else None,
@@ -527,7 +534,19 @@ def download_file(request, version_id):
         if not media.data:
             return Response({"error": "Файл версии отсутствует"}, status=404)
 
-        filename = os.path.basename(media.path or f"version_{version_id}")
+        try:
+            meta = MediaMeta.objects.get(media=media)
+            meta_info = {}
+            if meta.description:
+                try:
+                    meta_info = json.loads(meta.description)
+                except:
+                    pass
+            version = meta_info.get("version", "1.0.0")
+            filename = f"{meta.name or 'OurPaint'}_v{version}.zip"
+        except MediaMeta.DoesNotExist:
+            filename = f"version_{version_id}.zip"
+
         response = HttpResponse(
             media.data,
             content_type='application/octet-stream'
@@ -549,7 +568,7 @@ def download_file(request, version_id):
 
         return response
 
-    except Documentation.DoesNotExist:
+    except MediaFile.DoesNotExist:
         return Response({"error": "Версия не найдена"}, status=404)
     except Exception as e:
         return Response({"error": f"Ошибка при скачивании файла: {str(e)}"}, status=500)
@@ -593,10 +612,7 @@ def create_version(request):
         file_bytes = uploaded_file.read()
         if not file_size:
             file_size = str(len(file_bytes))
-        now = datetime.now()
-
         media = MediaFile.objects.create(
-            path=uploaded_file.name,
             type='installer',
             data=file_bytes
         )
@@ -607,7 +623,8 @@ def create_version(request):
             description=json.dumps({
                 "version": version,
                 "platform": platform or "Все платформы",
-                "file_size": file_size
+                "file_size": file_size,
+                "content": content
             }),
             name=title
         )
@@ -663,27 +680,24 @@ def delete_version(request, version_id):
                             status=403)
 
         try:
-            version = Documentation.objects.get(id=version_id, type='api')
-        except Documentation.DoesNotExist:
+            media = MediaFile.objects.get(id=version_id, type='installer')
+        except MediaFile.DoesNotExist:
             return Response({"error": "Версия не найдена"}, status=404)
 
-        file_path = None
-        if version.text and '<!-- FILE_PATH:' in version.text:
-            try:
-                path_start = version.text.find('<!-- FILE_PATH:') + 15
-                path_end = version.text.find(' -->', path_start)
-                file_path = version.text[path_start:path_end].strip()
-            except:
-                pass
-
-        version.delete()
+        try:
+            meta = MediaMeta.objects.get(media=media)
+            meta.delete()
+        except MediaMeta.DoesNotExist:
+            pass
 
         EntityLog.objects.create(
             action='delete',
             id_user=user,
-            type='documentation',
+            type='media_files',
             id_entity=version_id
         )
+
+        media.delete()
 
         return Response({
             "message": "Версия приложения успешно удалена"

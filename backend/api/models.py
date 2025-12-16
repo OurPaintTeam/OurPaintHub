@@ -186,7 +186,6 @@ class MediaFile(models.Model):
         ('installer', 'Инсталлятор'),
     ]
     
-    path = models.TextField()
     type = models.CharField(max_length=255, choices=TYPE_CHOICES)
     data = models.BinaryField(null=True, blank=True)
     

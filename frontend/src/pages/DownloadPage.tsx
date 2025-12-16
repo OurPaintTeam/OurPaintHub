@@ -12,7 +12,7 @@ interface DownloadItem {
   version?: string;
   platform?: string;
   release_date?: string;
-  file_path?: string;
+  file_name?: string;
   file_size?: string;
   author_email?: string;
 }
@@ -201,8 +201,8 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
                   <div className="download-item-actions">
                     <button
                       className="download-btn"
-                      onClick={() => handleDownload(item.id, item.file_path ? item.file_path.split('/').pop() || '' : '')}
-                      disabled={downloading === item.id || !item.file_path}
+                      onClick={() => handleDownload(item.id, item.file_name || `OurPaint-v${item.version || '1.0.0'}.zip`)}
+                      disabled={downloading === item.id}
                     >
                       <FontAwesomeIcon icon={faDownload} />
                       {downloading === item.id ? "Скачивание..." : "Скачать"}
