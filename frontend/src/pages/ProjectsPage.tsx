@@ -105,7 +105,7 @@ const ProjectsPage: React.FC = () => {
                     const res = await fetch(`http://192.168.0.101:8000/api/project/get_user_projects/`,{
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ user_id: user.id,viewer_id: friend.id }),
+                        body: JSON.stringify({ viewer_id: user.id,user_id: friend.id }),
                     });
                     if (!res.ok) return [];
                     const data = await res.json();
