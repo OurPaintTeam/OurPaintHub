@@ -92,15 +92,7 @@ const AddVersionPage: React.FC = () => {
       formData.append("file", file);
       formData.append("file_size", file.size.toString());
 
-      // Если файл выбран, но путь не указан, сначала нужно загрузить файл на сервер
-      // Для упрощения будем требовать указать путь к уже загруженному файлу
-      if (file && !filePath) {
-        setMessage("Пожалуйста, сначала загрузите файл на сервер и укажите полный путь к нему");
-        setSaving(false);
-        return;
-      }
-
-      const response = await fetch("http://192.168.0.101:8000/api/download/create/", {
+      const response = await fetch("http://localhost:8000/api/download/create/", {
         method: "POST",
         body: formData,
       });
