@@ -45,7 +45,7 @@ const SettingsPage: React.FC = () => {
 
   const loadUserProfile = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/profile/?user_id=${userId}`);
+      const response = await fetch(`http://192.168.0.101:8000/api/profile/?user_id=${userId}`);
       if (response.ok) {
         const profileData = await response.json();
         setProfile(profileData);
@@ -85,7 +85,7 @@ const SettingsPage: React.FC = () => {
         payload.avatar = avatarData ?? "";
       }
 
-      const response = await fetch("http://localhost:8000/api/profile/update/", {
+      const response = await fetch("http://192.168.0.101:8000/api/profile/update/", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

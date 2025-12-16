@@ -44,7 +44,7 @@ const AddVersionPage: React.FC = () => {
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`http://192.168.0.101:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -96,7 +96,7 @@ const AddVersionPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:8000/api/download/create/", {
+      const response = await fetch("http://192.168.0.101:8000/api/download/create/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

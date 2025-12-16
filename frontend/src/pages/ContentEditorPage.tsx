@@ -96,8 +96,8 @@ const ContentEditorPage: React.FC = () => {
     setMessage("");
 
     const endpoint = isDocsMode
-      ? "http://localhost:8000/api/documentation/create/"
-      : "http://localhost:8000/api/news/create/";
+      ? "http://192.168.0.101:8000/api/documentation/create/"
+      : "http://192.168.0.101:8000/api/news/create/";
 
     const payload = isDocsMode
       ? {

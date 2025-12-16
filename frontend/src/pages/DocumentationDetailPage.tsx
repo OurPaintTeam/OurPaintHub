@@ -52,7 +52,7 @@ const DocumentationDetailPage: React.FC = () => {
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`http://192.168.0.101:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -64,7 +64,7 @@ const DocumentationDetailPage: React.FC = () => {
 
   const loadDocumentation = async (docId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/documentation/`);
+      const response = await fetch(`http://192.168.0.101:8000/api/documentation/`);
       if (response.ok) {
         const docData = await response.json();
         const docItem = docData.find((item: DocItem) => item.id === docId);
@@ -98,7 +98,7 @@ const DocumentationDetailPage: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/documentation/${doc.id}/delete/`, {
+      const response = await fetch(`http://192.168.0.101:8000/api/documentation/${doc.id}/delete/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id }),

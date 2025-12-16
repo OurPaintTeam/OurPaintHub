@@ -49,7 +49,7 @@ const EditProjectModal: React.FC<EditProjectModalProps> = ({
 
         try {
             setSaving(true);
-            const response = await fetch(`http://localhost:8000/api/project/change/${projectId}/`, {
+            const response = await fetch(`http://192.168.0.101:8000/api/project/change/${projectId}/`, {
                 method: "PATCH",
                 body: formData,
             });
