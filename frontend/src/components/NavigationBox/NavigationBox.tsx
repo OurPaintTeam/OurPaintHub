@@ -22,7 +22,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({ isAuthenticated = false }
     if (!userData) return;
     try {
       const parsed = JSON.parse(userData);
-      fetch(`http://192.168.0.101:8000/api/friends/requests/?user_id=${parsed.id}`)
+      fetch(`http://localhost:8000/api/friends/requests/?user_id=${parsed.id}`)
         .then(res => res.ok ? res.json() : [])
         .then((list) => setRequestsCount(Array.isArray(list) ? list.length : 0))
         .catch(() => setRequestsCount(0));

@@ -49,7 +49,7 @@ const FriendsPage: React.FC = () => {
     const loadFriends = async (userId: number, search: string = "") => {
         try {
             const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/?user_id=${userId}${searchParam}`);
+            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${userId}${searchParam}`);
             if (response.ok) {
                 const data = await response.json();
                 const enriched = await enrichUsersWithAvatar(data);
@@ -65,7 +65,7 @@ const FriendsPage: React.FC = () => {
     const loadAllUsers = async (userId: number, friendsList: UserData[] = friends, search: string = "") => {
         try {
             const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
-            const response = await fetch(`http://192.168.0.101:8000/api/users/?exclude_id=${userId}${searchParam}`);
+            const response = await fetch(`http://localhost:8000/api/users/?exclude_id=${userId}${searchParam}`);
             if (response.ok) {
                 const data = await response.json();
                 // Фильтруем пользователей - убираем тех, кто уже в друзьях
@@ -97,7 +97,7 @@ const FriendsPage: React.FC = () => {
 
     const loadRequests = async (userId: number) => {
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/requests/?user_id=${userId}`);
+            const response = await fetch(`http://localhost:8000/api/friends/requests/?user_id=${userId}`);
             if (response.ok) {
                 const data = await response.json();
                 const enriched = await enrichUsersWithAvatar(data);
@@ -110,7 +110,7 @@ const FriendsPage: React.FC = () => {
 
     const loadSentRequests = async (userId: number) => {
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/requests/sent/?user_id=${userId}`);
+            const response = await fetch(`http://localhost:8000/api/friends/requests/sent/?user_id=${userId}`);
             if (response.ok) {
                 const data = await response.json();
                 const enriched = await enrichUsersWithAvatar(data);
@@ -124,7 +124,7 @@ const FriendsPage: React.FC = () => {
     const handleRespond = async (fromUserId: number, action: 'accept' | 'decline') => {
         if (!user) return;
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/requests/respond/`, {
+            const response = await fetch(`http://localhost:8000/api/friends/requests/respond/`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({user_id: user.id, from_user_id: fromUserId, action}),
@@ -154,7 +154,7 @@ const FriendsPage: React.FC = () => {
         if (!user) return;
 
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/add/`, {
+            const response = await fetch(`http://localhost:8000/api/friends/add/`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -190,7 +190,7 @@ const FriendsPage: React.FC = () => {
         if (!confirmed) return;
 
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/remove/`, {
+            const response = await fetch(`http://localhost:8000/api/friends/remove/`, {
                 method: "DELETE",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -224,7 +224,7 @@ const FriendsPage: React.FC = () => {
         if (!confirmed) return;
 
         try {
-            const response = await fetch(`http://192.168.0.101:8000/api/friends/requests/cancel/`, {
+            const response = await fetch(`http://localhost:8000/api/friends/requests/cancel/`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({user_id: user.id, receiver_id: receiverId}),
@@ -279,7 +279,7 @@ const FriendsPage: React.FC = () => {
     const enrichUsersWithAvatar = async (users: UserData[]) => {
         return Promise.all(users.map(async (u) => {
             try {
-                const res = await fetch(`http://192.168.0.101:8000/api/profile/?user_id=${u.id}`);
+                const res = await fetch(`http://localhost:8000/api/profile/?user_id=${u.id}`);
                 if (res.ok) {
                     const profile = await res.json();
                     return {...u, avatar: profile.avatar || null};

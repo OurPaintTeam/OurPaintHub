@@ -77,7 +77,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
     }
 
     // Загружаем документацию
-    fetch("http://192.168.0.101:8000/api/documentation/")
+    fetch("http://localhost:8000/api/documentation/")
       .then(res => res.json())
       .then(data => {
         setDocs(data);
@@ -91,7 +91,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -117,7 +117,7 @@ const DocumentationPage: React.FC<DocumentationPageProps> = ({ isAuthenticated =
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/documentation/${docId}/delete/`, {
+      const response = await fetch(`http://localhost:8000/api/documentation/${docId}/delete/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id }),

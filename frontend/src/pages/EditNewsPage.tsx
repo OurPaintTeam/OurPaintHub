@@ -51,7 +51,7 @@ const EditNewsPage: React.FC = () => {
 
   const loadNews = async (newsId: number) => {
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/news/`);
+      const response = await fetch(`http://localhost:8000/api/news/`);
       if (response.ok) {
         const newsData = await response.json();
         const newsItem = newsData.find((item: NewsData) => item.id === newsId);
@@ -86,7 +86,7 @@ const EditNewsPage: React.FC = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/news/${id}/`, {
+      const response = await fetch(`http://localhost:8000/api/news/${id}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

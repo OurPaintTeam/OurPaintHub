@@ -52,7 +52,7 @@ const EditDocumentationPage: React.FC = () => {
 
   const loadDocumentation = async (docId: number) => {
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/documentation/`);
+      const response = await fetch(`http://localhost:8000/api/documentation/`);
       if (response.ok) {
         const docData = await response.json();
         const docItem = docData.find((item: DocData) => item.id === docId);
@@ -93,7 +93,7 @@ const EditDocumentationPage: React.FC = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/documentation/${id}/`, {
+      const response = await fetch(`http://localhost:8000/api/documentation/${id}/`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

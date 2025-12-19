@@ -43,7 +43,7 @@ const AddVersionPage: React.FC = () => {
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);

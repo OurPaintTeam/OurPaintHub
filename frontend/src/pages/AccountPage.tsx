@@ -45,7 +45,7 @@ const AccountPage: React.FC = () => {
     const loadUserProfile = async (userId: number) => {
         try {
             // Профиль
-            const profileResponse = await fetch(`http://192.168.0.101:8000/api/profile/?user_id=${userId}`);
+            const profileResponse = await fetch(`http://localhost:8000/api/profile/?user_id=${userId}`);
             if (profileResponse.ok) {
                 const profileData = await profileResponse.json();
                 setAccount(prev => prev ? {
@@ -58,14 +58,14 @@ const AccountPage: React.FC = () => {
             }
 
             // Роль
-            const roleResponse = await fetch(`http://192.168.0.101:8000/api/user/role/?user_id=${userId}`);
+            const roleResponse = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
             if (roleResponse.ok) {
                 const roleData = await roleResponse.json();
                 setAccount(prev => prev ? {...prev, is_admin: roleData.is_admin} : null);
             }
 
             // Мои проекты
-            const projectsResponse = await fetch(`http://192.168.0.101:8000/api/project/get_user_projects/`,{
+            const projectsResponse = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -79,7 +79,7 @@ const AccountPage: React.FC = () => {
             }
 
             // Полученные проекты
-            const receivedResponse = await fetch(`http://192.168.0.101:8000/api/project/shared/`,{
+            const receivedResponse = await fetch(`http://localhost:8000/api/project/shared/`,{
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -93,7 +93,7 @@ const AccountPage: React.FC = () => {
             }
 
             // Друзья
-            const friendsResponse = await fetch(`http://192.168.0.101:8000/api/friends/?user_id=${userId}`);
+            const friendsResponse = await fetch(`http://localhost:8000/api/friends/?user_id=${userId}`);
             if (friendsResponse.ok) {
                 const friendsData = await friendsResponse.json();
                 setAccount(prev => prev ? {...prev, friends_count: friendsData.length} : null);
