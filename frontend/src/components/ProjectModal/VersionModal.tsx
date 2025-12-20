@@ -24,7 +24,7 @@ const VersionModal: React.FC<VersionModalProps> = ({userId,projectId, onClose}) 
             if (!userId || !projectId) return;
             try {
                 const response = await fetch(
-                    `http://localhost:8000/api/project/get_project_versions/${projectId}/`,{
+                    `https://localhost:8000/api/project/get_project_versions/${projectId}/`,{
                         method: "POST",
                         headers: {"Content-Type": "application/json"},
                         body: JSON.stringify({ user_id: userId,viewer_id:userId }),

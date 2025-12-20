@@ -43,7 +43,7 @@ const AddVersionPage: React.FC = () => {
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`https://localhost:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -92,7 +92,7 @@ const AddVersionPage: React.FC = () => {
       formData.append("file", file);
       formData.append("file_size", file.size.toString());
 
-      const response = await fetch("http://localhost:8000/api/download/create/", {
+      const response = await fetch("https://localhost:8000/api/download/create/", {
         method: "POST",
         body: formData,
       });

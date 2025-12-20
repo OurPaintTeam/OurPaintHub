@@ -54,7 +54,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
     const checkAdminRole = async (u: UserData) => {
         try {
             const res = await fetch(
-                `http://localhost:8000/api/user/role/?user_id=${u.id}`
+                `https://localhost:8000/api/user/role/?user_id=${u.id}`
             );
             const data = await res.json();
             if (res.ok && data?.is_admin === true) {
@@ -68,7 +68,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
     const fetchQA = async () => {
         setLoading(true);
         try {
-            const res = await fetch("http://localhost:8000/api/QA/");
+            const res = await fetch("https://localhost:8000/api/QA/");
             const text = await res.text();
             let data: QAItem[] | string = [];
             if (text) {
@@ -98,7 +98,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
 
         const payload = {text_question: newQuestion.trim(), user_id: user.id};
         try {
-            const res = await fetch("http://localhost:8000/api/QA/create/", {
+            const res = await fetch("https://localhost:8000/api/QA/create/", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(payload),
@@ -143,7 +143,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
         if (!confirmed) return;
 
         try {
-            const response = await fetch(`http://localhost:8000/api/QA/${qaId}/delete/`, {
+            const response = await fetch(`https://localhost:8000/api/QA/${qaId}/delete/`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id }),
@@ -172,7 +172,7 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
 
         try {
             const payload = {answer_text: answer.trim(), user_id: user.id};
-            const res = await fetch(`http://localhost:8000/api/QA/${qaId}/answer/`, {
+            const res = await fetch(`https://localhost:8000/api/QA/${qaId}/answer/`, {
                 method: "PATCH",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(payload),

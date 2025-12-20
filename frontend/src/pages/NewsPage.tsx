@@ -45,7 +45,7 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
     }
 
     // Загружаем новости
-    fetch("http://localhost:8000/api/news/")
+    fetch("https://localhost:8000/api/news/")
       .then((res) => res.json())
       .then((data) => {
         setNews(data);
@@ -59,7 +59,7 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`https://localhost:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -84,7 +84,7 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/news/${newsId}/delete/`, {
+      const response = await fetch(`https://localhost:8000/api/news/${newsId}/delete/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id }),

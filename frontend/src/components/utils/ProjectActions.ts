@@ -5,7 +5,7 @@ export const handleDownload = async (
     fileType: string
 ) => {
     try {
-        const response = await fetch(`http://localhost:8000/api/project/download/${projectId}/`,{
+        const response = await fetch(`https://localhost:8000/api/project/download/${projectId}/`,{
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: userId }),
@@ -40,14 +40,14 @@ export const handleDelete = async (
 
     try {
         if (isReceived && sharedId) {
-            const response = await fetch(`http://localhost:8000/api/project/delete_received/${sharedId}/`, {
+            const response = await fetch(`https://localhost:8000/api/project/delete_received/${sharedId}/`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: userId }),
             });
             if (response.ok && refreshReceived) refreshReceived();
         } else {
-            const response = await fetch(`http://localhost:8000/api/project/delete/${projectId}/`, {
+            const response = await fetch(`https://localhost:8000/api/project/delete/${projectId}/`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: userId }),

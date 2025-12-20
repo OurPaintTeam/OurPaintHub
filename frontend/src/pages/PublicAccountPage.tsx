@@ -47,7 +47,7 @@ const PublicAccountPage: React.FC = () => {
 
     const load = async () => {
       try {
-        const resp = await fetch(`http://localhost:8000/api/profile/?user_id=${id}`);
+        const resp = await fetch(`https://localhost:8000/api/profile/?user_id=${id}`);
         const data = await resp.json();
         if (!resp.ok) {
           setError(data?.error || "Ошибка загрузки профиля");
@@ -79,7 +79,7 @@ const PublicAccountPage: React.FC = () => {
           setCurrentUserId(parsed.id);
           
           // Проверяем, является ли пользователь другом
-          const friendsResp = await fetch(`http://localhost:8000/api/friends/?user_id=${parsed.id}`);
+          const friendsResp = await fetch(`https://localhost:8000/api/friends/?user_id=${parsed.id}`);
           if (friendsResp.ok) {
             const friends = await friendsResp.json();
             const friendStatus = Array.isArray(friends) && friends.some((f: {id: number}) => f.id === fid);
@@ -109,7 +109,7 @@ const PublicAccountPage: React.FC = () => {
   const loadFriendFriends = async (friendId: number) => {
     setLoadingFriends(true);
     try {
-      const resp = await fetch(`http://localhost:8000/api/friends/?user_id=${friendId}`);
+      const resp = await fetch(`https://localhost:8000/api/friends/?user_id=${friendId}`);
       if (resp.ok) {
         const data = await resp.json();
         setFriendFriends(data || []);
@@ -126,7 +126,7 @@ const PublicAccountPage: React.FC = () => {
     if (adding) return;
     setAdding(true);
     try {
-      const resp = await fetch(`http://localhost:8000/api/friends/add/`, {
+      const resp = await fetch(`https://localhost:8000/api/friends/add/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUserId, friend_id: Number(id) })
@@ -160,7 +160,7 @@ const PublicAccountPage: React.FC = () => {
     
     setRemoving(true);
     try {
-      const resp = await fetch(`http://localhost:8000/api/friends/remove/`, {
+      const resp = await fetch(`https://localhost:8000/api/friends/remove/`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUserId, friend_id: Number(id) })

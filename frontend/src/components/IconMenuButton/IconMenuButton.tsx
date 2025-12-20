@@ -33,7 +33,7 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
       setUser(parsed);
       
       // Загружаем актуальный профиль с аватаром
-      fetch(`http://localhost:8000/api/profile/?user_id=${parsed.id}`)
+      fetch(`https://localhost:8000/api/profile/?user_id=${parsed.id}`)
         .then(res => res.ok ? res.json() : null)
         .then(profile => {
           if (profile) {

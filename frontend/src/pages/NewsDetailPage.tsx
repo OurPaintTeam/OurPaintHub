@@ -55,7 +55,7 @@ const NewsDetailPage: React.FC<NewsDetailPage> = ({ isAuthenticated = false }) =
 
   const checkAdminRole = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/user/role/?user_id=${userId}`);
+      const response = await fetch(`https://localhost:8000/api/user/role/?user_id=${userId}`);
       if (response.ok) {
         const roleData = await response.json();
         setIsAdmin(roleData.is_admin);
@@ -67,7 +67,7 @@ const NewsDetailPage: React.FC<NewsDetailPage> = ({ isAuthenticated = false }) =
 
   const loadNews = async (newsId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/news/`);
+      const response = await fetch(`https://localhost:8000/api/news/`);
       if (response.ok) {
         const newsData = await response.json();
         const newsItem = newsData.find((item: NewsItem) => item.id === newsId);
@@ -101,7 +101,7 @@ const NewsDetailPage: React.FC<NewsDetailPage> = ({ isAuthenticated = false }) =
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/news/${news.id}/delete/`, {
+      const response = await fetch(`https://localhost:8000/api/news/${news.id}/delete/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user.id }),

@@ -71,7 +71,7 @@ const ProjectsPage: React.FC = () => {
     const fetchUserProjects = async () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
+            const response = await fetch(`https://localhost:8000/api/project/get_user_projects/`,{
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id,viewer_id:user.id }),
@@ -87,7 +87,7 @@ const ProjectsPage: React.FC = () => {
     const fetchFriends = async () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/friends/?user_id=${user.id}`);
+            const response = await fetch(`https://localhost:8000/api/friends/?user_id=${user.id}`);
             if (!response.ok) return;
             const data = await response.json();
             setFriends(data);
@@ -102,7 +102,7 @@ const ProjectsPage: React.FC = () => {
         try {
             const allProjects = await Promise.all(
                 friendsList.map(async (friend) => {
-                    const res = await fetch(`http://localhost:8000/api/project/get_user_projects/`,{
+                    const res = await fetch(`https://localhost:8000/api/project/get_user_projects/`,{
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ viewer_id: user.id,user_id: friend.id }),
@@ -123,7 +123,7 @@ const ProjectsPage: React.FC = () => {
     const fetchReceivedProjects = async () => {
         if (!user) return alert("Сначала авторизуйтесь");
         try {
-            const response = await fetch(`http://localhost:8000/api/project/shared/`,{
+            const response = await fetch(`https://localhost:8000/api/project/shared/`,{
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id }),
@@ -152,7 +152,7 @@ const ProjectsPage: React.FC = () => {
         formData.append("description", description);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/project/add/`, {
+            const response = await fetch(`https://localhost:8000/api/project/add/`, {
                 method: "POST",
                 body: formData,
             });
@@ -185,7 +185,7 @@ const ProjectsPage: React.FC = () => {
     const sendProjectToFriend = async (userId:number,friendId: number, comment: string) => {
         if (!sharingProject) return;
         try {
-            const response = await fetch(`http://localhost:8000/api/project/share/${sharingProject.id}/`, {
+            const response = await fetch(`https://localhost:8000/api/project/share/${sharingProject.id}/`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
