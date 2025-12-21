@@ -295,7 +295,7 @@ class MediaFile(models.Model):
 
 class MediaMeta(models.Model):
     admin = models.ForeignKey(User, on_delete=models.CASCADE, db_column='admin_id')
-    media = models.ForeignKey(MediaFile, on_delete=models.CASCADE, db_column='media_id')
+    media = models.OneToOneField(MediaFile, on_delete=models.CASCADE, db_column='media_id', null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     name = models.CharField(max_length=255)
     
