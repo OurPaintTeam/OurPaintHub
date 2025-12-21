@@ -5,11 +5,30 @@ from django.core.exceptions import ValidationError
 import hashlib
 import re
 from datetime import date, timedelta
+from .fields import (
+    ProjectTypeField,
+    FriendshipStatusField,
+    EntityLogActionField,
+    EntityLogTypeField,
+    MediaFileTypeField,
+    DocumentationTypeField
+)
+
+class Role(models.Model):
+    role_name = models.CharField(max_length=255, unique=True)
+    objects = models.Manager()
+
+    class Meta:
+        db_table = 'role'
+
+    def __str__(self):
+        return self.role_name
 
 class User(models.Model):
     email = models.CharField(max_length=255, unique=True)
     password = models.TextField()
     registration_date = models.DateTimeField(auto_now_add=True)
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True, db_column='role_id')
     objects = models.Manager()
     
     class Meta:
@@ -53,18 +72,6 @@ class UserProfile(models.Model):
             if self.date_of_birth > min_date:
                 raise ValidationError('Возраст должен быть не менее 7 лет')
 
-class Role(models.Model):
-    ROLE_CHOICES = [
-        ('admin', 'Администратор'),
-        ('user', 'Пользователь'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
-    role = models.CharField(max_length=255, choices=ROLE_CHOICES)
-    objects = models.Manager()
-    
-    class Meta:
-        db_table = 'role'
 
 class ProjectGroups(models.Model):
     user = models.ForeignKey(
@@ -254,15 +261,9 @@ class Shared(models.Model):
             raise ValidationError({'receiver': 'Проект не может быть передан самому владельцу'})
 
 class Friendship(models.Model):
-    STATUS_CHOICES = [
-        ('sent', 'Отправлен'),
-        ('accepted', 'Принят'),
-        ('blocked', 'Заблокирован'),
-    ]
-    
     user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_initiated', db_column='user1')
     user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_received', db_column='user2')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='sent')
+    status = FriendshipStatusField(default='sent')
     
     class Meta:
         db_table = 'friendship'
@@ -275,30 +276,10 @@ class Friendship(models.Model):
             raise ValidationError('Пользователь не может быть другом сам себе')
 
 class EntityLog(models.Model):
-    ACTION_CHOICES = [
-        ('add', 'Добавление'),
-        ('change', 'Изменение'),
-        ('delete', 'Удаление'),
-    ]
-    
-    TYPE_CHOICES = [
-        ('user_profile', 'Профиль пользователя'),
-        ('role', 'Роль'),
-        ('projects', 'Проект'),
-        ('project_meta', 'Метаданные проекта'),
-        ('project_changes', 'Изменения проекта'),
-        ('shared', 'Общий доступ'),
-        ('friendship', 'Дружба'),
-        ('media_files', 'Медиафайл'),
-        ('media_meta', 'Метаданные медиа'),
-        ('documentation', 'Документация'),
-        ('faq', 'FAQ'),
-    ]
-    
     time = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    action = EntityLogActionField()
     id_user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='id_user')
-    type = models.CharField(max_length=255, choices=TYPE_CHOICES)
+    type = EntityLogTypeField()
     id_entity = models.BigIntegerField()
     objects = models.Manager()
     
@@ -306,14 +287,7 @@ class EntityLog(models.Model):
         db_table = 'entity_logs'
 
 class MediaFile(models.Model):
-    TYPE_CHOICES = [
-        ('image', 'Изображение'),
-        ('video', 'Видео'),
-        ('md', 'Markdown'),
-        ('installer', 'Инсталлятор'),
-    ]
-    
-    type = models.CharField(max_length=255, choices=TYPE_CHOICES)
+    type = MediaFileTypeField()
     data = models.BinaryField(null=True, blank=True)
     
     class Meta:
@@ -329,13 +303,7 @@ class MediaMeta(models.Model):
         db_table = 'media_meta'
 
 class Documentation(models.Model):
-    TYPE_CHOICES = [
-        ('guide', 'Руководство'),
-        ('reference', 'Справочник'),
-        ('api', 'API'),
-    ]
-    
-    type = models.CharField(max_length=255, choices=TYPE_CHOICES)
+    type = DocumentationTypeField()
     admin = models.ForeignKey(User, on_delete=models.CASCADE, db_column='admin')
     text = models.TextField(null=True, blank=True)
     objects = models.Manager()

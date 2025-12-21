@@ -37,6 +37,15 @@ def get_friend_ids(user):
     return ids
 
 
+def get_or_create_role(role_name):
+    role, created = Role.objects.get_or_create(role_name=role_name)
+    return role
+
+
+def is_admin(user):
+    return user.role and user.role.role_name == 'admin'
+
+
 @api_view(["POST"])
 def register_user(request):
     """
@@ -59,11 +68,11 @@ def register_user(request):
         return Response({"error": "Пользователь с таким email уже существует"}, status=400)
 
     try:
-        user = User.objects.create(email=email, password=password)
+        user_role = get_or_create_role('user')
+        user = User.objects.create(email=email, password=password, role=user_role)
         
         nickname = email.split('@')[0]
         UserProfile.objects.create(user=user, name=nickname)
-        Role.objects.create(user=user, role='user')
         
         return Response({
             "message": "Пользователь успешно зарегистрирован", 
@@ -187,9 +196,7 @@ def create_news(request):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            role = Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
 
         now = datetime.now()
@@ -292,9 +299,7 @@ def create_documentation(request):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать документацию."},
                             status=403)
 
@@ -363,9 +368,7 @@ def update_documentation(request, doc_id):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут редактировать документацию."},
                             status=403)
 
@@ -440,9 +443,7 @@ def delete_documentation(request, doc_id):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут удалять документацию."},
                             status=403)
 
@@ -603,9 +604,7 @@ def create_version(request):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."},
                             status=403)
 
@@ -673,9 +672,7 @@ def delete_version(request, version_id):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут удалять версии приложения."},
                             status=403)
 
@@ -843,9 +840,7 @@ def update_news(request, news_id):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            role = Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут редактировать новости."},
                             status=403)
 
@@ -909,9 +904,7 @@ def delete_news(request, news_id):
     try:
         user = User.objects.get(id=user_id)
 
-        try:
-            role = Role.objects.get(user=user, role='admin')
-        except Role.DoesNotExist:
+        if not is_admin(user):
             return Response({"error": "Недостаточно прав. Только администраторы могут удалять новости."}, status=403)
 
         try:
@@ -951,14 +944,13 @@ def check_user_role(request):
 
     try:
         user = User.objects.get(id=user_id)
-        try:
-            role = Role.objects.get(user=user)
+        if user.role:
             return Response({
                 "user_id": user.id,
-                "role": role.role,
-                "is_admin": role.role == 'admin'
+                "role": user.role.role_name,
+                "is_admin": user.role.role_name == 'admin'
             }, status=200)
-        except Role.DoesNotExist:
+        else:
             return Response({
                 "user_id": user.id,
                 "role": "user",
@@ -2208,8 +2200,7 @@ def answer_QA(request, qa_id):
         )
 
     # Проверка администратора
-    is_admin = Role.objects.filter(user=user, role="admin").exists()
-    if not is_admin:
+    if not is_admin(user):
         return Response(
             {"error": "Недостаточно прав. Только администраторы могут отвечать на вопросы."},
             status=status.HTTP_403_FORBIDDEN
