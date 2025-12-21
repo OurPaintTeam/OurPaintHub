@@ -13,6 +13,28 @@ from django.http import HttpResponse
 from rest_framework import status
 import mimetypes
 import json
+import base64
+
+
+def get_image_mime_type(image_bytes):
+    if not image_bytes:
+        return 'image/png'
+    
+    if isinstance(image_bytes, memoryview):
+        image_bytes = bytes(image_bytes)
+    
+    if image_bytes.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    elif image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    elif image_bytes.startswith(b'GIF87a') or image_bytes.startswith(b'GIF89a'):
+        return 'image/gif'
+    elif image_bytes.startswith(b'RIFF') and b'WEBP' in image_bytes[:12]:
+        return 'image/webp'
+    elif image_bytes.startswith(b'<?xml') or image_bytes.startswith(b'<svg') or b'<svg' in image_bytes[:200]:
+        return 'image/svg+xml'
+    else:
+        return 'image/png'
 
 
 def make_friendship_entity_id(user_a, user_b):
@@ -725,11 +747,34 @@ def get_user_profile(request):
                 status='accepted'
             ).count()
 
+            avatar_data_uri = None
+            if profile.avatar:
+                try:
+                    if isinstance(profile.avatar, str):
+                        if profile.avatar.startswith('data:'):
+                            avatar_data_uri = profile.avatar
+                        elif ';base64,' in profile.avatar:
+                            if profile.avatar.startswith('image/'):
+                                avatar_data_uri = f"data:{profile.avatar}"
+                            else:
+                                avatar_data_uri = f"data:image/{profile.avatar}"
+                        else:
+                            avatar_data_uri = f"data:image/png;base64,{profile.avatar}"
+                    else:
+                        avatar_bytes = bytes(profile.avatar) if isinstance(profile.avatar, memoryview) else profile.avatar
+                        if avatar_bytes:
+                            mime_type = get_image_mime_type(avatar_bytes)
+                            avatar_base64 = base64.b64encode(avatar_bytes).decode('utf-8')
+                            avatar_data_uri = f"data:{mime_type};base64,{avatar_base64}"
+                except Exception as e:
+                    print(f"Ошибка обработки аватара: {e}, тип: {type(profile.avatar)}")
+                    avatar_data_uri = None
+            
             return Response({
                 "id": user.id,
                 "email": user.email,
                 "nickname": profile.name,
-                "avatar": profile.avatar,
+                "avatar": avatar_data_uri,
                 "bio": profile.bio,
                 "date_of_birth": profile.date_of_birth,
                 "friends_count": friends_count
@@ -769,20 +814,41 @@ def update_user_profile(request):
 
         avatar_changed = False
         if avatar_provided:
-            new_avatar = None
+            new_avatar_bytes = None
             if isinstance(avatar, str):
                 trimmed_avatar = avatar.strip()
                 if trimmed_avatar:
-                    if not trimmed_avatar.startswith('data:image'):
-                        return Response({"error": "Аватар должен быть изображением в формате base64"}, status=400)
-                    if len(trimmed_avatar) > 7 * 1024 * 1024:
-                        return Response({"error": "Размер аватара слишком большой"}, status=400)
-                    new_avatar = trimmed_avatar
+                    if ',' in trimmed_avatar:
+                        trimmed_avatar = trimmed_avatar.split(',', 1)[1]
+                    
+                    try:
+                        new_avatar_bytes = base64.b64decode(trimmed_avatar)
+                        if len(new_avatar_bytes) > 7 * 1024 * 1024:
+                            return Response({"error": "Размер аватара слишком большой"}, status=400)
+                    except Exception as e:
+                        return Response({"error": f"Некорректный формат base64: {str(e)}"}, status=400)
             elif avatar is not None:
                 return Response({"error": "Некорректный формат аватара"}, status=400)
 
-            if profile.avatar != new_avatar:
-                profile.avatar = new_avatar
+            if isinstance(profile.avatar, str):
+                if profile.avatar.startswith('data:'):
+                    old_base64 = profile.avatar.split(',', 1)[1] if ',' in profile.avatar else ''
+                    try:
+                        current_avatar_bytes = base64.b64decode(old_base64) if old_base64 else None
+                    except:
+                        current_avatar_bytes = None
+                else:
+                    try:
+                        current_avatar_bytes = base64.b64decode(profile.avatar)
+                    except:
+                        current_avatar_bytes = None
+            elif isinstance(profile.avatar, memoryview):
+                current_avatar_bytes = bytes(profile.avatar)
+            else:
+                current_avatar_bytes = profile.avatar
+            
+            if current_avatar_bytes != new_avatar_bytes:
+                profile.avatar = new_avatar_bytes
                 avatar_changed = True
 
         if nickname:
@@ -802,12 +868,35 @@ def update_user_profile(request):
                 id_entity=user.id
             )
 
+        avatar_data_uri = None
+        if profile.avatar:
+            try:
+                if isinstance(profile.avatar, str):
+                    if profile.avatar.startswith('data:'):
+                        avatar_data_uri = profile.avatar
+                    elif ';base64,' in profile.avatar:
+                        if profile.avatar.startswith('image/'):
+                            avatar_data_uri = f"data:{profile.avatar}"
+                        else:
+                            avatar_data_uri = f"data:image/{profile.avatar}"
+                    else:
+                        avatar_data_uri = f"data:image/png;base64,{profile.avatar}"
+                else:
+                    avatar_bytes = bytes(profile.avatar) if isinstance(profile.avatar, memoryview) else profile.avatar
+                    if avatar_bytes:
+                        mime_type = get_image_mime_type(avatar_bytes)
+                        avatar_base64 = base64.b64encode(avatar_bytes).decode('utf-8')
+                        avatar_data_uri = f"data:{mime_type};base64,{avatar_base64}"
+            except Exception as e:
+                print(f"Ошибка обработки аватара: {e}, тип: {type(profile.avatar)}")
+                avatar_data_uri = None
+        
         return Response({
             "message": "Профиль успешно обновлен",
             "nickname": profile.name,
             "bio": profile.bio,
             "date_of_birth": profile.date_of_birth,
-            "avatar": profile.avatar
+            "avatar": avatar_data_uri
         }, status=200)
 
     except User.DoesNotExist:

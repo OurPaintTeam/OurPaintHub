@@ -51,7 +51,7 @@ class User(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, db_column='user_id')
     name = models.CharField(max_length=255)
-    avatar = models.TextField(null=True, blank=True)
+    avatar = models.BinaryField(null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     objects = models.Manager()
