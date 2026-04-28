@@ -1,4 +1,5 @@
 {
+  "private": true,
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0"
@@ -10,11 +11,17 @@
     "sass": "^1.93.2"
   },
   "scripts": {
+    "frontend": "cd frontend && npx vite --host 0.0.0.0",
     "frontend:build": "cd frontend && npx vite build",
-    "frontend:preview": "cd frontend && npx vite preview",
+    "frontend:preview": "cd frontend && npx vite preview --host 0.0.0.0",
     "frontend:lint": "cd frontend && npx eslint .",
-    "frontend": "cd frontend && npx vite --host",
-    "backend": "cross-env-shell \"python backend/manage.py runserver\"",
-    "dev": "concurrently \"npm run frontend\" \"npm run backend\""
+    "backend": "cd backend && python manage.py runserver_plus 0.0.0.0:8000 --cert-file certs/cert.pem --key-file certs/key.pem",
+    "backend:migrate": "cd backend && python manage.py migrate",
+    "backend:makemigrations": "cd backend && python manage.py makemigrations",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:migrate": "docker compose exec backend python manage.py migrate",
+    "docker:createsuperuser": "docker compose exec backend python manage.py createsuperuser"
   }
 }
