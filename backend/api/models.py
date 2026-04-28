@@ -1,327 +1,819 @@
-from decimal import Decimal
-
-from django.db import models
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-import hashlib
-import re
-from datetime import date, timedelta
-from .fields import (
-    ProjectTypeField,
-    FriendshipStatusField,
-    EntityLogActionField,
-    EntityLogTypeField,
-    MediaFileTypeField,
-    DocumentationTypeField
+from django.utils import timezone
+from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
+
+from .choices import (
+    CommitFileOperation,
+    ContentAudience,
+    DocumentationType,
+    NotificationStatus,
+    RepositoryVisibility,
+    UserRole,
 )
 
-class Role(models.Model):
-    role_name = models.CharField(max_length=255, unique=True)
-    objects = models.Manager()
+
+# =========================================================
+# BASE MODEL
+# =========================================================
+class TimeStampedModel(models.Model):
+    """
+    Базовая абстрактная модель для времени создания/обновления.
+
+    Soft-delete не используется:
+    - если сущность удаляется, она удаляется физически;
+    - если удаляется Company, каскадом удаляются её участники и репозитории;
+    - если удаляется Repository, каскадом удаляется его история, файлы и коммиты.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'role'
+        abstract = True
 
-    def __str__(self):
-        return self.role_name
 
-class User(models.Model):
-    email = models.CharField(max_length=255, unique=True)
-    password = models.TextField()
-    registration_date = models.DateTimeField(auto_now_add=True)
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True, db_column='role_id')
-    objects = models.Manager()
-    
+# =========================================================
+# USER
+# =========================================================
+class UserManager(DjangoUserManager):
+    """
+    Manager пользователя.
+
+    Нормализует username/email:
+    - username хранится в lowercase;
+    - email хранится в lowercase;
+    - обычный user получает role=user;
+    - superuser автоматически получает role=admin, is_staff=True, is_superuser=True.
+    """
+
+    def _normalize_username_email(self, username, email):
+        username = username.lower().strip() if username else username
+        email = self.normalize_email(email).lower().strip() if email else email
+        return username, email
+
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        username, email = self._normalize_username_email(username, email)
+        extra_fields.setdefault("role", UserRole.USER)
+        return super().create_user(username=username, email=email, password=password, **extra_fields)
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        username, email = self._normalize_username_email(username, email)
+        extra_fields.setdefault("role", UserRole.ADMIN)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        return super().create_superuser(username=username, email=email, password=password, **extra_fields)
+
+
+class User(AbstractUser):
+    """
+    Основной пользователь системы.
+
+    Правила:
+    - username обязателен и уникален;
+    - email обязателен и уникален;
+    - first_name/last_name необязательные;
+    - date_of_birth хранится в UserProfile и необязательна;
+    - бизнес-роли только две: user/admin;
+    - вход можно делать по username или email на уровне auth backend/serializer.
+
+    Важно:
+    - role отвечает за бизнес-логику приложения;
+    - is_staff отвечает за доступ в Django admin;
+    - is_superuser отвечает за полные Django permissions.
+    """
+
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+    email = models.EmailField(unique=True, db_index=True)
+    role = models.CharField(
+        max_length=20,
+        choices=UserRole.choices,
+        default=UserRole.USER,
+        db_index=True,
+    )
+
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = ["email"]
+
+    objects = UserManager()
+
     class Meta:
-        db_table = 'users'
-    
+        constraints = [
+            models.UniqueConstraint(Lower("username"), name="unique_lower_username"),
+            models.UniqueConstraint(Lower("email"), name="unique_lower_email"),
+        ]
+
     def save(self, *args, **kwargs):
-        if not self.password.startswith('sha256$'):
-            self.password = hashlib.sha256(self.password.encode()).hexdigest()
+        if self.username:
+            self.username = self.username.lower().strip()
+        if self.email:
+            self.email = User.objects.normalize_email(self.email).lower().strip()
         super().save(*args, **kwargs)
-    
-    def check_password(self, raw_password):
-        hashed_password = hashlib.sha256(raw_password.encode()).hexdigest()
-        return self.password == hashed_password
-    
-    @staticmethod
-    def validate_email(email):
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return re.match(pattern, email) is not None
 
-class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, db_column='user_id')
-    name = models.CharField(max_length=255)
-    avatar = models.BinaryField(null=True, blank=True)
+    @property
+    def is_app_admin(self):
+        return self.role == UserRole.ADMIN
+
+
+class UserProfile(TimeStampedModel):
+    """
+    Дополнительные данные пользователя.
+
+    User отвечает за авторизацию.
+    UserProfile хранит необязательные профильные данные.
+    """
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    objects = models.Manager()
-    
+
+    def __str__(self):
+        return self.user.username
+
+
+class AuthRefreshSession(TimeStampedModel):
+    """
+    Backend refresh-сессия.
+
+    Frontend хранит только access_token.
+    Refresh token не отдаётся в JSON и хранится у клиента только в HttpOnly cookie.
+    В БД хранится hash refresh token, а не сам token.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="refresh_sessions")
+    token_hash = models.CharField(max_length=128, unique=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
     class Meta:
-        db_table = 'user_profile'
-    
-    def clean(self):
-        super().clean()
-        # Проверка имени: не пустое
-        if self.name:
-            if not self.name.strip():
-                raise ValidationError('Имя не может быть пустым')
-        
-        # Проверка возраста: минимум 7 лет
-        if self.date_of_birth:
-            min_date = date.today() - timedelta(days=7*365)
-            if self.date_of_birth > min_date:
-                raise ValidationError('Возраст должен быть не менее 7 лет')
+        indexes = [
+            models.Index(fields=["user", "expires_at"]),
+            models.Index(fields=["token_hash"]),
+        ]
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+    def revoke(self):
+        if self.revoked_at is None:
+            self.revoked_at = timezone.now()
+            self.save(update_fields=["revoked_at", "updated_at"])
+
+    def __str__(self):
+        return f"refresh session for {self.user.username}"
 
 
-class ProjectGroups(models.Model):
-    user = models.ForeignKey(
+class Notification(TimeStampedModel):
+    """
+    Уведомление пользователя.
+
+    Состояния:
+    - unread: новое уведомление;
+    - read: пользователь прочитал;
+
+    Удаление уведомления — физическое удаление строки из БД.
+    """
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    actor = models.ForeignKey(
         User,
-        null=False,
-        on_delete=models.CASCADE,
-        db_column='user_id'
-    )
-
-    name = models.CharField(null=False,max_length=255)
-    private = models.BooleanField(null=False,default=True)
-    objects = models.Manager()
-
-    class Meta:
-        db_table = 'project_groups'
-
-    def clean(self):
-        super().clean()
-        if not self.user:
-            raise ValidationError({'user': 'Пользователь обязателен'})
-
-        if not self.name or not self.name.strip():
-            raise ValidationError({'name': 'Имя не может быть пустым'})
-        if len(self.name.strip()) > 255:
-            raise ValidationError({'name': 'Имя не может быть больше 255 символов'})
-
-        if not isinstance(self.private, bool):
-            raise ValidationError({'private': 'Поле private должно быть логическим (True/False)'})
-
-
-class Project(models.Model):
-    project_groups = models.ForeignKey(
-        ProjectGroups,
-        null=False,
-        on_delete=models.CASCADE,
-        db_column='project_groups_id'
-    )
-    objects = models.Manager()
-
-    class Meta:
-        db_table = 'projects'
-
-    def clean(self):
-        super().clean()
-
-        if not self.project_groups:
-            raise ValidationError({'project_groups_id': 'Проектная группа обязательна'})
-        if not isinstance(self.project_groups, ProjectGroups):
-            raise ValidationError({'project_groups_id': 'Неверный тип для project_groups_id'})
-
-
-class ProjectMeta(models.Model):
-    project = models.ForeignKey(
-        Project,
-        null=False,
-        on_delete=models.CASCADE,
-        db_column='project_id'
-    )
-    last_project = models.ForeignKey(
-        'self',
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
-        db_column='last_project_id'
+        related_name="sent_notifications",
     )
-    project_name = models.CharField(null=False,max_length=255)
-    data = models.BinaryField(null=False)
-    weight = models.DecimalField(max_digits=10, decimal_places=2, null=False, blank=False)
-    type = models.CharField(null=False,max_length=255)
-    objects = models.Manager()
-
-    def get_history(self):
-        history = []
-        current = self
-        while current:
-            history.append(current)
-            current = current.last_project
-        return history
-
-    def create_new_version(self, project_name=None, data=None, weight=None, type=None):
-        """
-        Создает новую версию метаданных, ссылаясь на текущую как last_project.
-        Возвращает новую мету.
-        """
-        new_meta = ProjectMeta.objects.create(
-            project=self.project,
-            last_project=self,
-            project_name=project_name or self.project_name,
-            data=data or self.data,
-            weight=weight if weight is not None else self.weight,
-            type=type if type is not None else self.type,
-        )
-        return new_meta
+    title = models.CharField(max_length=255)
+    text = models.TextField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=NotificationStatus.choices,
+        default=NotificationStatus.UNREAD,
+        db_index=True,
+    )
+    metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        db_table = 'project_metadata'
+        indexes = [
+            models.Index(fields=["recipient", "status", "created_at"]),
+            models.Index(fields=["recipient", "created_at"]),
+        ]
 
-    def clean(self):
-        super().clean()
+    def mark_read(self):
+        if self.status != NotificationStatus.READ:
+            self.status = NotificationStatus.READ
+            self.save(update_fields=["status", "updated_at"])
 
-        if not self.project:
-            raise ValidationError({'project': 'Проект обязателен'})
-        if not isinstance(self.project, Project):
-            raise ValidationError({'project': 'Неверный тип для project'})
+    def __str__(self):
+        return self.title
 
-        if self.last_project and not isinstance(self.last_project, ProjectMeta):
-            raise ValidationError({'last_project': 'last_project должен быть ProjectMeta или None'})
 
-        if not self.project_name or not self.project_name.strip():
-            raise ValidationError({'project_name': 'Имя проекта не может быть пустым'})
-        if len(self.project_name.strip()) > 255:
-            raise ValidationError({'project_name': 'Имя проекта не может быть больше 255 символов'})
+# =========================================================
+# COMPANY
+# =========================================================
+class Company(TimeStampedModel):
+    """
+    Компания — организация/пространство.
 
-        if not self.type or not self.type.strip():
-            raise ValidationError({'type': 'Тип не может быть пустым'})
-        if len(self.type.strip()) > 255:
-            raise ValidationError({'type': 'Тип проекта не может быть больше 255 символов'})
+    Правила:
+    - у компании всегда есть owner;
+    - только owner управляет названием, описанием, участниками и удалением компании;
+    - участники компании равны в работе над репозиториями;
+    - любой участник может создать repository внутри компании;
+    - удалить company repository может только owner компании.
 
-        if not self.data:
-            raise ValidationError({'data': 'Данные проекта обязательны'})
-        if not isinstance(self.data, (bytes, bytearray)):
-            raise ValidationError({'data': 'data должен быть байтовым полем'})
+    Удаление:
+    - Company удаляется физически;
+    - CompanyMember удаляются каскадом;
+    - Repository компании удаляются каскадом;
+    - история репозиториев компании тоже удаляется каскадом.
+    """
 
-        if self.weight is not None and not isinstance(self.weight, Decimal):
-            raise ValidationError({'weight': 'weight должен быть Decimal'})
-
-class ProjectChanges(models.Model):
-    meta = models.ForeignKey(ProjectMeta, on_delete=models.CASCADE, db_column='meta_id',null=False, blank=False)
-    changer = models.ForeignKey(User, on_delete=models.CASCADE, db_column='changer_id',null=False, blank=False)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="owned_companies")
+    name = models.CharField(max_length=255, db_index=True)
     description = models.TextField(null=True, blank=True)
-    
+
     class Meta:
-        db_table = 'change_project'
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["owner"]),
+        ]
 
-    def clean(self):
-        super().clean()
-
-        if not self.meta:
-            raise ValidationError({'meta': 'Метаданные проекта обязательны'})
-        if not isinstance(self.meta, ProjectMeta):
-            raise ValidationError({'meta': 'meta должен быть ProjectMeta'})
-
-        if not self.changer:
-            raise ValidationError({'changer': 'Пользователь, вносящий изменения, обязателен'})
-        if not isinstance(self.changer, User):
-            raise ValidationError({'changer': 'changer должен быть User'})
-
-        if self.description is not None and not isinstance(self.description, str):
-            raise ValidationError({'description': 'Описание должно быть строкой или пустым'})
+    def __str__(self):
+        return self.name
 
 
-class Shared(models.Model):
-    project = models.ForeignKey(
-        'ProjectGroups',
-        on_delete=models.CASCADE,
-        db_column='project_id'
-        , null=False, blank=False
-    )
-    receiver = models.ForeignKey(
+class CompanyMember(TimeStampedModel):
+    """
+    Участник компании.
+
+    Ролей внутри компании нет:
+    - owner хранится в Company.owner;
+    - остальные участники равны для работы с repository;
+    - управление компанией остаётся только у owner.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="company_memberships")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "user"], name="unique_company_member"),
+        ]
+        indexes = [
+            models.Index(fields=["company", "user"]),
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.company.name}"
+
+
+# =========================================================
+# REPOSITORY
+# =========================================================
+class Repository(TimeStampedModel):
+    """
+    Репозиторий проекта.
+
+    Репозиторий принадлежит ровно одному владельцу:
+    - либо owner_user;
+    - либо owner_company.
+
+    Visibility отвечает только за просмотр:
+    - public видят все авторизованные пользователи;
+    - private видит owner_user или участники компании.
+
+    Редактирование:
+    - personal repo редактирует только owner_user;
+    - company repo редактируют участники компании.
+
+    Удаление:
+    - personal repo удаляет owner_user;
+    - company repo удаляет owner компании;
+    - repository удаляется физически вместе с файлами, blob-ами и коммитами.
+    """
+
+    owner_user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        db_column='receiver_id'
-        , null=False, blank=False
+        null=True,
+        blank=True,
+        related_name="personal_repositories",
     )
-    comment = models.TextField(null=True, blank=True)
+    owner_company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="repositories",
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_repositories",
+    )
+    name = models.CharField(max_length=255, db_index=True)
+    description = models.TextField(null=True, blank=True)
+    visibility = models.CharField(
+        max_length=20,
+        choices=RepositoryVisibility.choices,
+        default=RepositoryVisibility.PRIVATE,
+        db_index=True,
+    )
 
     class Meta:
-        db_table = 'shared_projects'
+        constraints = [
+            models.CheckConstraint(
+                name="repository_has_exactly_one_owner",
+                check=(
+                    Q(owner_user__isnull=False, owner_company__isnull=True)
+                    | Q(owner_user__isnull=True, owner_company__isnull=False)
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=["owner_user", "name"],
+                condition=Q(owner_user__isnull=False),
+                name="unique_personal_repository_name",
+            ),
+            models.UniqueConstraint(
+                fields=["owner_company", "name"],
+                condition=Q(owner_company__isnull=False),
+                name="unique_company_repository_name",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["visibility"]),
+            models.Index(fields=["owner_user", "visibility"]),
+            models.Index(fields=["owner_company", "visibility"]),
+            models.Index(fields=["name"]),
+        ]
+
+    @property
+    def is_personal(self):
+        return self.owner_user_id is not None
+
+    @property
+    def is_company_repository(self):
+        return self.owner_company_id is not None
 
     def clean(self):
         super().clean()
+        has_user_owner = self.owner_user_id is not None
+        has_company_owner = self.owner_company_id is not None
 
-        if not self.project:
-            raise ValidationError({'project': 'Проект обязателен'})
-        if not isinstance(self.project, ProjectGroups):
-            raise ValidationError({'project': 'project должен быть ProjectGroups'})
+        if has_user_owner == has_company_owner:
+            raise ValidationError("Repository must have exactly one owner: user or company.")
 
-        if not self.receiver:
-            raise ValidationError({'receiver': 'Получатель обязателен'})
-        if not isinstance(self.receiver, User):
-            raise ValidationError({'receiver': 'receiver должен быть User'})
+    def __str__(self):
+        return self.name
 
-        if self.comment is not None and not isinstance(self.comment, str):
-            raise ValidationError({'comment': 'Комментарий должен быть строкой или пустым'})
 
-        if self.project.user == self.receiver:
-            raise ValidationError({'receiver': 'Проект не может быть передан самому владельцу'})
+# =========================================================
+# FILES AND BLOBS
+# =========================================================
+class File(TimeStampedModel):
+    """
+    Логический файл внутри репозитория.
 
-class Friendship(models.Model):
-    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_initiated', db_column='user1')
-    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships_received', db_column='user2')
-    status = FriendshipStatusField(default='sent')
-    
+    Хранит путь, но не хранит содержимое.
+    Содержимое лежит в FileBlob и привязывается к конкретному CommitFile.
+    """
+
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="files")
+    path = models.CharField(max_length=512, db_index=True)
+
     class Meta:
-        db_table = 'friendship'
-        unique_together = ('user1', 'user2')
-    
-    def clean(self):
-        super().clean()
-        # Проверка: пользователь не может быть другом сам себе
-        if self.user1 == self.user2:
-            raise ValidationError('Пользователь не может быть другом сам себе')
+        constraints = [
+            models.UniqueConstraint(fields=["repository", "path"], name="unique_file_path_in_repository"),
+        ]
+        indexes = [
+            models.Index(fields=["repository", "path"]),
+        ]
 
-class EntityLog(models.Model):
-    time = models.DateTimeField(auto_now_add=True)
-    action = EntityLogActionField()
-    id_user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='id_user')
-    type = EntityLogTypeField()
-    id_entity = models.BigIntegerField()
-    objects = models.Manager()
-    
+    @property
+    def name(self):
+        return self.path.rsplit("/", 1)[-1]
+
+    def __str__(self):
+        return self.path
+
+
+class FileBlob(TimeStampedModel):
+    """
+    Физическое содержимое файла.
+
+    Это замена BinaryField/file_url:
+    - файл хранится через Django storage;
+    - sha256 нужен для проверки целостности;
+    - size/mime_type полезны для API/UI.
+
+    Привязан к Repository, чтобы blob-ы удалялись каскадом вместе с проектом.
+    """
+
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="blobs")
+    blob = models.FileField(upload_to="repository_blobs/%Y/%m/%d/")
+    sha256 = models.CharField(max_length=64, db_index=True)
+    size = models.PositiveBigIntegerField()
+    mime_type = models.CharField(max_length=255, null=True, blank=True)
+    original_name = models.CharField(max_length=255, null=True, blank=True)
+
     class Meta:
-        db_table = 'entity_logs'
+        indexes = [
+            models.Index(fields=["repository", "sha256"]),
+            models.Index(fields=["sha256"]),
+        ]
 
-class MediaFile(models.Model):
-    type = MediaFileTypeField()
-    data = models.BinaryField(null=True, blank=True)
-    
+    def __str__(self):
+        return self.sha256
+
+
+# =========================================================
+# COMMITS
+# =========================================================
+class Commit(TimeStampedModel):
+    """
+    Коммит — неизменяемый снимок изменения репозитория.
+
+    История линейная:
+    - у коммита максимум один parent;
+    - старый коммит нельзя обновлять;
+    - отдельного удаления коммита в API быть не должно;
+    - при удалении Repository коммиты удаляются каскадом.
+    """
+
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="commits")
+    message = models.TextField()
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="commits")
+    commit_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="children",
+    )
+
     class Meta:
-        db_table = 'media_files'
+        indexes = [
+            models.Index(fields=["repository", "created_at"]),
+            models.Index(fields=["commit_hash"]),
+        ]
 
-class MediaMeta(models.Model):
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, db_column='admin_id')
-    media = models.OneToOneField(MediaFile, on_delete=models.CASCADE, db_column='media_id', null=True, blank=True)
+    def save(self, *args, **kwargs):
+        if self.pk and Commit.objects.filter(pk=self.pk).exists():
+            raise ValidationError("Commit is immutable and cannot be changed after creation.")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.commit_hash
+
+
+class CommitFile(TimeStampedModel):
+    """
+    Файл внутри конкретного коммита.
+
+    path дублируется специально:
+    если файл потом переименуют, старый коммит должен показывать старый путь.
+
+    Старый CommitFile нельзя обновлять.
+    При удалении Repository/Commit удаляется каскадом.
+    """
+
+    commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name="files")
+    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="commit_versions")
+    path = models.CharField(max_length=512)
+    previous_path = models.CharField(max_length=512, null=True, blank=True)
+    operation = models.CharField(max_length=20, choices=CommitFileOperation.choices)
+    blob = models.ForeignKey(
+        FileBlob,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="commit_files",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["commit", "path"], name="unique_file_path_per_commit"),
+            models.CheckConstraint(
+                name="commit_file_blob_matches_operation",
+                check=(
+                    Q(operation=CommitFileOperation.DELETED, blob__isnull=True)
+                    | Q(
+                        operation__in=[
+                            CommitFileOperation.ADDED,
+                            CommitFileOperation.MODIFIED,
+                            CommitFileOperation.RENAMED,
+                        ],
+                        blob__isnull=False,
+                    )
+                ),
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["commit", "path"]),
+            models.Index(fields=["file"]),
+            models.Index(fields=["operation"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk and CommitFile.objects.filter(pk=self.pk).exists():
+            raise ValidationError("CommitFile is immutable and cannot be changed after creation.")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.commit.commit_hash}: {self.path}"
+
+
+# =========================================================
+# PERMISSION HELPERS
+# =========================================================
+def is_company_member(user, company):
+    """
+    Проверяет, является ли user участником company.
+
+    Owner компании считается участником даже без отдельной CompanyMember записи.
+    """
+
+    if not user or not user.is_authenticated or company is None:
+        return False
+
+    if company.owner_id == user.id:
+        return True
+
+    return CompanyMember.objects.filter(company=company, user=user).exists()
+
+
+def can_view_repository(user, repository):
+    """
+    Проверяет право просмотра repository.
+
+    Public repository виден всем авторизованным пользователям.
+    Private repository виден owner_user или участникам owner_company.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    if repository.visibility == RepositoryVisibility.PUBLIC:
+        return True
+
+    if repository.is_personal:
+        return repository.owner_user_id == user.id
+
+    return is_company_member(user, repository.owner_company)
+
+
+def can_edit_repository(user, repository):
+    """
+    Проверяет право редактирования repository.
+
+    Public не даёт права редактирования.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    if repository.is_personal:
+        return repository.owner_user_id == user.id
+
+    return is_company_member(user, repository.owner_company)
+
+
+def can_delete_repository(user, repository):
+    """
+    Проверяет право удаления repository.
+
+    Personal repository удаляет owner_user.
+    Company repository удаляет owner компании.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    if repository.is_personal:
+        return repository.owner_user_id == user.id
+
+    return repository.owner_company.owner_id == user.id
+
+
+def can_manage_company(user, company):
+    """
+    Проверяет право управления компанией.
+
+    Управлять компанией может только owner.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    return company.owner_id == user.id
+
+
+def can_create_company_repository(user, company):
+    """
+    Проверяет право создания repository внутри компании.
+
+    Создавать может owner или любой участник компании.
+    """
+
+    if not user or not user.is_authenticated:
+        return False
+
+    return is_company_member(user, company)
+
+
+# =========================================================
+# ENTITY LOG
+# =========================================================
+class EntityLog(TimeStampedModel):
+    """
+    Универсальный audit log.
+
+    GenericForeignKey позволяет логировать любую модель.
+
+    Важно:
+    - связанные бизнес-объекты могут быть физически удалены;
+    - после удаления entity может вернуть None;
+    - поэтому важные данные нужно дублировать в metadata.
+    """
+
+    action = models.CharField(max_length=255, db_index=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="entity_logs",
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.CharField(max_length=64)
+    entity = GenericForeignKey("content_type", "object_id")
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["action"]),
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+
+    def __str__(self):
+        return self.action
+
+
+# =========================================================
+# MEDIA FILES
+# =========================================================
+class MediaFile(TimeStampedModel):
+    """
+    Медиа-файл: изображение, видео, документ и т.д.
+
+    Удаляется физически.
+    """
+
+    file = models.FileField(upload_to="media/")
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_media_files",
+    )
+
+    def __str__(self):
+        return self.file.name
+
+
+class MediaMeta(TimeStampedModel):
+    """
+    Метаданные медиа.
+
+    Управляется администраторами приложения.
+    Удаляется физически.
+    """
+
+    admin = models.ForeignKey(User, on_delete=models.PROTECT, related_name="managed_media_meta")
+    media = models.OneToOneField(MediaFile, on_delete=models.CASCADE, related_name="meta")
     description = models.TextField(null=True, blank=True)
     name = models.CharField(max_length=255)
-    
-    class Meta:
-        db_table = 'media_meta'
 
-class Documentation(models.Model):
-    type = DocumentationTypeField()
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, db_column='admin')
+    def __str__(self):
+        return self.name
+
+
+# =========================================================
+# APP VERSIONS / DOWNLOADS
+# =========================================================
+class AppVersion(TimeStampedModel):
+    """
+    Версия приложения для download-раздела.
+
+    Это отдельная бизнес-сущность, а не MediaMeta JSON:
+    - список версий приложения публичный;
+    - скачивание файла публичное;
+    - создавать/редактировать/удалять версии может только admin приложения.
+    """
+
+    file = models.FileField(upload_to="app_versions/%Y/%m/%d/")
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    version = models.CharField(max_length=50, db_index=True)
+    platform = models.CharField(max_length=100, default="all", db_index=True)
+    file_size = models.PositiveBigIntegerField()
+    original_name = models.CharField(max_length=255)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_app_versions")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["version"]),
+            models.Index(fields=["platform"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} {self.version}"
+
+
+# =========================================================
+# DOCUMENTATION
+# =========================================================
+class Documentation(TimeStampedModel):
+    """
+    Документация/новости/справочные материалы.
+
+    Управляется администраторами приложения.
+    Удаляется физически.
+    """
+
+    type = models.CharField(
+        max_length=20,
+        choices=DocumentationType.choices,
+        default=DocumentationType.GUIDE,
+        db_index=True,
+    )
+    admin = models.ForeignKey(User, on_delete=models.PROTECT, related_name="documentation_items")
+    target_audience = models.CharField(
+        max_length=20,
+        choices=ContentAudience.choices,
+        default=ContentAudience.ALL,
+        db_index=True,
+    )
     text = models.TextField(null=True, blank=True)
-    objects = models.Manager()
-    
-    class Meta:
-        db_table = 'documentation'
 
-class FAQ(models.Model):
-    text_question = models.TextField()
-    answered = models.BooleanField(default=False)
-    answer_text = models.TextField(null=True, blank=True)
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name='faq_admin', db_column='admin_id',null=True,blank=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='faq_user', db_column='user_id')
-    
     class Meta:
-        db_table = 'faq'
-    
-    def clean(self):
-        super().clean()
-        if self.text_question and not self.text_question.strip():
-            raise ValidationError('Текст вопроса не может быть пустым')
+        indexes = [
+            models.Index(fields=["type"]),
+            models.Index(fields=["target_audience"]),
+        ]
+
+    def __str__(self):
+        return self.type
+
+
+# =========================================================
+# FAQ
+# =========================================================
+class FAQ(TimeStampedModel):
+    """
+    FAQ: вопрос-ответ система.
+
+    Пользователь задаёт вопрос, администратор отвечает.
+    Удаляется физически.
+    """
+
+    text_question = models.TextField()
+    answered = models.BooleanField(default=False, db_index=True)
+    answer_text = models.TextField(null=True, blank=True)
+    target_audience = models.CharField(
+        max_length=20,
+        choices=ContentAudience.choices,
+        default=ContentAudience.ALL,
+        db_index=True,
+    )
+    questioner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="faq_questions")
+    answerer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="faq_answers",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["answered"]),
+            models.Index(fields=["target_audience"]),
+            models.Index(fields=["questioner", "created_at"]),
+        ]
+
+    def __str__(self):
+        return self.text_question[:80]

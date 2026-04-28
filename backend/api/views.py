@@ -1,2376 +1,1627 @@
-from django.db.models import Q, OuterRef, Subquery, Count
+import hashlib
+import mimetypes
+import os
+import secrets
+import time
+
+from django.contrib.auth.hashers import check_password
+from django.core.files.base import ContentFile
+from django.core import signing
+from django.conf import settings
+from django.db import connection, transaction
+from django.db.utils import OperationalError
+from django.db.models import Q
+from django.http import HttpResponse, StreamingHttpResponse
+from django.utils import timezone
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.core.exceptions import ValidationError
-from django.http import FileResponse
-from .models import User, UserProfile, Role, Documentation, EntityLog, Project, ProjectMeta, Shared, FAQ, \
-    ProjectChanges, Friendship, MediaFile, MediaMeta
-from decimal import Decimal
-from datetime import datetime
-import re
-import os
-from django.http import HttpResponse
-from rest_framework import status
-import mimetypes
-import json
-import base64
+
+from .choices import (
+    CommitFileOperation,
+    ContentAudience,
+    DocumentationType,
+    NotificationStatus,
+    RepositoryVisibility,
+)
+from .models import (
+    AppVersion,
+    Commit,
+    CommitFile,
+    AuthRefreshSession,
+    Company,
+    CompanyMember,
+    Documentation,
+    EntityLog,
+    FAQ,
+    File,
+    FileBlob,
+    Notification,
+    Repository,
+    User,
+    UserProfile,
+    can_create_company_repository,
+    can_delete_repository,
+    can_edit_repository,
+    can_manage_company,
+    can_view_repository,
+    is_company_member,
+)
 
 
-def get_image_mime_type(image_bytes):
-    if not image_bytes:
-        return 'image/png'
-    
-    if isinstance(image_bytes, memoryview):
-        image_bytes = bytes(image_bytes)
-    
-    if image_bytes.startswith(b'\xff\xd8\xff'):
-        return 'image/jpeg'
-    elif image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
-        return 'image/png'
-    elif image_bytes.startswith(b'GIF87a') or image_bytes.startswith(b'GIF89a'):
-        return 'image/gif'
-    elif image_bytes.startswith(b'RIFF') and b'WEBP' in image_bytes[:12]:
-        return 'image/webp'
-    elif image_bytes.startswith(b'<?xml') or image_bytes.startswith(b'<svg') or b'<svg' in image_bytes[:200]:
-        return 'image/svg+xml'
-    else:
-        return 'image/png'
+# =========================================================
+# AUTH SETTINGS
+# =========================================================
+ACCESS_TOKEN_TTL_SECONDS = 15 * 60
+REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
+REFRESH_COOKIE_NAME = "refresh_token"
 
 
-def make_friendship_entity_id(user_a, user_b):
-    return min(user_a, user_b) * 1000000 + max(user_a, user_b)
+# =========================================================
+# COMMON HELPERS
+# =========================================================
+def hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
-def get_friendship_between(user_a_id, user_b_id):
-    friendship = Friendship.objects.filter(
-        Q(user1_id=user_a_id, user2_id=user_b_id) | Q(user1_id=user_b_id, user2_id=user_a_id)
-    ).values_list('user1_id', 'user2_id', 'status').first()
-    return friendship
+def get_client_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 
-def get_friend_ids(user):
-    friendships = Friendship.objects.filter(
-        Q(user1=user) | Q(user2=user),
-        status='accepted'
-    ).values_list('user1_id', 'user2_id')
-    ids = []
-    for u1, u2 in friendships:
-        ids.append(u2 if u1 == user.id else u1)
-    return ids
+def create_access_token(user, refresh_session):
+    payload = {
+        "user_id": user.id,
+        "session_id": refresh_session.id,
+        "type": "access",
+    }
+    return signing.dumps(payload, salt="access-token")
 
 
-def get_or_create_role(role_name):
-    role, created = Role.objects.get_or_create(role_name=role_name)
-    return role
+def parse_access_token(token):
+    try:
+        payload = signing.loads(token, salt="access-token", max_age=ACCESS_TOKEN_TTL_SECONDS)
+    except signing.SignatureExpired:
+        return None, "expired"
+    except signing.BadSignature:
+        return None, "invalid"
+
+    if payload.get("type") != "access":
+        return None, "invalid"
+
+    try:
+        session = AuthRefreshSession.objects.select_related("user").get(
+            id=payload.get("session_id"),
+            user_id=payload.get("user_id"),
+        )
+    except AuthRefreshSession.DoesNotExist:
+        return None, "invalid"
+
+    if not session.is_active:
+        return None, "revoked"
+
+    return session.user, None
+
+
+def get_bearer_token(request):
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.replace("Bearer ", "", 1).strip()
+
+    return request.GET.get("access_token")
+
+
+def get_user_from_access_token(request):
+    token = get_bearer_token(request)
+    if not token:
+        return None, Response({"error": "Access token обязателен"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user, error_code = parse_access_token(token)
+    if error_code:
+        return None, Response({"error": "Access token недействителен", "code": error_code}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return user, None
+
+
+def get_user_from_request_data(request):
+    return get_user_from_access_token(request)
 
 
 def is_admin(user):
-    return user.role and user.role.role_name == 'admin'
+    return bool(user and user.is_authenticated and user.is_app_admin)
 
 
+def build_document_text(title, content, category=None):
+    parts = [f"# {title}", "", content]
+    if category:
+        parts.extend(["", f"<!-- CATEGORY: {category} -->"])
+    return "\n".join(parts).strip()
+
+
+def parse_document_text(text):
+    if not text:
+        return {"title": "", "content": "", "category": None}
+
+    lines = text.splitlines()
+    title = lines[0][2:].strip() if lines and lines[0].startswith("# ") else ""
+    category = None
+    content_lines = []
+
+    for line in lines[1:]:
+        if line.startswith("<!-- CATEGORY:") and line.endswith("-->"):
+            category = line.replace("<!-- CATEGORY:", "").replace("-->", "").strip()
+        elif not line.startswith("<!--"):
+            content_lines.append(line)
+
+    content = "\n".join(content_lines).strip()
+    return {"title": title or text[:80], "content": content, "category": category}
+
+
+def log_action(user, action, entity, metadata=None):
+    EntityLog.objects.create(
+        action=action,
+        user=user,
+        entity=entity,
+        metadata=metadata or {},
+    )
+
+
+def serialize_user(user):
+    profile = getattr(user, "profile", None)
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "is_admin": user.is_app_admin,
+        "is_staff": user.is_staff,
+        "is_superuser": user.is_superuser,
+        "bio": profile.bio if profile else None,
+        "date_of_birth": profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None,
+        "avatar": profile.avatar.url if profile and profile.avatar else None,
+    }
+
+
+def serialize_auth_response(user, refresh_session):
+    return {
+        "access_token": create_access_token(user, refresh_session),
+        "token_type": "Bearer",
+        "expires_in": ACCESS_TOKEN_TTL_SECONDS,
+        "user": serialize_user(user),
+    }
+
+
+def set_refresh_cookie(response, refresh_token):
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        refresh_token,
+        max_age=REFRESH_TOKEN_TTL_SECONDS,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="Lax",
+    )
+    return response
+
+
+def clear_refresh_cookie(response):
+    response.delete_cookie(REFRESH_COOKIE_NAME, samesite="Lax")
+    return response
+
+
+def create_refresh_session(request, user):
+    refresh_token = secrets.token_urlsafe(64)
+    refresh_session = AuthRefreshSession.objects.create(
+        user=user,
+        token_hash=hash_token(refresh_token),
+        expires_at=timezone.now() + timezone.timedelta(seconds=REFRESH_TOKEN_TTL_SECONDS),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        ip_address=get_client_ip(request),
+    )
+    return refresh_token, refresh_session
+
+
+def serialize_company(company):
+    return {
+        "id": company.id,
+        "name": company.name,
+        "description": company.description,
+        "owner_id": company.owner_id,
+        "owner_username": company.owner.username,
+    }
+
+
+def serialize_repository(repository, user=None):
+    data = {
+        "id": repository.id,
+        "name": repository.name,
+        "description": repository.description,
+        "visibility": repository.visibility,
+        "created_by_id": repository.created_by_id,
+        "owner_user_id": repository.owner_user_id,
+        "owner_company_id": repository.owner_company_id,
+        "is_personal": repository.is_personal,
+        "is_company_repository": repository.is_company_repository,
+    }
+
+    if user:
+        data.update(
+            {
+                "can_view": can_view_repository(user, repository),
+                "can_edit": can_edit_repository(user, repository),
+                "can_delete": can_delete_repository(user, repository),
+            }
+        )
+
+    return data
+
+
+def serialize_documentation(item):
+    parsed = parse_document_text(item.text)
+    return {
+        "id": item.id,
+        "type": item.type,
+        "title": parsed["title"],
+        "content": parsed["content"],
+        "category": parsed["category"],
+        "target_audience": item.target_audience,
+        "author_id": item.admin_id,
+        "created_at": item.created_at.isoformat(),
+        "updated_at": item.updated_at.isoformat(),
+    }
+
+
+def serialize_notification(notification):
+    return {
+        "id": notification.id,
+        "recipient_id": notification.recipient_id,
+        "actor_id": notification.actor_id,
+        "title": notification.title,
+        "text": notification.text,
+        "status": notification.status,
+        "metadata": notification.metadata,
+        "created_at": notification.created_at.isoformat(),
+        "updated_at": notification.updated_at.isoformat(),
+    }
+
+
+def serialize_faq(faq):
+    return {
+        "id": faq.id,
+        "text_question": faq.text_question,
+        "answered": faq.answered,
+        "answer_text": faq.answer_text,
+        "questioner_id": faq.questioner_id,
+        "answerer_id": faq.answerer_id,
+        "created_at": faq.created_at.isoformat(),
+        "updated_at": faq.updated_at.isoformat(),
+    }
+
+
+def serialize_app_version(app_version):
+    return {
+        "id": app_version.id,
+        "title": app_version.title,
+        "content": app_version.content,
+        "version": app_version.version,
+        "platform": app_version.platform,
+        "file_name": app_version.original_name,
+        "file_size": app_version.file_size,
+        "created_by_id": app_version.created_by_id,
+        "created_at": app_version.created_at.isoformat(),
+        "updated_at": app_version.updated_at.isoformat(),
+        "download_url": f"/api/download/{app_version.id}/",
+    }
+
+
+# =========================================================
+# AUTH / USERS
+# =========================================================
 @api_view(["POST"])
 def register_user(request):
     """
-    POST /api/register/
-    {
-        "email": "...",
-        "password": "..."
-    }
+    Регистрация пользователя.
+
+    Обязательные поля:
+    - username;
+    - email;
+    - password.
+
+    Необязательные:
+    - first_name;
+    - last_name;
+    - date_of_birth.
     """
-    email = request.data.get("email")
+
+    username = (request.data.get("username") or "").strip().lower()
+    email = (request.data.get("email") or "").strip().lower()
     password = request.data.get("password")
+    first_name = (request.data.get("first_name") or "").strip()
+    last_name = (request.data.get("last_name") or "").strip()
+    date_of_birth = request.data.get("date_of_birth")
 
-    if not password or not email:
-        return Response({"error": "Все поля обязательны"}, status=400)
+    if not username or not email or not password:
+        return Response({"error": "username, email и password обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not User.validate_email(email):
-        return Response({"error": "Неверный формат email"}, status=400)
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "Пользователь с таким username уже существует"}, status=status.HTTP_400_BAD_REQUEST)
 
     if User.objects.filter(email=email).exists():
-        return Response({"error": "Пользователь с таким email уже существует"}, status=400)
+        return Response({"error": "Пользователь с таким email уже существует"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user_role = get_or_create_role('user')
-        user = User.objects.create(email=email, password=password, role=user_role)
-        
-        nickname = email.split('@')[0]
-        UserProfile.objects.create(user=user, name=nickname)
-        
-        return Response({
-            "message": "Пользователь успешно зарегистрирован", 
-            "email": user.email, 
-            "id": user.id,
-            "nickname": nickname
-        }, status=201)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании пользователя: {str(e)}"}, status=500)
+    user = User.objects.create_user(
+        username=username,
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name,
+    )
+    UserProfile.objects.create(user=user, date_of_birth=date_of_birth or None)
+
+    return Response(
+        {
+            "message": "Пользователь успешно зарегистрирован",
+            "user": serialize_user(user),
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["POST"])
 def login_user(request):
     """
-    POST /api/login/
+    Вход по username или email + password.
+
+    Request:
     {
-        "email": "...",
+        "login": "username или email",
         "password": "..."
     }
     """
-    email = request.data.get("email")
+
+    login = (request.data.get("login") or request.data.get("email") or request.data.get("username") or "").strip().lower()
     password = request.data.get("password")
 
-    if not email or not password:
-        return Response({"error": "Все поля обязательны"}, status=400)
+    if not login or not password:
+        return Response({"error": "login и password обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = User.objects.get(email=email)
-        if user.check_password(password):
-            return Response({"message": "Успешная авторизация", "email": user.email, "id": user.id}, status=200)
-        else:
-            return Response({"error": "Неверный пароль"}, status=400)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=400)
+    user = User.objects.filter(Q(username=login) | Q(email=login)).first()
+
+    if not user or not check_password(password, user.password):
+        return Response({"error": "Invalid login or password"}, status=status.HTTP_400_BAD_REQUEST)
+
+    refresh_token, refresh_session = create_refresh_session(request, user)
+    response = Response(
+        {
+            "message": "Успешная авторизация",
+            **serialize_auth_response(user, refresh_session),
+        },
+        status=status.HTTP_200_OK,
+    )
+    return set_refresh_cookie(response, refresh_token)
 
 
-@api_view(["GET"])
-def news_view(request):
+@api_view(["GET", "POST"])
+def validate_token(request):
     """
-    GET /api/news/
-    Получить список всех новостей (используем Documentation с типом 'guide')
+    Проверить, жив ли access_token.
+
+    Frontend отправляет:
+    Authorization: Bearer <access_token>
     """
-    try:
-        news = Documentation.objects.filter(type='guide').order_by('-id')
-        news_data = []
-        for item in news:
 
-            clean_text = item.text
-            clean_text = re.sub(r'<!-- CREATED:.*?-->', '', clean_text)
-            clean_text = re.sub(r'<!-- UPDATED:.*?-->', '', clean_text)
-            clean_text = clean_text.strip()
-            
-            text_lines = clean_text.split('\n')
-            
-            if text_lines and text_lines[0].startswith('# '):
-                title = text_lines[0][2:].strip()
-                content = '\n'.join(text_lines[2:]).strip() if len(text_lines) > 2 else ""
-            else:
-                title = clean_text[:50] + "..." if len(clean_text) > 50 else clean_text
-                content = clean_text
+    user, error = get_user_from_access_token(request)
+    if error:
+        return error
 
-            created_at = None
-            updated_at = None
-
-            if item.text and '<!-- CREATED:' in item.text:
-                try:
-                    created_start = item.text.find('<!-- CREATED:') + 13
-                    created_end = item.text.find(' -->', created_start)
-                    created_at = item.text[created_start:created_end].strip()
-                except:
-                    pass
-
-            if item.text and '<!-- UPDATED:' in item.text:
-                try:
-                    updated_start = item.text.find('<!-- UPDATED:') + 13
-                    updated_end = item.text.find(' -->', updated_start)
-                    updated_at = item.text[updated_start:updated_end].strip()
-                except:
-                    pass
-            
-            news_data.append({
-                "id": item.id,
-                "title": title,
-                "content": content,
-                "author_id": item.admin.id,
-                "author_email": item.admin.email,
-                "created_at": created_at,
-                "updated_at": updated_at
-            })
-        
-        if not news_data:
-            news_data = [
-                {"id": 1, "title": "Новости будут добавлены позже", "content": "Пока раздел находится в разработке."}]
-
-        return Response(news_data)
-    except Exception as e:
-        return Response({"error": f"Ошибка при загрузке новостей: {str(e)}"}, status=500)
+    return Response({"valid": True, "user": serialize_user(user)}, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
-def create_news(request):
+def refresh_token(request):
     """
-    POST /api/news/create/
-    Создать новую новость (только для админов)
-    {
-        "user_id": 1,
-        "title": "Заголовок новости",
-        "content": "Содержание новости"
-    }
+    Обновить access_token по backend refresh-сессии.
+
+    Refresh token берётся из HttpOnly cookie.
+    В JSON refresh token не возвращается.
+
+    Используется rotation:
+    - старый refresh token отзывается;
+    - создаётся новая refresh-сессия;
+    - новый refresh token ставится в HttpOnly cookie;
+    - frontend получает только новый access_token.
     """
-    user_id = request.data.get('user_id')
-    title = request.data.get('title')
-    content = request.data.get('content')
 
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    raw_refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if not raw_refresh_token:
+        return Response({"error": "Refresh token отсутствует"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    if not title or not content:
-        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
+    token_hash = hash_token(raw_refresh_token)
 
     try:
-        user = User.objects.get(id=user_id)
+        refresh_session = AuthRefreshSession.objects.select_related("user").get(token_hash=token_hash)
+    except AuthRefreshSession.DoesNotExist:
+        return Response({"error": "Refresh token недействителен"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут создавать новости."}, status=403)
+    if not refresh_session.is_active:
+        return Response({"error": "Refresh token истёк или отозван"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        now = datetime.now()
-        full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {now.isoformat()} -->"
-        news = Documentation.objects.create(
-            type='guide',
-            admin=user,
-            text=full_content.strip()
-        )
+    user = refresh_session.user
+    refresh_session.revoke()
+    new_refresh_token, new_refresh_session = create_refresh_session(request, user)
 
-        EntityLog.objects.create(
-            action='add',
-            id_user=user,
-            type='documentation',
-            id_entity=news.id
-        )
-
-        return Response({
-            "message": "Новость успешно создана",
-            "id": news.id,
-            "title": title,
-            "content": content,
-            "author_id": news.admin.id,
-            "created_at": None
-        }, status=201)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании новости: {str(e)}"}, status=500)
-
-
-@api_view(["GET"])
-def documentation_view(request):
-    try:
-        docs = Documentation.objects.filter(type='reference').order_by('-id')
-        documentation_data = []
-
-        for item in docs:
-            raw_text = item.text or ""
-
-            category_match = re.search(r'<!--\s*CATEGORY:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            category = category_match.group(1).strip() if category_match else "Примитивы"
-
-            created_match = re.search(r'<!--\s*CREATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            updated_match = re.search(r'<!--\s*UPDATED:\s*(.*?)\s*-->', raw_text, re.IGNORECASE)
-            created_at = created_match.group(1).strip() if created_match else None
-            updated_at = updated_match.group(1).strip() if updated_match else None
-
-            clean_text = re.sub(r'<!--\s*(CATEGORY|CREATED|UPDATED):.*?-->', '', raw_text, flags=re.IGNORECASE).strip()
-            text_lines = clean_text.split('\n') if clean_text else []
-
-            if text_lines and text_lines[0].startswith('# '):
-                title = text_lines[0][2:].strip()
-                content = '\n'.join(text_lines[1:]).strip()
-            else:
-                title = clean_text[:50] + "..." if clean_text and len(clean_text) > 50 else clean_text
-                content = clean_text
-
-            documentation_data.append({
-                "id": item.id,
-                "title": title or "Без названия",
-                "content": content or "",
-                "category": category,
-                "author_id": item.admin.id,
-                "author_email": item.admin.email,
-                "created_at": created_at,
-                "updated_at": updated_at,
-            })
-
-        if not documentation_data:
-            documentation_data = [{
-                "id": 1,
-                "title": "Документация будет добавлена позже",
-                "content": "Пока раздел находится в разработке.",
-                "category": "Примитивы",
-            }]
-
-        return Response(documentation_data)
-    except Exception as e:
-        return Response({"error": f"Ошибка при загрузке документации: {str(e)}"}, status=500)
+    response = Response(
+        {
+            "message": "Access token обновлён, refresh token заменён",
+            **serialize_auth_response(user, new_refresh_session),
+        },
+        status=status.HTTP_200_OK,
+    )
+    return set_refresh_cookie(response, new_refresh_token)
 
 
 @api_view(["POST"])
-def create_documentation(request):
-    user_id = request.data.get('user_id')
-    title = request.data.get('title')
-    content = request.data.get('content')
-    category = request.data.get('category')
+def logout_user(request):
+    """
+    Logout отзывает backend refresh-сессию и удаляет refresh cookie.
+    """
 
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    raw_refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if raw_refresh_token:
+        AuthRefreshSession.objects.filter(token_hash=hash_token(raw_refresh_token), revoked_at__isnull=True).update(
+            revoked_at=timezone.now()
+        )
 
-    if not title or not content:
-        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
+    response = Response({"message": "Выход выполнен"}, status=status.HTTP_200_OK)
+    return clear_refresh_cookie(response)
 
-    if not category or not isinstance(category, str):
-        return Response({"error": "Категория обязательна"}, status=400)
+
+@api_view(["GET"])
+def check_db(request):
+    """
+    Проверить, жива ли БД и есть ли соединение.
+    """
 
     try:
-        user = User.objects.get(id=user_id)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except OperationalError:
+        return Response({"database": "down"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут создавать документацию."},
-                            status=403)
-
-        now = datetime.now()
-        full_content = (
-            f"# {title}\n\n" \
-            f"{content}\n\n" \
-            f"<!-- CATEGORY: {category} -->\n" \
-            f"<!-- CREATED: {now.isoformat()} -->"
-        )
-
-        documentation = Documentation.objects.create(
-            type='reference',
-            admin=user,
-            text=full_content.strip()
-        )
-
-        EntityLog.objects.create(
-            action='add',
-            id_user=user,
-            type='documentation',
-            id_entity=documentation.id
-        )
-
-        return Response({
-            "message": "Документация успешно создана",
-            "id": documentation.id,
-            "title": title,
-            "content": content,
-            "category": category,
-            "author_id": documentation.admin.id,
-        }, status=201)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании документации: {str(e)}"}, status=500)
+    return Response({"database": "ok"}, status=status.HTTP_200_OK)
 
 
-@api_view(["PUT"])
-def update_documentation(request, doc_id):
-    """
-    PUT /api/documentation/{id}/
-    Обновить документацию (только для админов)
-    {
-        "user_id": 1,
-        "title": "Новый заголовок",
-        "content": "Новое содержание",
-        "category": "Примитивы"
-    }
-    """
-    user_id = request.data.get('user_id')
-    title = request.data.get('title')
-    content = request.data.get('content')
-    category = request.data.get('category')
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    if not title or not content:
-        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
-
-    if not category or not isinstance(category, str):
-        return Response({"error": "Категория обязательна"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать документацию."},
-                            status=403)
-
-        try:
-            doc = Documentation.objects.get(id=doc_id, type='reference')
-        except Documentation.DoesNotExist:
-            return Response({"error": "Документация не найдена"}, status=404)
-
-        now = datetime.now()
-        created_date = None
-        if doc.text and '<!-- CREATED:' in doc.text:
-            try:
-                created_start = doc.text.find('<!-- CREATED:') + 13
-                created_end = doc.text.find(' -->', created_start)
-                created_date = doc.text[created_start:created_end]
-            except:
-                pass
-
-        if created_date:
-            full_content = (
-                f"# {title}\n\n" \
-                f"{content}\n\n" \
-                f"<!-- CATEGORY: {category} -->\n" \
-                f"<!-- CREATED: {created_date} -->\n" \
-                f"<!-- UPDATED: {now.isoformat()} -->"
-            )
-        else:
-            full_content = (
-                f"# {title}\n\n" \
-                f"{content}\n\n" \
-                f"<!-- CATEGORY: {category} -->\n" \
-                f"<!-- CREATED: {now.isoformat()} -->\n" \
-                f"<!-- UPDATED: {now.isoformat()} -->"
-            )
-
-        doc.text = full_content.strip()
-        doc.save()
-
-        EntityLog.objects.create(
-            action='change',
-            id_user=user,
-            type='documentation',
-            id_entity=doc.id
-        )
-
-        return Response({
-            "message": "Документация успешно обновлена",
-            "id": doc.id,
-            "title": title,
-            "content": content,
-            "category": category,
-            "author_id": doc.admin.id,
-        }, status=200)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при обновлении документации: {str(e)}"}, status=500)
-
-
-@api_view(["DELETE"])
-def delete_documentation(request, doc_id):
-    """
-    DELETE /api/documentation/{id}/delete/
-    Удалить документацию (только для админов)
-    """
-    user_id = request.data.get('user_id')
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут удалять документацию."},
-                            status=403)
-
-        try:
-            doc = Documentation.objects.get(id=doc_id, type='reference')
-        except Documentation.DoesNotExist:
-            return Response({"error": "Документация не найдена"}, status=404)
-
-        doc.delete()
-
-        EntityLog.objects.create(
-            action='delete',
-            id_user=user,
-            type='documentation',
-            id_entity=doc_id
-        )
-
-        return Response({
-            "message": "Документация успешно удалена"
-        }, status=200)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при удалении документации: {str(e)}"}, status=500)
-
-
+# =========================================================
+# DOWNLOAD / APP VERSIONS
+# =========================================================
 @api_view(["GET"])
 def download_view(request):
     """
-    GET /api/download/
-    Получить список доступных версий приложения
+    Публичный список доступных версий приложения.
     """
-    try:
-        installers = MediaFile.objects.filter(type='installer').order_by('-id')
-        versions_data = []
 
-        for media in installers:
-            meta = MediaMeta.objects.filter(media=media).select_related('admin').first()
-            meta_info = {}
-            if meta and meta.description:
-                try:
-                    meta_info = json.loads(meta.description)
-                except Exception:
-                    meta_info = {}
-            file_name = f"{meta.name or 'version'}_{meta_info.get('version', '1.0.0')}.zip" if meta else f"version_{media.id}.zip"
-            content_text = ""
-            if meta_info:
-                content_text = meta_info.get("content", "")
-            elif meta and meta.description and not meta.description.strip().startswith('{'):
-                content_text = meta.description
-            
-            versions_data.append({
-                "id": media.id,
-                "title": meta.name if meta else f"Версия {meta_info.get('version', '1.0.0')}",
-                "content": content_text,
-                "version": meta_info.get("version", "1.0.0"),
-                "platform": meta_info.get("platform", "Все платформы"),
-                "file_name": file_name,
-                "file_size": meta_info.get("file_size") or (str(len(media.data)) if media.data else None),
-                "release_date": None,
-                "author_id": meta.admin.id if meta and meta.admin_id else None,
-                "author_email": meta.admin.email if meta and meta.admin_id else None,
-            })
-
-        if not versions_data:
-            versions_data = [{
-                "id": 1,
-                "title": "Версии будут добавлены позже",
-                "content": "Пока раздел находится в разработке.",
-                "version": "1.0.0",
-                "platform": "Все платформы",
-            }]
-
-        return Response(versions_data)
-    except Exception as e:
-        return Response({"error": f"Ошибка при загрузке версий: {str(e)}"}, status=500)
+    versions = AppVersion.objects.select_related("created_by").order_by("-created_at")
+    return Response([serialize_app_version(item) for item in versions], status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
 def download_file(request, version_id):
     """
-    GET /api/download/{version_id}/
-    Скачать файл версии приложения
+    Публичное скачивание файла версии приложения.
     """
+
     try:
-        media = MediaFile.objects.get(id=version_id, type='installer')
+        app_version = AppVersion.objects.get(id=version_id)
+    except AppVersion.DoesNotExist:
+        return Response({"error": "Версия не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not media.data:
-            return Response({"error": "Файл версии отсутствует"}, status=404)
-
-        try:
-            meta = MediaMeta.objects.get(media=media)
-            meta_info = {}
-            if meta.description:
-                try:
-                    meta_info = json.loads(meta.description)
-                except:
-                    pass
-            version = meta_info.get("version", "1.0.0")
-            filename = f"{meta.name or 'OurPaint'}_v{version}.zip"
-        except MediaMeta.DoesNotExist:
-            filename = f"version_{version_id}.zip"
-
-        response = HttpResponse(
-            media.data,
-            content_type='application/octet-stream'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-
-        try:
-            user_id = request.GET.get('user_id')
-            if user_id:
-                user = User.objects.get(id=int(user_id))
-                EntityLog.objects.create(
-                    action='add',
-                    id_user=user,
-                    type='media_files',
-                    id_entity=media.id
-                )
-        except:
-            pass
-
-        return response
-
-    except MediaFile.DoesNotExist:
-        return Response({"error": "Версия не найдена"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при скачивании файла: {str(e)}"}, status=500)
+    file_handle = app_version.file.open("rb")
+    response = HttpResponse(file_handle.read(), content_type="application/octet-stream")
+    response["Content-Disposition"] = f'attachment; filename="{app_version.original_name}"'
+    return response
 
 
 @api_view(["POST"])
 def create_version(request):
     """
-    POST /api/download/create/
-    Создать новую версию приложения (только для админов)
+    Создать новую версию приложения.
+
+    Доступно только admin приложения.
     """
-    user_id = request.data.get('user_id')
-    title = request.data.get('title')
-    content = request.data.get('content')
-    version = request.data.get('version')
-    platform = request.data.get('platform')
-    uploaded_file = request.FILES.get('file')
-    file_size = request.data.get('file_size')
 
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not title or not content:
-        return Response({"error": "Заголовок и описание обязательны"}, status=400)
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    if not version:
-        return Response({"error": "Версия обязательна"}, status=400)
+    title = (request.data.get("title") or "").strip()
+    content = (request.data.get("content") or "").strip()
+    version = (request.data.get("version") or "").strip()
+    platform = (request.data.get("platform") or "all").strip()
+    uploaded_file = request.FILES.get("file")
+
+    if not title or not content or not version:
+        return Response({"error": "title, content и version обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
     if not uploaded_file:
-        return Response({"error": "Файл обязателен"}, status=400)
+        return Response({"error": "Файл обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+
+    app_version = AppVersion.objects.create(
+        file=uploaded_file,
+        title=title,
+        content=content,
+        version=version,
+        platform=platform,
+        file_size=uploaded_file.size,
+        original_name=uploaded_file.name,
+        created_by=user,
+    )
+    log_action(user, "add", app_version)
+
+    return Response(
+        {"message": "Версия приложения создана", "version": serialize_app_version(app_version)},
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["PUT", "PATCH"])
+def update_version(request, version_id):
+    """
+    Редактировать версию приложения.
+
+    Доступно только admin приложения.
+    """
+
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        user = User.objects.get(id=user_id)
+        app_version = AppVersion.objects.get(id=version_id)
+    except AppVersion.DoesNotExist:
+        return Response({"error": "Версия не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут создавать версии приложения."},
-                            status=403)
+    if "title" in request.data:
+        app_version.title = request.data.get("title")
+    if "content" in request.data:
+        app_version.content = request.data.get("content")
+    if "version" in request.data:
+        app_version.version = request.data.get("version")
+    if "platform" in request.data:
+        app_version.platform = request.data.get("platform") or "all"
+    if "file" in request.FILES:
+        uploaded_file = request.FILES["file"]
+        app_version.file = uploaded_file
+        app_version.file_size = uploaded_file.size
+        app_version.original_name = uploaded_file.name
 
-        file_bytes = uploaded_file.read()
-        if not file_size:
-            file_size = str(len(file_bytes))
-        media = MediaFile.objects.create(
-            type='installer',
-            data=file_bytes
-        )
+    app_version.save()
+    log_action(user, "change", app_version)
 
-        media_meta = MediaMeta.objects.create(
-            admin=user,
-            media=media,
-            description=json.dumps({
-                "version": version,
-                "platform": platform or "Все платформы",
-                "file_size": file_size,
-                "content": content
-            }),
-            name=title
-        )
-
-        EntityLog.objects.create(
-            action='add',
-            id_user=user,
-            type='media_files',
-            id_entity=media.id
-        )
-        EntityLog.objects.create(
-            action='add',
-            id_user=user,
-            type='media_meta',
-            id_entity=media_meta.id
-        )
-
-        return Response({
-            "message": "Версия приложения успешно создана",
-            "id": media.id,
-            "title": title,
-            "version": version,
-            "platform": platform,
-            "media_id": media.id,
-            "file_name": uploaded_file.name,
-            "file_size": file_size
-        }, status=201)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании версии: {str(e)}"}, status=500)
+    return Response(
+        {"message": "Версия приложения обновлена", "version": serialize_app_version(app_version)},
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["DELETE"])
 def delete_version(request, version_id):
     """
-    DELETE /api/download/{version_id}/delete/
-    Удалить версию приложения (только для админов)
-    """
-    user_id = request.data.get('user_id')
+    Удалить версию приложения.
 
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    Доступно только admin приложения.
+    """
+
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        user = User.objects.get(id=user_id)
+        app_version = AppVersion.objects.get(id=version_id)
+    except AppVersion.DoesNotExist:
+        return Response({"error": "Версия не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут удалять версии приложения."},
-                            status=403)
+    log_action(
+        user,
+        "delete",
+        app_version,
+        {"app_version_id": app_version.id, "title": app_version.title, "version": app_version.version},
+    )
+    app_version.delete()
 
-        try:
-            media = MediaFile.objects.get(id=version_id, type='installer')
-        except MediaFile.DoesNotExist:
-            return Response({"error": "Версия не найдена"}, status=404)
-
-        try:
-            meta = MediaMeta.objects.get(media=media)
-            meta.delete()
-        except MediaMeta.DoesNotExist:
-            pass
-
-        EntityLog.objects.create(
-            action='delete',
-            id_user=user,
-            type='media_files',
-            id_entity=version_id
-        )
-
-        media.delete()
-
-        return Response({
-            "message": "Версия приложения успешно удалена"
-        }, status=200)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при удалении версии: {str(e)}"}, status=500)
+    return Response({"message": "Версия приложения удалена"}, status=status.HTTP_200_OK)
 
 
+# =========================================================
+# NOTIFICATIONS
+# =========================================================
 @api_view(["GET"])
-def get_user_profile(request):
+def get_notifications(request):
     """
-    GET /api/profile/
-    Получить профиль пользователя по ID
+    Получить уведомления текущего пользователя.
+
+    Можно передать ?status=unread/read.
     """
-    user_id = request.GET.get('user_id')
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    notification_status = request.GET.get("status")
+    notifications = Notification.objects.filter(recipient=user)
+
+    if notification_status:
+        if notification_status not in NotificationStatus.values:
+            return Response({"error": "Некорректный статус уведомления"}, status=status.HTTP_400_BAD_REQUEST)
+        notifications = notifications.filter(status=notification_status)
+
+    notifications = notifications.order_by("-created_at")
+    return Response([serialize_notification(item) for item in notifications], status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+def create_notification(request):
+    """
+    Создать уведомление.
+
+    Для MVP создавать уведомления может admin приложения.
+    В реальной логике этот helper обычно вызывается backend-сервисами:
+    например при приглашении в компанию, новом коммите, ответе на FAQ.
+    """
+
+    actor, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(actor):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    recipient_id = request.data.get("recipient_id")
+    title = (request.data.get("title") or "").strip()
+    text = (request.data.get("text") or "").strip()
+    metadata = request.data.get("metadata") or {}
+
+    if not recipient_id or not title:
+        return Response({"error": "recipient_id и title обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(id=user_id)
-        try:
-            profile = UserProfile.objects.get(user=user)
-            friends_count = Friendship.objects.filter(
-                Q(user1=user) | Q(user2=user),
-                status='accepted'
-            ).count()
-
-            avatar_data_uri = None
-            if profile.avatar:
-                try:
-                    if isinstance(profile.avatar, str):
-                        if profile.avatar.startswith('data:'):
-                            avatar_data_uri = profile.avatar
-                        elif ';base64,' in profile.avatar:
-                            if profile.avatar.startswith('image/'):
-                                avatar_data_uri = f"data:{profile.avatar}"
-                            else:
-                                avatar_data_uri = f"data:image/{profile.avatar}"
-                        else:
-                            avatar_data_uri = f"data:image/png;base64,{profile.avatar}"
-                    else:
-                        avatar_bytes = bytes(profile.avatar) if isinstance(profile.avatar, memoryview) else profile.avatar
-                        if avatar_bytes:
-                            mime_type = get_image_mime_type(avatar_bytes)
-                            avatar_base64 = base64.b64encode(avatar_bytes).decode('utf-8')
-                            avatar_data_uri = f"data:{mime_type};base64,{avatar_base64}"
-                except Exception as e:
-                    print(f"Ошибка обработки аватара: {e}, тип: {type(profile.avatar)}")
-                    avatar_data_uri = None
-            
-            return Response({
-                "id": user.id,
-                "email": user.email,
-                "nickname": profile.name,
-                "avatar": avatar_data_uri,
-                "bio": profile.bio,
-                "date_of_birth": profile.date_of_birth,
-                "friends_count": friends_count
-            }, status=200)
-        except UserProfile.DoesNotExist:
-            return Response({"error": "Профиль пользователя не найден"}, status=404)
+        recipient = User.objects.get(id=recipient_id)
     except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+        return Response({"error": "Получатель не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    notification = Notification.objects.create(
+        recipient=recipient,
+        actor=actor,
+        title=title,
+        text=text,
+        metadata=metadata,
+    )
+
+    return Response(
+        {"message": "Уведомление создано", "notification": serialize_notification(notification)},
+        status=status.HTTP_201_CREATED,
+    )
 
 
-@api_view(["PUT"])
-def update_user_profile(request):
-    """
-    PUT /api/profile/
-    Обновить профиль пользователя
-    {
-        "user_id": 1,
-        "nickname": "новый_nickname",
-        "bio": "описание",
-        "date_of_birth": "1990-01-01",
-        "avatar": "data:image/png;base64,..."
-    }
-    """
-    user_id = request.data.get('user_id')
-    nickname = request.data.get('nickname')
-    bio = request.data.get('bio')
-    date_of_birth = request.data.get('date_of_birth')
-    avatar_provided = 'avatar' in request.data
-    avatar = request.data.get('avatar') if avatar_provided else None
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+@api_view(["POST"])
+def mark_notification_read(request, notification_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
     try:
-        user = User.objects.get(id=user_id)
-        profile, _ = UserProfile.objects.get_or_create(user=user)
+        notification = Notification.objects.get(id=notification_id, recipient=user)
+    except Notification.DoesNotExist:
+        return Response({"error": "Уведомление не найдено"}, status=status.HTTP_404_NOT_FOUND)
 
-        avatar_changed = False
-        if avatar_provided:
-            new_avatar_bytes = None
-            if isinstance(avatar, str):
-                trimmed_avatar = avatar.strip()
-                if trimmed_avatar:
-                    if ',' in trimmed_avatar:
-                        trimmed_avatar = trimmed_avatar.split(',', 1)[1]
-                    
-                    try:
-                        new_avatar_bytes = base64.b64decode(trimmed_avatar)
-                        if len(new_avatar_bytes) > 7 * 1024 * 1024:
-                            return Response({"error": "Размер аватара слишком большой"}, status=400)
-                    except Exception as e:
-                        return Response({"error": f"Некорректный формат base64: {str(e)}"}, status=400)
-            elif avatar is not None:
-                return Response({"error": "Некорректный формат аватара"}, status=400)
-
-            if isinstance(profile.avatar, str):
-                if profile.avatar.startswith('data:'):
-                    old_base64 = profile.avatar.split(',', 1)[1] if ',' in profile.avatar else ''
-                    try:
-                        current_avatar_bytes = base64.b64decode(old_base64) if old_base64 else None
-                    except:
-                        current_avatar_bytes = None
-                else:
-                    try:
-                        current_avatar_bytes = base64.b64decode(profile.avatar)
-                    except:
-                        current_avatar_bytes = None
-            elif isinstance(profile.avatar, memoryview):
-                current_avatar_bytes = bytes(profile.avatar)
-            else:
-                current_avatar_bytes = profile.avatar
-            
-            if current_avatar_bytes != new_avatar_bytes:
-                profile.avatar = new_avatar_bytes
-                avatar_changed = True
-
-        if nickname:
-            profile.name = nickname
-        if bio is not None:
-            profile.bio = bio if bio.strip() else None
-        if date_of_birth is not None:
-            profile.date_of_birth = date_of_birth if date_of_birth.strip() else None
-
-        profile.save()
-
-        if avatar_changed:
-            EntityLog.objects.create(
-                action='change',
-                id_user=user,
-                type='user_profile',
-                id_entity=user.id
-            )
-
-        avatar_data_uri = None
-        if profile.avatar:
-            try:
-                if isinstance(profile.avatar, str):
-                    if profile.avatar.startswith('data:'):
-                        avatar_data_uri = profile.avatar
-                    elif ';base64,' in profile.avatar:
-                        if profile.avatar.startswith('image/'):
-                            avatar_data_uri = f"data:{profile.avatar}"
-                        else:
-                            avatar_data_uri = f"data:image/{profile.avatar}"
-                    else:
-                        avatar_data_uri = f"data:image/png;base64,{profile.avatar}"
-                else:
-                    avatar_bytes = bytes(profile.avatar) if isinstance(profile.avatar, memoryview) else profile.avatar
-                    if avatar_bytes:
-                        mime_type = get_image_mime_type(avatar_bytes)
-                        avatar_base64 = base64.b64encode(avatar_bytes).decode('utf-8')
-                        avatar_data_uri = f"data:{mime_type};base64,{avatar_base64}"
-            except Exception as e:
-                print(f"Ошибка обработки аватара: {e}, тип: {type(profile.avatar)}")
-                avatar_data_uri = None
-        
-        return Response({
-            "message": "Профиль успешно обновлен",
-            "nickname": profile.name,
-            "bio": profile.bio,
-            "date_of_birth": profile.date_of_birth,
-            "avatar": avatar_data_uri
-        }, status=200)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при обновлении профиля: {str(e)}"}, status=500)
-
-
-@api_view(["PUT"])
-def update_news(request, news_id):
-    """
-    PUT /api/news/{id}/
-    Обновить новость (только для админов)
-    {
-        "user_id": 1,
-        "title": "Новый заголовок",
-        "content": "Новое содержание"
-    }
-    """
-    user_id = request.data.get('user_id')
-    title = request.data.get('title')
-    content = request.data.get('content')
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    if not title or not content:
-        return Response({"error": "Заголовок и содержание обязательны"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут редактировать новости."},
-                            status=403)
-
-        try:
-            news = Documentation.objects.get(id=news_id, type='guide')
-        except Documentation.DoesNotExist:
-            return Response({"error": "Новость не найдена"}, status=404)
-
-        now = datetime.now()
-        created_date = None
-        if news.text and '<!-- CREATED:' in news.text:
-            try:
-                created_start = news.text.find('<!-- CREATED:') + 13
-                created_end = news.text.find(' -->', created_start)
-                created_date = news.text[created_start:created_end]
-            except:
-                pass
-
-        if created_date:
-            full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {created_date} -->\n<!-- UPDATED: {now.isoformat()} -->"
-        else:
-            full_content = f"# {title}\n\n{content}\n\n<!-- CREATED: {now.isoformat()} -->\n<!-- UPDATED: {now.isoformat()} -->"
-
-        news.text = full_content.strip()
-        news.save()
-
-        EntityLog.objects.create(
-
-            action='change',
-            id_user=user,
-            type='documentation',
-            id_entity=news.id
-        )
-
-        return Response({
-            "message": "Новость успешно обновлена",
-            "id": news.id,
-            "title": title,
-            "content": content,
-            "author_id": news.admin.id,
-            "updated_at": None
-        }, status=200)
-
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при обновлении новости: {str(e)}"}, status=500)
+    notification.mark_read()
+    return Response({"message": "Уведомление прочитано", "notification": serialize_notification(notification)})
 
 
 @api_view(["DELETE"])
-def delete_news(request, news_id):
+def delete_notification(request, notification_id):
     """
-    DELETE /api/news/{id}/
-    Удалить новость (только для админов)
+    Физически удалить уведомление из БД.
     """
-    user_id = request.data.get('user_id')
 
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
     try:
-        user = User.objects.get(id=user_id)
+        notification = Notification.objects.get(id=notification_id, recipient=user)
+    except Notification.DoesNotExist:
+        return Response({"error": "Уведомление не найдено"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not is_admin(user):
-            return Response({"error": "Недостаточно прав. Только администраторы могут удалять новости."}, status=403)
+    notification.delete()
+    return Response({"message": "Уведомление удалено"}, status=status.HTTP_200_OK)
 
-        try:
-            news = Documentation.objects.get(id=news_id, type='guide')
-        except Documentation.DoesNotExist:
-            return Response({"error": "Новость не найдена"}, status=404)
 
-        news.delete()
+def notification_events(request):
+    """
+    Realtime-сигнал через Server-Sent Events.
 
-        EntityLog.objects.create(
+    Frontend открывает EventSource('/notifications/events/?access_token=...')
+    или передаёт access token в Authorization header через свой клиент.
 
-            action='delete',
-            id_user=user,
-            type='documentation',
-            id_entity=news_id
-        )
+    Когда backend видит новые unread-уведомления, он отправляет event.
+    Frontend после event делает обычный GET /notifications/ и обновляет список.
 
-        return Response({
-            "message": "Новость успешно удалена"
-        }, status=200)
+    Для production лучше WebSocket через Django Channels + Redis.
+    SSE проще для MVP и решает проблему "не слать запрос каждую секунду".
+    """
 
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-    except Exception as e:
-        return Response({"error": f"Ошибка при удалении новости: {str(e)}"}, status=500)
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    def event_stream():
+        last_unread_count = None
+
+        while True:
+            unread_count = Notification.objects.filter(
+                recipient=user,
+                status=NotificationStatus.UNREAD,
+            ).count()
+
+            if unread_count != last_unread_count:
+                last_unread_count = unread_count
+                yield f"event: notifications_changed\ndata: {unread_count}\n\n"
+
+            time.sleep(5)
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
+
+@api_view(["GET"])
+def get_all_users(request):
+    users = User.objects.order_by("username")
+    return Response([serialize_user(user) for user in users], status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
 def check_user_role(request):
-    """
-    GET /api/user/role/
-    Проверить роль пользователя
-    """
-    user_id = request.GET.get('user_id')
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-        if user.role:
-            return Response({
-                "user_id": user.id,
-                "role": user.role.role_name,
-                "is_admin": user.role.role_name == 'admin'
-            }, status=200)
-        else:
-            return Response({
-                "user_id": user.id,
-                "role": "user",
-                "is_admin": False
-            }, status=200)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-
-
-@api_view(["POST"])
-def add_project(request):
-    """
-    POST /api/project/add/
-    Добавить проект для пользователя.
-
-    Тело запроса:
-    {
-        "project_name": "Новый проект",
-        "weight": "1.5",
-        "type": "txt",
-        "private": "true",
-        "file": <файл>,
-        "description": "Описание проекта"
-    }
-    """
-    user_id = request.data.get("user_id")
-
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    user_id = int(user_id)
-
-    # Пользователь
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    project_name = (request.data.get("project_name") or "").strip()
-    private = request.data.get("private", "false")
-    description = (request.data.get("description") or "").strip()
-    uploaded_file = request.FILES.get("file")
-
-    if isinstance(private, str):
-        private = private.lower() == "true"
-
-    if not project_name:
-        return Response({"error": "Название проекта обязательно"}, status=400)
-
-    if not uploaded_file:
-        return Response({"error": "Файл не выбран"}, status=400)
-
-    # Файл
-    file_bytes = uploaded_file.read()
-
-    weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
-    weight_mb = round(weight_mb, 2)
-    if weight_mb>100 :
-        return Response({"error": "Слишком большой файл"}, status=400)
-
-    file_type = "txt"
-    if "." in uploaded_file.name:
-        file_type = uploaded_file.name.rsplit(".", 1)[-1].lower()
-
-    allowed_types = [c[0] for c in ProjectMeta.TYPE_CHOICES]
-    if file_type not in allowed_types:
-        return Response({"error": "Не верный формат"}, status=400)
-
-    try:
-        # Проект
-        project = Project.objects.create(
-            user=user,
-            private=private
-        )
-
-        project_meta = ProjectMeta(
-            project=project,
-            project_name=project_name,
-            weight=weight_mb,
-            type=file_type,
-            data=file_bytes
-        )
-        project_meta.clean()
-        project_meta.save()
-
-        # История
-        change_text = f"Добавлен проект '{project_name}'"
-        if description:
-            change_text += f". {description}"
-
-        ProjectChanges.objects.create(
-            project=project,
-            changer=user,
-            description=change_text
-        )
-
-        EntityLog.objects.create(
-            action="add",
-            id_user=user,
-            type="projects",
-            id_entity=project.id
-        )
-
-    except Exception as e:
-        return Response(
-            {"error": f"Ошибка при сохранении проекта: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
     return Response(
         {
-            "message": "Проект успешно создан",
-            "project_id": project.id
+            "user_id": user.id,
+            "role": user.role,
+            "is_admin": user.is_app_admin,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
         },
-        status=status.HTTP_201_CREATED
+        status=status.HTTP_200_OK,
     )
 
-@api_view(["POST"])
-def get_project_versions(request, project_id):
-    """
-    GET /api/project/get_project_versions/<int:project_id>/
-    Возвращает все версии проекта
-    """
-    user_id = request.data.get("user_id")
 
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+@api_view(["GET"])
+def get_user_profile(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    # Пользователь
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+    return Response(serialize_user(user), status=status.HTTP_200_OK)
 
-    # Проект
-    try:
-        project = Project.objects.select_related("user").get(id=project_id)
-    except Project.DoesNotExist:
-        return Response(
-            {"error": "Проект не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
 
-    # Проверка прав
-    is_owner = project.user_id == user.id
-    is_shared = Shared.objects.filter(
-        project=project,
-        receiver=user
-    ).exists()
+@api_view(["PUT"])
+def update_user_profile(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not is_owner and not is_shared:
-        return Response(
-            {"error": "Нет прав на просмотр версий проекта"},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    profile, _ = UserProfile.objects.get_or_create(user=user)
 
-    meta = ProjectMeta.objects.filter(project=project).first()
+    user.first_name = request.data.get("first_name", user.first_name)
+    user.last_name = request.data.get("last_name", user.last_name)
+    user.save(update_fields=["first_name", "last_name"])
 
-    # Изменения
-    changes = (
-        ProjectChanges.objects
-        .filter(project=project)
-        .select_related("changer")
-        .order_by("-id")
-    )
+    if "bio" in request.data:
+        profile.bio = request.data.get("bio")
+    if "date_of_birth" in request.data:
+        profile.date_of_birth = request.data.get("date_of_birth") or None
+    if "avatar" in request.FILES:
+        profile.avatar = request.FILES["avatar"]
+    profile.save()
 
-    result = []
-    for ch in changes:
-        result.append({
-            "id": ch.id,
-            "changer_email": ch.changer.email,
-            "description": ch.description or "",
-            "project_name": meta.project_name if meta else "Без имени",
-            "type": meta.type if meta else "",
-            "weight": str(meta.weight) if meta and meta.weight else "0",
-        })
+    return Response({"message": "Профиль обновлён", "user": serialize_user(user)}, status=status.HTTP_200_OK)
 
-    return Response(result, status=status.HTTP_200_OK)
+
+# =========================================================
+# COMPANIES
+# =========================================================
+@api_view(["GET"])
+def get_companies(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    companies = Company.objects.filter(Q(owner=user) | Q(members__user=user)).distinct().order_by("name")
+    return Response([serialize_company(company) for company in companies], status=status.HTTP_200_OK)
+
 
 @api_view(["POST"])
-def get_user_projects(request):
-    """
-    GET /api/project/get_user_projects/
-    Получить список проектов пользователя
-    Возвращает:
-    {
-        "projects": [
-            {
-                "id": 1,
-                "project_name": "Проект 1",
-                "weight": "1.50",
-                "type": "txt",
-                "private": false,
-                "description": "Описание последнего изменения"
-            },
-            ...
-        ]
-    }
-    """
+def create_company(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    user_id = request.data.get("user_id")
-    viewer_id = request.data.get("viewer_id")
+    name = (request.data.get("name") or "").strip()
+    description = (request.data.get("description") or "").strip()
 
-    if not user_id or not viewer_id:
-        return Response({"error": "user_id и viewer_id обязательны"}, status=400)
+    if not name:
+        return Response({"error": "Название компании обязательно"}, status=status.HTTP_400_BAD_REQUEST)
+
+    company = Company.objects.create(owner=user, name=name, description=description)
+    CompanyMember.objects.get_or_create(company=company, user=user)
+    log_action(user, "add", company)
+
+    return Response({"message": "Компания создана", "company": serialize_company(company)}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PUT"])
+def update_company(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
     try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        viewer = User.objects.get(pk=viewer_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+    if not can_manage_company(user, company):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    # Получаем проекты пользователя
-    projects_meta = ProjectMeta.objects.filter(project__user=user).select_related("project").order_by("-id")
+    if "name" in request.data:
+        company.name = request.data.get("name")
+    if "description" in request.data:
+        company.description = request.data.get("description")
+    company.save()
+    log_action(user, "change", company)
 
-    # Последние изменения проектов
-    last_changes = {
-        pc.project_id: pc.description
-        for pc in ProjectChanges.objects.filter(project__user=user)
-        .order_by("project_id", "-id")
-        .distinct("project_id")
-    }
-
-    # Проверка дружбы
-    friends = Friendship.objects.filter(
-        ((Q(user1=user) & Q(user2=viewer)) | (Q(user1=viewer) & Q(user2=user))),
-        status="accepted"
-    ).exists()
-
-    result = []
-    for pm in projects_meta:
-        # Приватный проект
-        if pm.project.private and viewer != user and not friends:
-            continue
-
-        result.append({
-            "id": pm.project.id,
-            "project_name": pm.project_name,
-            "weight": str(pm.weight) if pm.weight is not None else "0",
-            "type": pm.type or "",
-            "private": pm.project.private,
-            "description": last_changes.get(pm.project.id, "Без описания"),
-        })
-
-    return Response({"projects": result}, status=200)
+    return Response({"message": "Компания обновлена", "company": serialize_company(company)}, status=status.HTTP_200_OK)
 
 
 @api_view(["DELETE"])
-def delete_project(request, project_id):
-    """
-    DELETE /api/project/delete/<int:project_id>/
-    Удалить проект по ID
-        """
-    user_id = request.data.get("user_id")
+def delete_company(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # Пользователь
     try:
-        user = User.objects.get(id=user_id)
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_manage_company(user, company):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    log_action(user, "delete", company, {"company_id": company.id, "name": company.name})
+    company.delete()
+    return Response({"message": "Компания удалена"}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def get_company_members(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not is_company_member(user, company):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    members = User.objects.filter(company_memberships__company=company).distinct()
+    return Response([serialize_user(member) for member in members], status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+def add_company_member(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    member_id = request.data.get("member_id")
+    if not member_id:
+        return Response({"error": "member_id обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = Company.objects.get(id=company_id)
+        member = User.objects.get(id=member_id)
+    except Company.DoesNotExist:
+        return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
     except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Проект
+    if not can_manage_company(user, company):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    CompanyMember.objects.get_or_create(company=company, user=member)
+    log_action(user, "change", company, {"member_id": member.id, "operation": "add_member"})
+
+    return Response({"message": "Участник добавлен"}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["DELETE"])
+def remove_company_member(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    member_id = request.data.get("member_id")
+    if not member_id:
+        return Response({"error": "member_id обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        project = Project.objects.get(id=project_id)
-    except Project.DoesNotExist:
-        return Response(
-            {"error": "Проект не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # Проверка прав
-    if project.user_id != user.id:
-        return Response(
-            {"error": "Недостаточно прав для удаления проекта"},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    # Удаление зависимостей
-    ProjectChanges.objects.filter(project=project).delete()
-    Shared.objects.filter(project=project).delete()
-    ProjectMeta.objects.filter(project=project).delete()
-
-    EntityLog.objects.create(
-        action="remove",
-        id_user=user,
-        type="projects",
-        id_entity=project.id
-    )
-
-    project.delete()
-
-    return Response(
-        {"success": "Проект успешно удалён"},
-        status=status.HTTP_200_OK
-    )
-
-
-@api_view(["PATCH"])
-def change_project(request, project_id):
-    """
-    PATCH /api/project/change/<project_id>/
-    Изменить проект по ID
-    {
-        "user_id" : int
-        "project_name": "Новое имя",
-        "description": "Описание изменений",
-        "private": true/false,
-        "file": (binary),
-    }
-    """
-    data = request.data
-    user_id = data.get("user_id")
-    user_id = int(user_id)
-
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    # Пользователь
-    try:
-        user = User.objects.get(id=user_id)
+        company = Company.objects.get(id=company_id)
+        member = User.objects.get(id=member_id)
+    except Company.DoesNotExist:
+        return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
     except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Проект
-    try:
-        project = Project.objects.select_related("user").get(id=project_id)
-    except Project.DoesNotExist:
-        return Response({"error": "Проект не найден"}, status=404)
+    if not can_manage_company(user, company):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    # Проверка прав
-    is_owner = project.user_id == user.id
-    is_shared = Shared.objects.filter(
-        project=project,
-        receiver=user
-    ).exists()
+    if company.owner_id == member.id:
+        return Response({"error": "Нельзя удалить владельца компании"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not is_owner and not is_shared:
-        return Response(
-            {"error": "Недостаточно прав для изменения проекта"},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    CompanyMember.objects.filter(company=company, user=member).delete()
+    log_action(user, "change", company, {"member_id": member.id, "operation": "remove_member"})
 
-    try:
-        project_meta = ProjectMeta.objects.get(project=project)
-    except ProjectMeta.DoesNotExist:
-        return Response({"error": "Метаданные проекта не найдены"}, status=404)
+    return Response({"message": "Участник удалён"}, status=status.HTTP_200_OK)
 
-    project_name = data.get("project_name")
-    private = data.get("private")
-    description = data.get("description", "").strip()
-    file_uploaded = request.FILES.get("file")
 
-    changed_fields = []
+# =========================================================
+# REPOSITORIES
+# =========================================================
+@api_view(["GET"])
+def get_repositories(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    # Имя проекта
-    if project_name and project_name.strip() and project_name != project_meta.project_name:
-        old_name = project_meta.project_name
-        project_meta.project_name = project_name.strip()
-        changed_fields.append(f"Название: '{old_name}' → '{project_name}'")
+    repositories = Repository.objects.filter(
+        Q(visibility=RepositoryVisibility.PUBLIC)
+        | Q(owner_user=user)
+        | Q(owner_company__owner=user)
+        | Q(owner_company__members__user=user)
+    ).distinct().order_by("name")
 
-    # Приватность
-    if private is not None:
-        if isinstance(private, str):
-            private = private.lower() == "true"
+    return Response([serialize_repository(repository, user) for repository in repositories], status=status.HTTP_200_OK)
 
-        if private != project.private:
-            old_privacy = "Приватный" if project.private else "Публичный"
-            new_privacy = "Приватный" if private else "Публичный"
-            project.private = private
-            project.save(update_fields=["private"])
-            changed_fields.append(f"Приватность: {old_privacy} → {new_privacy}")
 
-    # Файл
-    if file_uploaded:
-        file_bytes = file_uploaded.read()
-        project_meta.data = file_bytes
+@api_view(["POST"])
+def create_repository(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-        weight_mb = Decimal(len(file_bytes)) / Decimal(1024 * 1024)
-        project_meta.weight = round(weight_mb, 2)
+    name = (request.data.get("name") or "").strip()
+    description = (request.data.get("description") or "").strip()
+    visibility = request.data.get("visibility") or RepositoryVisibility.PRIVATE
+    owner_company_id = request.data.get("company_id")
 
-        if "." in file_uploaded.name:
-            project_meta.type = file_uploaded.name.rsplit(".", 1)[-1].lower()
+    if not name:
+        return Response({"error": "Название репозитория обязательно"}, status=status.HTTP_400_BAD_REQUEST)
 
-        changed_fields.append(
-            f"Файл обновлён (Вес: {project_meta.weight} MB, Тип: {project_meta.type})"
-        )
+    if visibility not in RepositoryVisibility.values:
+        return Response({"error": "Некорректная видимость репозитория"}, status=status.HTTP_400_BAD_REQUEST)
 
-    project_meta.save()
+    if owner_company_id:
+        try:
+            company = Company.objects.get(id=owner_company_id)
+        except Company.DoesNotExist:
+            return Response({"error": "Компания не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-    if description or changed_fields:
-        change_description = (
-            description if description
-            else "Изменены данные проекта:\n" + "\n".join(changed_fields)
-        )
+        if not can_create_company_repository(user, company):
+            return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-        ProjectChanges.objects.create(
-            project=project,
-            changer=user,
-            description=change_description
+        repository = Repository.objects.create(
+            owner_company=company,
+            created_by=user,
+            name=name,
+            description=description,
+            visibility=visibility,
         )
     else:
-        change_description = ""
+        repository = Repository.objects.create(
+            owner_user=user,
+            created_by=user,
+            name=name,
+            description=description,
+            visibility=visibility,
+        )
 
-    EntityLog.objects.create(
-        action="change",
-        id_user=user,
-        type="projects",
-        id_entity=project.id
+    log_action(user, "add", repository)
+    return Response(
+        {"message": "Репозиторий создан", "repository": serialize_repository(repository, user)},
+        status=status.HTTP_201_CREATED,
     )
 
-    return Response({
-        "success": True,
-        "message": "Проект успешно обновлён",
-        "project": {
-            "id": project.id,
-            "project_name": project_meta.project_name,
-            "weight": str(project_meta.weight),
-            "type": project_meta.type,
-            "private": project.private,
-            "description": change_description,
-        }
-    }, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+def get_repository(request, repository_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    return Response(serialize_repository(repository, user), status=status.HTTP_200_OK)
+
+
+@api_view(["PUT"])
+def update_repository(request, repository_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_edit_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    if "name" in request.data:
+        repository.name = request.data.get("name")
+    if "description" in request.data:
+        repository.description = request.data.get("description")
+    if "visibility" in request.data:
+        visibility = request.data.get("visibility")
+        if visibility not in RepositoryVisibility.values:
+            return Response({"error": "Некорректная видимость репозитория"}, status=status.HTTP_400_BAD_REQUEST)
+        repository.visibility = visibility
+
+    repository.save()
+    log_action(user, "change", repository)
+    return Response(
+        {"message": "Репозиторий обновлён", "repository": serialize_repository(repository, user)},
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["DELETE"])
+def delete_repository(request, repository_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_delete_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    log_action(
+        user,
+        "delete",
+        repository,
+        {
+            "repository_id": repository.id,
+            "name": repository.name,
+            "owner_user_id": repository.owner_user_id,
+            "owner_company_id": repository.owner_company_id,
+        },
+    )
+    repository.delete()
+    return Response({"message": "Репозиторий удалён"}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def get_repository_files(request, repository_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    files = repository.files.order_by("path")
+    return Response([{"id": file.id, "path": file.path, "name": file.name} for file in files], status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def get_repository_commits(request, repository_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    commits = repository.commits.select_related("created_by").order_by("-created_at")
+    return Response(
+        [
+            {
+                "id": commit.id,
+                "message": commit.message,
+                "commit_hash": commit.commit_hash,
+                "parent_id": commit.parent_id,
+                "created_by_id": commit.created_by_id,
+                "created_by_username": commit.created_by.username,
+                "created_at": commit.created_at.isoformat(),
+            }
+            for commit in commits
+        ],
+        status=status.HTTP_200_OK,
+    )
+
 
 @api_view(["POST"])
-def download_project(request, project_id):
+def create_commit(request, repository_id):
     """
-    GET /api/project/download/<int:project_id>/
-    Скачать файл проекта
+    Создать линейный commit.
+
+    Request:
+    - Authorization: Bearer <access_token>
+    - message
+    - files[] multipart, опционально
+    - paths[] multipart, опционально
+
+    Упрощение для MVP:
+    каждый загруженный файл создаёт/обновляет File + CommitFile с operation added/modified.
     """
-    user_id = request.data.get("user_id")
 
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # Пользователь
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # Проект
-    try:
-        project = Project.objects.select_related("user").get(id=project_id)
-    except Project.DoesNotExist:
-        return Response(
-            {"error": "Проект не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # Проверка прав
-    is_owner = project.user_id == user.id
-    is_shared = Shared.objects.filter(project=project, receiver=user).exists()
-
-    if not is_owner and not is_shared:
-        return Response(
-            {"error": "Нет прав на скачивание проекта"},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
     try:
-        project_meta = ProjectMeta.objects.get(project=project)
-    except ProjectMeta.DoesNotExist:
-        return Response(
-            {"error": "Файл проекта не найден"},
-            status=status.HTTP_404_NOT_FOUND
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_edit_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    message = (request.data.get("message") or "").strip()
+    if not message:
+        return Response({"error": "Сообщение коммита обязательно"}, status=status.HTTP_400_BAD_REQUEST)
+
+    uploaded_files = request.FILES.getlist("files")
+    paths = request.data.getlist("paths")
+
+    latest_commit = repository.commits.order_by("-created_at").first()
+
+    with transaction.atomic():
+        hash_input = f"{repository.id}:{user.id}:{message}:{repository.commits.count()}".encode()
+        commit = Commit.objects.create(
+            repository=repository,
+            created_by=user,
+            message=message,
+            parent=latest_commit,
+            commit_hash=hashlib.sha256(hash_input).hexdigest(),
         )
+        changed_files = []
 
-    if not project_meta.data:
-        return Response(
-            {"error": "Файл пуст или отсутствует"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        for index, uploaded_file in enumerate(uploaded_files):
+            path = paths[index] if index < len(paths) and paths[index] else uploaded_file.name
+            content = uploaded_file.read()
+            sha256 = hashlib.sha256(content).hexdigest()
+            mime_type, _ = mimetypes.guess_type(uploaded_file.name)
 
-    # Формирование файла
-    ext = project_meta.type or "txt"
-    filename = f"{project_meta.project_name}.{ext}"
+            file_obj, file_created = File.objects.get_or_create(repository=repository, path=path)
+            blob = FileBlob.objects.create(
+                repository=repository,
+                blob=ContentFile(content, name=uploaded_file.name),
+                sha256=sha256,
+                size=len(content),
+                mime_type=mime_type,
+                original_name=uploaded_file.name,
+            )
+            commit_file = CommitFile.objects.create(
+                commit=commit,
+                file=file_obj,
+                path=path,
+                operation=CommitFileOperation.ADDED if file_created else CommitFileOperation.MODIFIED,
+                blob=blob,
+            )
+            changed_files.append(
+                {
+                    "file_id": file_obj.id,
+                    "commit_file_id": commit_file.id,
+                    "path": commit_file.path,
+                    "previous_path": commit_file.previous_path,
+                    "operation": commit_file.operation,
+                    "blob_id": blob.id,
+                    "size": blob.size,
+                    "sha256": blob.sha256,
+                    "download_url": f"/api/commit-files/{commit_file.id}/download/",
+                }
+            )
 
-    mime_type, _ = mimetypes.guess_type(filename)
-
-    response = HttpResponse(
-        project_meta.data,
-        content_type=mime_type or "application/octet-stream"
+    log_action(user, "add", commit)
+    return Response(
+        {
+            "message": "Коммит создан",
+            "repository": {
+                "id": repository.id,
+                "name": repository.name,
+            },
+            "commit": {
+                "id": commit.id,
+                "hash": commit.commit_hash,
+                "message": commit.message,
+                "parent_id": commit.parent_id,
+                "created_by_id": commit.created_by_id,
+                "created_at": commit.created_at.isoformat(),
+            },
+            "files": changed_files,
+        },
+        status=status.HTTP_201_CREATED,
     )
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
+
+@api_view(["GET"])
+def get_commit_files(request, commit_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        commit = Commit.objects.select_related("repository").get(id=commit_id)
+    except Commit.DoesNotExist:
+        return Response({"error": "Коммит не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, commit.repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    commit_files = commit.files.select_related("file", "blob").order_by("path")
+    return Response(
+        [
+            {
+                "id": commit_file.id,
+                "path": commit_file.path,
+                "previous_path": commit_file.previous_path,
+                "operation": commit_file.operation,
+                "file_id": commit_file.file_id,
+                "blob_id": commit_file.blob_id,
+                "size": commit_file.blob.size if commit_file.blob else None,
+                "sha256": commit_file.blob.sha256 if commit_file.blob else None,
+            }
+            for commit_file in commit_files
+        ],
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+def download_commit_file(request, commit_file_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        commit_file = CommitFile.objects.select_related("commit__repository", "blob").get(id=commit_file_id)
+    except CommitFile.DoesNotExist:
+        return Response({"error": "Файл коммита не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, commit_file.commit.repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    if not commit_file.blob:
+        return Response({"error": "У этой операции нет файла для скачивания"}, status=status.HTTP_404_NOT_FOUND)
+
+    file_handle = commit_file.blob.blob.open("rb")
+    filename = commit_file.blob.original_name or os.path.basename(commit_file.path)
+    mime_type = commit_file.blob.mime_type or "application/octet-stream"
+    response = HttpResponse(file_handle.read(), content_type=mime_type)
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
-@api_view(["POST"])
-def share_project(request, project_id):
-    """
-    POST /api/project/share/<project_id>/
-   {
-   "user_id": int,"
-   "recipient_id": int,
-   "comment": "..."
-    }
-    """
-    try:
-        user_id = request.data.get("user_id")
-        recipient_id = request.data.get("recipient_id")
-        comment = request.data.get("comment", "")
 
-        # Проверка входных данных
-        if not user_id:
-            return Response(
-                {"error": "ID пользователя обязателен"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not recipient_id:
-            return Response(
-                {"error": "Не указан получатель"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Проект
-        try:
-            project = Project.objects.get(id=project_id)
-        except Project.DoesNotExist:
-            return Response(
-                {"error": "Проект не найден"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Проверка владельца
-        if project.user_id != user_id:
-            return Response(
-                {"error": "Недостаточно прав"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Проверка приватности
-        if project.private:
-            return Response(
-                {"error": "Приватный проект нельзя передать"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Получатель
-        try:
-            receiver = User.objects.get(id=recipient_id)
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Пользователь не найден"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # ПРОВЕРКА ДРУЖБЫ
-        is_friend = Friendship.objects.filter(
-            Q(user1_id=user_id, user2_id=recipient_id) |
-            Q(user1_id=recipient_id, user2_id=user_id),
-            status='accepted'
-        ).exists()
-
-        if not is_friend:
-            return Response(
-                {"error": "Проект можно передать только друзьям"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-
-        shared_obj = Shared(
-            project=project,
-            receiver=receiver,
-            comment=comment
-        )
-
-        shared_obj.full_clean()
-        shared_obj.save()
-
-        EntityLog.objects.create(
-            action="add",
-            id_user=project.user,
-            type="shared",
-            id_entity=shared_obj.id
-        )
-
-        return Response(
-            {"success": "Проект успешно передан!"},
-            status=status.HTTP_201_CREATED
-        )
-
-    except ValidationError as e:
-        return Response(
-            {"error": e.message_dict if hasattr(e, "message_dict") else str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    except Exception as e:
-        print("Ошибка share_project:", e)
-        return Response(
-            {"error": "Ошибка при передаче проекта"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+# =========================================================
+# DOCUMENTATION / NEWS
+# =========================================================
+@api_view(["GET"])
+def news_view(request):
+    news = Documentation.objects.filter(type=DocumentationType.NEWS).order_by("-created_at")
+    return Response([serialize_documentation(item) for item in news], status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
-def get_shared_projects(request):
-    """
-    GET /api/project/shared/
-    Получить список проектов, которые были переданы пользователю
-    """
-    user_id = request.data.get("user_id")
+def create_news(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+    title = (request.data.get("title") or "").strip()
+    content = (request.data.get("content") or "").strip()
+    if not title or not content:
+        return Response({"error": "title и content обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
-    last_change_subquery = ProjectChanges.objects.filter(
-        project=OuterRef("project_id")
-    ).order_by("-id").values("description")[:1]
-
-    shared_records = (
-        Shared.objects
-        .filter(receiver=user)
-        .select_related("project", "project__user")
-        .prefetch_related("project__projectmeta_set")
-        .annotate(last_description=Subquery(last_change_subquery))
-        .order_by("-id")
+    news = Documentation.objects.create(
+        type=DocumentationType.NEWS,
+        admin=user,
+        text=build_document_text(title, content),
     )
+    log_action(user, "add", news)
+    return Response({"message": "Новость создана", "news": serialize_documentation(news)}, status=status.HTTP_201_CREATED)
 
-    result = []
 
-    for record in shared_records:
-        project = record.project
+@api_view(["PUT"])
+def update_news(request, news_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-        project_meta = project.projectmeta_set.first()
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-        result.append({
-            "shared_id": record.id,
-            "project_id": project.id,
-            "project_name": project_meta.project_name if project_meta else None,
-            "type": project_meta.type if project_meta else None,
-            "weight": str(project_meta.weight) if project_meta and project_meta.weight is not None else None,
-            "sender_id": project.user.id,
-            "sender_email": project.user.email,
-            "comment": record.comment,
-            "description": record.last_description or "",
-            "private" : record.project.private,
-        })
+    try:
+        news = Documentation.objects.get(id=news_id, type=DocumentationType.NEWS)
+    except Documentation.DoesNotExist:
+        return Response({"error": "Новость не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response(result, status=status.HTTP_200_OK)
+    title = (request.data.get("title") or "").strip()
+    content = (request.data.get("content") or "").strip()
+    if not title or not content:
+        return Response({"error": "title и content обязательны"}, status=status.HTTP_400_BAD_REQUEST)
+
+    news.text = build_document_text(title, content)
+    news.save()
+    log_action(user, "change", news)
+    return Response({"message": "Новость обновлена", "news": serialize_documentation(news)}, status=status.HTTP_200_OK)
 
 
 @api_view(["DELETE"])
-def delete_received(request, shared_id: int):
-    """
-    DELETE /api/project/delete_received/<shared_id>/
-    Удаляет запись о полученном проекте для пользователя
-    """
+def delete_news(request, news_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
     try:
-        user_id = request.data.get("user_id")
+        news = Documentation.objects.get(id=news_id, type=DocumentationType.NEWS)
+    except Documentation.DoesNotExist:
+        return Response({"error": "Новость не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-        if not user_id:
-            return Response(
-                {"error": "ID пользователя обязателен"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Пользователь
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {"error": "Пользователь не найден"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Shared
-        try:
-            shared_obj = Shared.objects.get(id=shared_id)
-        except Shared.DoesNotExist:
-            return Response(
-                {"error": "Запись не найдена"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Проверка владельца
-        if shared_obj.receiver_id != user.id:
-            return Response(
-                {"error": "Пользователь не владеет этим проектом"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        shared_obj.delete()
-
-        EntityLog.objects.create(
-            action="remove",
-            id_user=user,
-            type="shared",
-            id_entity=shared_id
-        )
-
-        return Response(
-            {"success": "Запись о полученном проекте удалена"},
-            status=status.HTTP_204_NO_CONTENT
-        )
-
-    except Exception as e:
-        print("Ошибка delete_received:", e)
-        return Response(
-            {"error": "Ошибка при удалении записи"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@api_view(["GET"])
-def get_all_users(request):
-    """
-    GET /api/users/
-    Получить список всех пользователей (с исключением текущего, если указан exclude_id)
-    
-    Параметры:
-    - exclude_id: ID пользователя, которого нужно исключить из списка
-    - search: Поиск по email (частичное совпадение, case-insensitive)
-    """
-    exclude_id = request.GET.get('exclude_id')
-    search = request.GET.get('search', '').strip()
-
-    users = User.objects.all()
-    if exclude_id:
-        try:
-            exclude_id = int(exclude_id)
-            users = users.exclude(id=exclude_id)
-        except ValueError:
-            return Response({"error": "Неверный формат exclude_id"}, status=400)
-
-    if search:
-        users = users.filter(email__icontains=search)
-
-    result = []
-    for user in users:
-        try:
-            profile = UserProfile.objects.get(user=user)
-            nickname = profile.name
-        except UserProfile.DoesNotExist:
-            nickname = None
-
-        result.append({
-            "id": user.id,
-            "email": user.email,
-            "nickname": nickname
-        })
-
-    return Response(result, status=200)
+    log_action(user, "delete", news, {"news_id": news.id, "text": news.text})
+    news.delete()
+    return Response({"message": "Новость удалена"}, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
-def get_friends(request):
-    """
-    GET /api/friends/
-    Получить список друзей пользователя
-
-    Параметры:
-    - user_id: ID пользователя
-    """
-    user_id = request.GET.get('user_id')
-    search = (request.GET.get('search') or '').strip()
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-
-    friend_ids = get_friend_ids(user)
-    friends = User.objects.filter(id__in=friend_ids)
-    if search:
-        friends = friends.filter(email__icontains=search)
-    result = []
-    for friend_user in friends:
-        try:
-            profile = UserProfile.objects.get(user=friend_user)
-            nickname = profile.name
-        except UserProfile.DoesNotExist:
-            nickname = None
-        result.append({
-            "id": friend_user.id,
-            "email": friend_user.email,
-            "nickname": nickname
-        })
-    return Response(result, status=200)
+def documentation_view(request):
+    docs = Documentation.objects.filter(type=DocumentationType.REFERENCE).order_by("-created_at")
+    return Response([serialize_documentation(item) for item in docs], status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
-def add_friend(request):
-    """
-    POST /api/friends/add/
-    Отправить запрос в друзья или принять запрос
-    
-    Тело запроса:
-    {
-        "user_id": 1,  # ID текущего пользователя
-        "friend_id": 2  # ID пользователя, с которым устанавливается дружба
-    }
-    """
-    user_id = request.data.get('user_id')
-    friend_id = request.data.get('friend_id')
+def create_documentation(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not user_id or not friend_id:
-        return Response({"error": "ID пользователя и друга обязательны"}, status=400)
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        user_id = int(user_id)
-        friend_id = int(friend_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
+    title = (request.data.get("title") or "").strip()
+    content = (request.data.get("content") or "").strip()
+    category = (request.data.get("category") or "").strip()
+    target_audience = request.data.get("target_audience") or ContentAudience.ALL
 
-    if user_id == friend_id:
-        return Response({"error": "Нельзя добавить себя в друзья"}, status=400)
+    if not title or not content:
+        return Response({"error": "title и content обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = User.objects.get(id=user_id)
-        friend = User.objects.get(id=friend_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
+    if target_audience not in ContentAudience.values:
+        return Response({"error": "Некорректная аудитория"}, status=status.HTTP_400_BAD_REQUEST)
 
-    row = get_friendship_between(user.id, friend.id)
-    if row:
-        u1, u2, friendship_status = row
-        if friendship_status == 'sent' and u2 == user.id:
-            Friendship.objects.filter(user1_id=u1, user2_id=u2).update(status='accepted')
-            entity_id = make_friendship_entity_id(u1, u2)
-            EntityLog.objects.create(
-                action='change',
-                id_user=user,
-                type='friendship',
-                id_entity=entity_id
-            )
-            return Response({"message": "Запрос в друзья принят", "status": "accepted"}, status=200)
-        if friendship_status == 'accepted':
-            return Response({"error": "Вы уже друзья"}, status=400)
-        return Response({"error": "Запрос в друзья уже отправлен"}, status=400)
+    doc = Documentation.objects.create(
+        type=DocumentationType.REFERENCE,
+        admin=user,
+        target_audience=target_audience,
+        text=build_document_text(title, content, category),
+    )
+    log_action(user, "add", doc)
+    return Response({"message": "Документация создана", "documentation": serialize_documentation(doc)}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PUT"])
+def update_documentation(request, doc_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        Friendship.objects.create(user1=user, user2=friend, status='sent')
-        entity_id = make_friendship_entity_id(user.id, friend.id)
-        EntityLog.objects.create(
-            action='add',
-            id_user=user,
-            type='friendship',
-            id_entity=entity_id
-        )
-        return Response({"message": "Запрос в друзья отправлен", "status": "sent"}, status=201)
-    except Exception as e:
-        return Response({"error": f"Ошибка при создании дружбы: {str(e)}"}, status=500)
+        doc = Documentation.objects.get(id=doc_id, type=DocumentationType.REFERENCE)
+    except Documentation.DoesNotExist:
+        return Response({"error": "Документация не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
+    title = (request.data.get("title") or "").strip()
+    content = (request.data.get("content") or "").strip()
+    category = (request.data.get("category") or "").strip()
+    target_audience = request.data.get("target_audience") or doc.target_audience
 
-@api_view(["GET"])
-def get_friend_requests(request):
-    """
-    GET /api/friends/requests/
-    Входящие заявки (status='sent'), где текущий пользователь — получатель (user2)
-    
-    Параметры:
-    - user_id: ID текущего пользователя
-    """
-    user_id = request.GET.get('user_id')
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
+    if not title or not content:
+        return Response({"error": "title и content обязательны"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
+    if target_audience not in ContentAudience.values:
+        return Response({"error": "Некорректная аудитория"}, status=status.HTTP_400_BAD_REQUEST)
 
-    sender_ids = list(Friendship.objects.filter(user2_id=user_id, status='sent').values_list('user1_id', flat=True))
-    senders = User.objects.filter(id__in=sender_ids)
+    doc.text = build_document_text(title, content, category)
+    doc.target_audience = target_audience
+    doc.save()
+    log_action(user, "change", doc)
+    return Response({"message": "Документация обновлена", "documentation": serialize_documentation(doc)}, status=status.HTTP_200_OK)
 
-    result = []
-    for sender in senders:
-        try:
-            profile = UserProfile.objects.get(user=sender)
-            nickname = profile.name
-        except UserProfile.DoesNotExist:
-            nickname = None
-        result.append({
-            "id": sender.id,
-            "email": sender.email,
-            "nickname": nickname
-        })
-    return Response(result, status=200)
-
-
-@api_view(["GET"])
-def get_sent_friend_requests(request):
-    """
-    GET /api/friends/requests/sent/
-    Отправленные заявки (status='sent'), где текущий пользователь — отправитель (user1)
-    
-    Параметры:
-    - user_id: ID текущего пользователя
-    """
-    user_id = request.GET.get('user_id')
-    if not user_id:
-        return Response({"error": "ID пользователя обязателен"}, status=400)
-
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
-
-    receiver_ids = list(Friendship.objects.filter(user1_id=user_id, status='sent').values_list('user2_id', flat=True))
-    receivers = User.objects.filter(id__in=receiver_ids)
-
-    result = []
-    for receiver in receivers:
-        try:
-            profile = UserProfile.objects.get(user=receiver)
-            nickname = profile.name
-        except UserProfile.DoesNotExist:
-            nickname = None
-        result.append({
-            "id": receiver.id,
-            "email": receiver.email,
-            "nickname": nickname
-        })
-    return Response(result, status=200)
-
-
-@api_view(["POST"])
-def respond_friend_request(request):
-    """
-    POST /api/friends/requests/respond/
-    Принять или отклонить входящую заявку
-
-    Тело запроса:
-    {
-      "user_id": <текущий пользователь-получатель>,
-      "from_user_id": <отправитель заявки>,
-      "action": "accept" | "decline"
-    }
-    """
-    user_id = request.data.get('user_id')
-    from_user_id = request.data.get('from_user_id')
-    action = (request.data.get('action') or '').lower()
-
-    if not user_id or not from_user_id or action not in ("accept", "decline"):
-        return Response({"error": "user_id, from_user_id и корректный action обязательны"}, status=400)
-
-    try:
-        user_id = int(user_id)
-        from_user_id = int(from_user_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
-
-    if user_id == from_user_id:
-        return Response({"error": "Некорректные участники заявки"}, status=400)
-
-    exists = get_friendship_between(from_user_id, user_id)
-    if not exists or exists[2] != 'sent' or exists[0] != from_user_id or exists[1] != user_id:
-        return Response({"error": "Заявка не найдена"}, status=404)
-
-    entity_id = make_friendship_entity_id(from_user_id, user_id)
-
-    if action == 'accept':
-        Friendship.objects.filter(user1_id=from_user_id, user2_id=user_id).update(status='accepted')
-        try:
-            user_obj = User.objects.get(id=user_id)
-            EntityLog.objects.create(
-                action='change',
-                id_user=user_obj,
-                type='friendship',
-                id_entity=entity_id
-            )
-        except User.DoesNotExist:
-            pass
-        return Response({"message": "Заявка принята", "status": "accepted"}, status=200)
-
-    try:
-        user_obj = User.objects.get(id=user_id)
-        EntityLog.objects.create(
-            action='delete',
-            id_user=user_obj,
-            type='friendship',
-            id_entity=entity_id
-        )
-    except User.DoesNotExist:
-        pass
-
-    Friendship.objects.filter(user1_id=from_user_id, user2_id=user_id).delete()
-    return Response({"message": "Заявка отклонена", "status": "declined"}, status=200)
 
 @api_view(["DELETE"])
-def remove_friend(request):
-    """
-    DELETE /api/friends/remove/
-    Удалить друга (удалить friendship со status='accepted')
-    
-    Тело запроса:
-    {
-        "user_id": 1,  # ID текущего пользователя
-        "friend_id": 2  # ID друга, которого удаляем
-    }
-    """
-    user_id = request.data.get('user_id')
-    friend_id = request.data.get('friend_id')
+def delete_documentation(request, doc_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not user_id or not friend_id:
-        return Response({"error": "ID пользователя и друга обязательны"}, status=400)
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        user_id = int(user_id)
-        friend_id = int(friend_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
+        doc = Documentation.objects.get(id=doc_id, type=DocumentationType.REFERENCE)
+    except Documentation.DoesNotExist:
+        return Response({"error": "Документация не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-    if user_id == friend_id:
-        return Response({"error": "Нельзя удалить себя из друзей"}, status=400)
-
-    try:
-        user = User.objects.get(id=user_id)
-        friend = User.objects.get(id=friend_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-
-    row = get_friendship_between(user_id, friend_id)
-    if not row or row[2] != 'accepted':
-        return Response({"error": "Дружба не найдена или уже удалена"}, status=404)
-
-    u1, u2, _ = row
-    entity_id = make_friendship_entity_id(u1, u2)
-    EntityLog.objects.create(
-        action='delete',
-        id_user=user,
-        type='friendship',
-        id_entity=entity_id
-    )
-
-    Friendship.objects.filter(
-        Q(user1_id=user_id, user2_id=friend_id) | Q(user1_id=friend_id, user2_id=user_id)
-    ).delete()
-
-    return Response({"message": "Друг успешно удален"}, status=200)
+    log_action(user, "delete", doc, {"documentation_id": doc.id, "text": doc.text})
+    doc.delete()
+    return Response({"message": "Документация удалена"}, status=status.HTTP_200_OK)
 
 
-@api_view(["POST"])
-def cancel_friend_request(request):
-    """
-    POST /api/friends/requests/cancel/
-    Отменить отправленную заявку (удалить friendship со status='sent', где user1 = текущий пользователь)
-    
-    Тело запроса:
-    {
-        "user_id": 1,  # ID текущего пользователя (отправитель)
-        "receiver_id": 2  # ID получателя заявки
-    }
-    """
-    user_id = request.data.get('user_id')
-    receiver_id = request.data.get('receiver_id')
-    
-    if not user_id or not receiver_id:
-        return Response({"error": "ID пользователя и получателя обязательны"}, status=400)
-    
-    try:
-        user_id = int(user_id)
-        receiver_id = int(receiver_id)
-    except (ValueError, TypeError):
-        return Response({"error": "Неверный формат ID"}, status=400)
-    
-    if user_id == receiver_id:
-        return Response({"error": "Некорректные параметры"}, status=400)
-    
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Пользователь не найден"}, status=404)
-
-    row = get_friendship_between(user_id, receiver_id)
-    if not row or row[2] != 'sent' or row[0] != user_id or row[1] != receiver_id:
-        return Response({"error": "Заявка не найдена или уже обработана"}, status=404)
-
-    entity_id = make_friendship_entity_id(row[0], row[1])
-    EntityLog.objects.create(
-        action='delete',
-        id_user=user,
-        type='friendship',
-        id_entity=entity_id
-    )
-
-    Friendship.objects.filter(user1_id=user_id, user2_id=receiver_id).delete()
-
-    return Response({"message": "Заявка отменена"}, status=200)
-
-
+# =========================================================
+# FAQ
+# =========================================================
 @api_view(["GET"])
 def get_QA_list(request):
-    faqs = FAQ.objects.select_related("user", "admin").order_by("-id")
+    """
+    Публичное чтение FAQ.
 
-    result = [
-        {
-            "id": faq.id,
-            "text_question": faq.text_question,
-            "answered": faq.answered,
-            "answer_text": faq.answer_text,
-            "user_email": faq.user.email,
-            "admin_email": faq.admin.email if faq.admin else None,
-        }
-        for faq in faqs
-    ]
+    Токен не нужен: FAQ могут читать все пользователи и гости.
+    """
 
-    return Response(result, status=status.HTTP_200_OK)
+    questions = FAQ.objects.select_related("questioner", "answerer").order_by("-created_at")
+    return Response([serialize_faq(faq) for faq in questions], status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def get_answered_QA_list(request):
+    """
+    Публичное чтение FAQ с ответами.
+    """
+
+    questions = FAQ.objects.select_related("questioner", "answerer").filter(answered=True).order_by("-updated_at")
+    return Response([serialize_faq(faq) for faq in questions], status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def get_unanswered_QA_list(request):
+    """
+    Чтение FAQ без ответа.
+
+    Доступно только admin приложения.
+    """
+
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    questions = FAQ.objects.select_related("questioner", "answerer").filter(answered=False).order_by("-created_at")
+    return Response([serialize_faq(faq) for faq in questions], status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
 def create_QA(request):
     """
-    POST /api/QA/create/
-    Создать новый вопрос
-    {
-        "user_id": 1,
-        "text_question": "Ваш вопрос"
-    }
+    Создать вопрос в FAQ.
+
+    Требуется Authorization: Bearer <access_token>.
     """
-    user_id = request.data.get("user_id")
-    text_question = request.data.get("text_question", "").strip()
 
-    # Валидация входных данных
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
+    text_question = (request.data.get("text_question") or "").strip()
     if not text_question:
-        return Response(
-            {"error": "Вопрос не может быть пустым"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "text_question обязателен"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Пользователь
-    try:
-        user = User.objects.get(id=int(user_id))
-    except (ValueError, User.DoesNotExist):
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+    faq = FAQ.objects.create(questioner=user, text_question=text_question)
+    log_action(user, "add", faq)
+    return Response({"message": "Вопрос создан", "id": faq.id}, status=status.HTTP_201_CREATED)
 
-    try:
-        faq = FAQ(
-            user=user,
-            text_question=text_question,
-            answered=False
-        )
-
-        faq.full_clean()
-        faq.save()
-
-        EntityLog.objects.create(
-            action="add",
-            id_user=user,
-            type="faq",
-            id_entity=faq.id
-        )
-
-        return Response(
-            {"message": "Вопрос успешно добавлен"},
-            status=status.HTTP_201_CREATED
-        )
-
-    except ValidationError as e:
-        return Response(
-            {"error": e.message_dict if hasattr(e, "message_dict") else str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    except Exception as e:
-        return Response(
-            {"error": f"Ошибка при создании вопроса: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 @api_view(["PATCH"])
 def answer_QA(request, qa_id):
-    """
-    PATCH /api/QA/<qa_id>/answer/
-    Ответ на вопрос (только для админов)
-    {
-        "answer_text": "Ваш ответ"
-    }
-    """
-    # Вопрос
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    answer_text = (request.data.get("answer_text") or "").strip()
+    if not answer_text:
+        return Response({"error": "answer_text обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         faq = FAQ.objects.get(id=qa_id)
     except FAQ.DoesNotExist:
-        return Response(
-            {"error": "Вопрос не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Вопрос не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Пользователь
-    user_id = request.data.get("user_id")
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # Проверка администратора
-    if not is_admin(user):
-        return Response(
-            {"error": "Недостаточно прав. Только администраторы могут отвечать на вопросы."},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    # Ответ
-    answer_text = request.data.get("answer_text", "").strip()
-    if not answer_text:
-        return Response(
-            {"error": "Ответ не может быть пустым"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
+    faq.answerer = user
     faq.answer_text = answer_text
     faq.answered = True
-    faq.admin = user
-    faq.full_clean()
     faq.save()
+    log_action(user, "change", faq)
 
-    EntityLog.objects.create(
-        action="change",
-        id_user=user,
-        type="faq",
-        id_entity=faq.id
-    )
+    return Response({"message": "Ответ сохранён"}, status=status.HTTP_200_OK)
 
-    return Response(
-        {"message": "Ответ успешно сохранён"},
-        status=status.HTTP_200_OK
-    )
 
 @api_view(["DELETE"])
 def delete_QA(request, qa_id):
-    """
-    DELETE /api/QA/<qa_id>/delete/
-    Удаляет вопрос и его ответ
-    """
-    user_id = request.data.get("user_id")
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if not user_id:
-        return Response(
-            {"error": "ID пользователя обязателен"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response(
-            {"error": "Пользователь не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # Проверка прав администратора
-    is_admin = Role.objects.filter(user=user, role="admin").exists()
-    if not is_admin:
-        return Response(
-            {"error": "Недостаточно прав. Только администраторы могут удалять вопросы."},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-    # Вопрос
     try:
         faq = FAQ.objects.get(id=qa_id)
     except FAQ.DoesNotExist:
-        return Response(
-            {"error": "Вопрос не найден"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "Вопрос не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-    faq_id = faq.id
+    log_action(user, "delete", faq, {"faq_id": faq.id, "text_question": faq.text_question})
     faq.delete()
-
-    EntityLog.objects.create(
-        action="remove",
-        id_user=user,
-        type="faq",
-        id_entity=faq_id
-    )
-
-    return Response(
-        {"message": "Вопрос удалён"},
-        status=status.HTTP_204_NO_CONTENT
-    )
+    return Response({"message": "Вопрос удалён"}, status=status.HTTP_200_OK)
