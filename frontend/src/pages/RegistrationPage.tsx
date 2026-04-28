@@ -2,163 +2,194 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faUser,
-  faEnvelope,
-  faLock,
-  faPenRuler,
+    faUser,
+    faEnvelope,
+    faLock,
+    faPenRuler,
+    faCalendar,
 } from "@fortawesome/free-solid-svg-icons";
+import { apiFetch } from "../config/api";
 import "./RegistrationPage.scss";
 
+interface UserData {
+    id: number;
+    username: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    date_of_birth?: string | null;
+}
+
+interface RegistrationResponse {
+    message?: string;
+    user?: UserData;
+}
+
 const RegistrationPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPasswordError, setShowPasswordError] = useState(false);
+    const navigate = useNavigate();
+    const [username, setUsername] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [message, setMessage] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [showPasswordError, setShowPasswordError] = useState(false);
+    const confirmGroupRef = useRef<HTMLDivElement | null>(null);
 
-  const confirmGroupRef = useRef<HTMLDivElement | null>(null);
+    const triggerErrorAnimation = (element: HTMLElement | null) => {
+        if (!element) return;
 
-  function triggerErrorAnimation(element: HTMLElement | null) {
-    if (!element) return;
-    element.classList.remove("input-error");
-    void element.offsetWidth;
-    element.classList.add("input-error");
-  }
+        element.classList.remove("input-error");
+        void element.offsetWidth;
+        element.classList.add("input-error");
+    };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setMessage("");
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setIsLoading(true);
+        setMessage("");
 
-    if (password !== confirmPassword) {
-      setShowPasswordError(true);
-      setMessage("Ошибка: пароли не совпадают");
-      triggerErrorAnimation(confirmGroupRef.current);
-      setIsLoading(false);
-      return;
-    }
+        if (password !== confirmPassword) {
+            setShowPasswordError(true);
+            setMessage("Ошибка: пароли не совпадают");
+            triggerErrorAnimation(confirmGroupRef.current);
+            setIsLoading(false);
+            return;
+        }
 
-    try {
-      const response = await fetch("https://localhost:8000/api/registration/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
+        try {
+            const data = await apiFetch<RegistrationResponse>("/registration/", {
+                method: "POST",
+                redirectOnError: false,
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                    first_name: firstName,
+                    last_name: lastName,
+                    date_of_birth: dateOfBirth || null,
+                }),
+            });
 
-      const data = await response.json();
+            if (!data.user) {
+                setMessage("Ошибка: backend не вернул пользователя");
+                return;
+            }
 
-      if (!response.ok) {
-        setMessage(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
-        return;
-      }
+            setMessage(`Успех! Пользователь зарегистрирован: ${data.user.email}`);
+            setTimeout(() => navigate("/login"), 1000);
+        } catch (error) {
+            setMessage(`Ошибка: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-      setMessage("Успех! Пользователь зарегистрирован: " + data.email);
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          email: data.email,
-          id: data.id,
-          nickname: data.nickname,
-        })
-      );
-      window.dispatchEvent(new Event("storage"));
-      setTimeout(() => navigate("/account"), 1000);
-    } catch (error) {
-      setMessage("Ошибка сети: " + error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="auth-page">
-      <div className="auth-container">
-        <div className="auth-header">
-          <FontAwesomeIcon icon={faPenRuler} />
-          <h1>OurPaintHUB</h1>
-          <p>Платформа для обмена проектами</p>
+    return (
+        <div className="auth-page">
+            <div className="auth-container">
+                <div className="auth-header">
+                    <FontAwesomeIcon icon={faPenRuler} />
+                    <h1>OurPaintHUB</h1>
+                    <p>Платформа для обмена проектами</p>
+                </div>
+                <div className="auth-form">
+                    <h2>Регистрация</h2>
+                    <form onSubmit={handleSubmit}>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faUser} />
+                            <input
+                                type="text"
+                                placeholder="Username"
+                                required
+                                value={username}
+                                onChange={(event) => setUsername(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faUser} />
+                            <input
+                                type="text"
+                                placeholder="Имя"
+                                value={firstName}
+                                onChange={(event) => setFirstName(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faUser} />
+                            <input
+                                type="text"
+                                placeholder="Фамилия"
+                                value={lastName}
+                                onChange={(event) => setLastName(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faEnvelope} />
+                            <input
+                                type="email"
+                                placeholder="Email"
+                                required
+                                value={email}
+                                onChange={(event) => setEmail(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faCalendar} />
+                            <input
+                                type="date"
+                                placeholder="Дата рождения"
+                                value={dateOfBirth}
+                                onChange={(event) => setDateOfBirth(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group">
+                            <FontAwesomeIcon icon={faLock} />
+                            <input
+                                type="password"
+                                placeholder="Пароль"
+                                required
+                                minLength={6}
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                            />
+                        </div>
+                        <div className="input-group" ref={confirmGroupRef}>
+                            <FontAwesomeIcon icon={faLock} />
+                            <input
+                                type="password"
+                                placeholder="Подтвердите пароль"
+                                required
+                                minLength={6}
+                                value={confirmPassword}
+                                onChange={(event) => {
+                                    setConfirmPassword(event.target.value);
+                                    setShowPasswordError(false);
+                                }}
+                                className={showPasswordError ? "input-error" : ""}
+                            />
+                            {showPasswordError && <p className="error-text">Пароли не совпадают</p>}
+                        </div>
+                        <button type="submit" className="auth-btn" disabled={isLoading}>
+                            {isLoading ? "Регистрация..." : "Зарегистрироваться"}
+                        </button>
+                    </form>
+                    {message && (
+                        <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
+                            {message}
+                        </p>
+                    )}
+                    <p>
+                        Уже есть аккаунт?{" "}
+                        <a onClick={() => navigate("/login")}>Войти</a>
+                    </p>
+                </div>
+            </div>
         </div>
-
-        <div className="auth-form">
-          <h2>Регистрация</h2>
-
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <FontAwesomeIcon icon={faUser} />
-              <input
-                type="text"
-                placeholder="Полное имя"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-
-            <div className="input-group">
-              <FontAwesomeIcon icon={faEnvelope} />
-              <input
-                type="email"
-                placeholder="Email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="input-group">
-              <FontAwesomeIcon icon={faLock} />
-              <input
-                type="password"
-                placeholder="Пароль"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <div className="input-group" ref={confirmGroupRef}>
-              <FontAwesomeIcon icon={faLock} />
-              <input
-                type="password"
-                placeholder="Подтвердите пароль"
-                required
-                minLength={6}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className={showPasswordError ? "input-error" : ""}
-              />
-              {showPasswordError && (
-                <p className="error-text">Пароли не совпадают</p>
-              )}
-            </div>
-
-            <button type="submit" className="auth-btn" disabled={isLoading}>
-              {isLoading ? "Регистрация..." : "Зарегистрироваться"}
-            </button>
-          </form>
-
-          {message && (
-            <p
-              className={`message ${
-                message.includes("Ошибка") ? "error" : "success"
-              }`}
-            >
-              {message}
-            </p>
-          )}
-
-          <p>
-            Уже есть аккаунт?{" "}
-            <a onClick={() => navigate("/login")}>Войти</a>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default RegistrationPage;

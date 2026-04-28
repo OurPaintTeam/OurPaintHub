@@ -2,107 +2,132 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { apiUrl, getAuthHeaders } from "../../config/api";
 import "./IconMenuButton.scss";
 
 interface IconMenuButtonProps {
-  isAuthenticated?: boolean;
+    isAuthenticated?: boolean;
 }
 
 interface UserData {
-  id: number;
-  email: string;
-  nickname?: string;
-  avatar?: string | null;
+    id: number;
+    username?: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    avatar?: string | null;
 }
 
 const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<UserData | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [user, setUser] = useState<UserData | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-  const loadUserAvatar = () => {
-    if (!isAuthenticated) return;
-    
-    const userData = localStorage.getItem('user');
-    if (!userData) return;
-    
-    try {
-      const parsed = JSON.parse(userData);
-      setUser(parsed);
-      
-      // Загружаем актуальный профиль с аватаром
-      fetch(`https://localhost:8000/api/profile/?user_id=${parsed.id}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(profile => {
-          if (profile) {
-            const updatedUser = { ...parsed, avatar: profile.avatar || null };
-            setUser(updatedUser);
-            // Обновляем localStorage для синхронизации
-            if (profile.avatar !== parsed.avatar) {
-              localStorage.setItem('user', JSON.stringify(updatedUser));
+    const loadUserAvatar = async () => {
+        if (!isAuthenticated) {
+            setUser(null);
+            return;
+        }
+
+        const userData = localStorage.getItem("user");
+        let parsedUser: UserData | null = null;
+
+        if (userData) {
+            try {
+                parsedUser = JSON.parse(userData);
+                setUser(parsedUser);
+            } catch (error) {
+                console.error("Ошибка при парсинге данных пользователя:", error);
+                localStorage.removeItem("user");
             }
-          }
-        })
-        .catch(() => {});
-    } catch (error) {
-      console.error("Ошибка при парсинге данных пользователя:", error);
-    }
-  };
+        }
 
-  useEffect(() => {
-    loadUserAvatar();
+        try {
+            const response = await fetch(apiUrl("/profile/"), {
+                headers: getAuthHeaders(),
+                credentials: "include",
+            });
 
-    // Слушаем изменения в localStorage для обновления аватара
-    const handleStorageChange = () => {
-      loadUserAvatar();
+            if (!response.ok) return;
+
+            const profile: UserData = await response.json();
+            const updatedUser = {
+                ...parsedUser,
+                ...profile,
+                avatar: profile.avatar || null,
+            };
+
+            setUser(updatedUser);
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+        } catch {
+            // profile refresh is optional for menu rendering
+        }
     };
 
-    // Слушаем кастомное событие для обновления аватара
-    const handleAvatarUpdate = () => {
-      loadUserAvatar();
-    };
+    useEffect(() => {
+        void loadUserAvatar();
 
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('avatarUpdated', handleAvatarUpdate);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('avatarUpdated', handleAvatarUpdate);
-    };
-  }, [isAuthenticated, location.pathname]);
+        const handleStorageChange = () => {
+            void loadUserAvatar();
+        };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+        const handleAvatarUpdate = () => {
+            void loadUserAvatar();
+        };
 
+        window.addEventListener("storage", handleStorageChange);
+        window.addEventListener("auth-changed", handleStorageChange);
+        window.addEventListener("avatarUpdated", handleAvatarUpdate);
 
-  return (
-    <div className="icon-menu-button">
-      <button className="circle-icon-button" onClick={() => setMenuOpen(prev => !prev)}>
-        {user?.avatar ? (
-          <img src={user.avatar} alt="Аватар пользователя" />
-        ) : (
-          <FontAwesomeIcon icon={faUserCircle} className="avatar-fallback-icon" />
-        )}
-      </button>
+        return () => {
+            window.removeEventListener("storage", handleStorageChange);
+            window.removeEventListener("auth-changed", handleStorageChange);
+            window.removeEventListener("avatarUpdated", handleAvatarUpdate);
+        };
+    }, [isAuthenticated, location.pathname]);
 
-{menuOpen && (
-  <div className="icon-menu" ref={menuRef}>
-    <button onClick={() => { navigate("/account"); setMenuOpen(false); }}>Профиль</button>
-    <button onClick={() => { navigate("/projects"); setMenuOpen(false); }}>Проекты</button>
-    <button onClick={() => { navigate("/friends"); setMenuOpen(false); }}>Контакты</button>
-  </div>
-)}
-    </div>
-  );
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="icon-menu-button">
+            <button
+                className="circle-icon-button"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                type="button"
+            >
+                {user?.avatar ? (
+                    <img src={user.avatar} alt="Аватар пользователя" />
+                ) : (
+                    <FontAwesomeIcon icon={faUserCircle} className="avatar-fallback-icon" />
+                )}
+            </button>
+
+            {menuOpen && (
+                <div className="icon-menu" ref={menuRef}>
+                    <button onClick={() => { navigate("/account"); setMenuOpen(false); }} type="button">
+                        Профиль
+                    </button>
+                    <button onClick={() => { navigate("/projects"); setMenuOpen(false); }} type="button">
+                        Проекты
+                    </button>
+                    <button onClick={() => { navigate("/friends"); setMenuOpen(false); }} type="button">
+                        Контакты
+                    </button>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default IconMenuButton;

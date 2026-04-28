@@ -2,224 +2,170 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import MarkdownText from "../components/MarkdownText";
+import { apiFetch } from "../config/api";
 import "./NewsDetailPage.scss";
 
 interface NewsItem {
-  id: number;
-  title: string;
-  content: string;
-  author_id?: number;
-  author_email?: string;
-  created_at?: string;
-  updated_at?: string;
+    id: number;
+    title: string;
+    content: string;
+    author_id?: number;
+    author_email?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
-interface UserData {
-  id: number;
-  email: string;
-  nickname?: string;
+interface RoleData {
+    is_admin?: boolean;
+    is_app_admin?: boolean;
 }
 
-interface NewsDetailPage {
+interface NewsDetailPageProps {
     isAuthenticated?: boolean;
 }
 
-const NewsDetailPage: React.FC<NewsDetailPage> = ({ isAuthenticated = false }) => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [news, setNews] = useState<NewsItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<UserData | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+const NewsDetailPage: React.FC<NewsDetailPageProps> = ({ isAuthenticated = false }) => {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const [news, setNews] = useState<NewsItem | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setUser(user);
-        void checkAdminRole(user.id);
-      } catch (error) {
-        console.error("Ошибка при парсинге данных пользователя:", error);
-      }
-    }
-
-    if (id) {
-      void loadNews(parseInt(id));
-    } else {
-      setError("ID новости не указан.");
-      setLoading(false);
-    }
-  }, [id]);
-
-  const checkAdminRole = async (userId: number) => {
-    try {
-      const response = await fetch(`https://localhost:8000/api/user/role/?user_id=${userId}`);
-      if (response.ok) {
-        const roleData = await response.json();
-        setIsAdmin(roleData.is_admin);
-      }
-    } catch (error) {
-      console.error("Ошибка при проверке роли:", error);
-    }
-  };
-
-  const loadNews = async (newsId: number) => {
-    try {
-      const response = await fetch(`https://localhost:8000/api/news/`);
-      if (response.ok) {
-        const newsData = await response.json();
-        const newsItem = newsData.find((item: NewsItem) => item.id === newsId);
-        
-        if (newsItem) {
-          setNews(newsItem);
+    useEffect(() => {
+        if (id) {
+            void loadNews(Number(id));
         } else {
-          setError("Новость не найдена.");
+            setError("ID новости не указан.");
+            setLoading(false);
         }
-      } else {
-        setError("Ошибка при загрузке новости.");
-      }
-    } catch (err) {
-      console.error("Ошибка при загрузке новости:", err);
-      setError("Ошибка сети при загрузке новости.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, [id]);
 
-  const handleEditNews = () => {
-    if (news) {
-      navigate(`/news/edit/${news.id}`);
-    }
-  };
+    useEffect(() => {
+        if (isAuthenticated) {
+            void checkAdminRole();
+        } else {
+            setIsAdmin(false);
+        }
+    }, [isAuthenticated]);
 
-  const handleDeleteNews = async () => {
-    if (!user || !news) return;
-    
-    const confirmed = window.confirm('Вы уверены, что хотите удалить эту новость?');
-    if (!confirmed) return;
+    const checkAdminRole = async () => {
+        try {
+            const roleData = await apiFetch<RoleData>("/user/role/", {
+                auth: true,
+                redirectOnError: false,
+            });
+            setIsAdmin(Boolean(roleData.is_app_admin ?? roleData.is_admin));
+        } catch {
+            setIsAdmin(false);
+        }
+    };
 
-    try {
-      const response = await fetch(`https://localhost:8000/api/news/${news.id}/delete/`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
-      });
+    const loadNews = async (newsId: number) => {
+        setLoading(true);
+        setError(null);
 
-      const data = await response.json();
+        try {
+            const newsData = await apiFetch<NewsItem[]>("/news/");
+            const newsItem = newsData.find((item) => item.id === newsId);
 
-      if (!response.ok) {
-        alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
-        return;
-      }
+            if (newsItem) {
+                setNews(newsItem);
+            } else {
+                setError("Новость не найдена.");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      alert("Новость успешно удалена!");
-      navigate("/news");
-      
-    } catch (error) {
-      alert("Ошибка сети: " + error);
-    }
-  };
+    const handleEditNews = () => {
+        if (news) {
+            navigate(`/news/edit/${news.id}`);
+        }
+    };
 
-  return (
-    <MainLayout isAuthenticated={isAuthenticated}>
-      <div className="news-detail-container">
-        <button onClick={() => navigate(-1)} className="back-btn">
-          &larr; Назад к новостям
-        </button>
-        
-        {loading ? (
-          <div className="loading">
-            <p>Загрузка новости...</p>
-          </div>
-        ) : error ? (
-          <div className="error">
-            <p>{error}</p>
-            <button onClick={() => navigate('/news')} className="back-to-news-btn">
-              Вернуться к новостям
-            </button>
-          </div>
-        ) : news ? (
-          <article className="news-detail">
-            <header className="news-header">
-              <h1>{news.title}</h1>
-              {isAuthenticated && isAdmin && (
-                <div className="news-actions">
-                  <button 
-                    onClick={handleEditNews} 
-                    className="edit-btn"
-                    title="Редактировать новость"
-                  >
-                    ✏️ Редактировать
-                  </button>
-                  <button 
-                    onClick={handleDeleteNews} 
-                    className="delete-btn"
-                    title="Удалить новость"
-                  >
-                    🗑️ Удалить
-                  </button>
-                </div>
-              )}
-            </header>
-            
-            <div className="news-meta">
-              {news.author_email && (
-                <span className="author">Автор: {news.author_email}</span>
-              )}
-              {news.created_at && (
-                <span className="date">
-                  Опубликовано: {(() => {
-                    try {
-                      const date = new Date(news.created_at);
-                      if (isNaN(date.getTime())) {
-                        return 'Дата недоступна';
-                      }
-                      return date.toLocaleString('ru-RU', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-                    } catch (error) {
-                      return 'Дата недоступна';
-                    }
-                  })()}
-                </span>
-              )}
-              {news.updated_at && news.updated_at !== news.created_at && (
-                <span className="updated">
-                  Обновлено: {(() => {
-                    try {
-                      const date = new Date(news.updated_at);
-                      if (isNaN(date.getTime())) {
-                        return 'Дата недоступна';
-                      }
-                      return date.toLocaleString('ru-RU', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-                    } catch (error) {
-                      return 'Дата недоступна';
-                    }
-                  })()}
-                </span>
-              )}
+    const handleDeleteNews = async () => {
+        if (!news) return;
+
+        const confirmed = window.confirm("Вы уверены, что хотите удалить эту новость?");
+        if (!confirmed) return;
+
+        await apiFetch(`/news/${news.id}/delete/`, {
+            method: "DELETE",
+            auth: true,
+        });
+
+        alert("Новость успешно удалена!");
+        navigate("/news");
+    };
+
+    const formatDate = (value: string) => {
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return "Дата недоступна";
+        }
+
+        return date.toLocaleString("ru-RU", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
+
+    return (
+        <MainLayout isAuthenticated={isAuthenticated}>
+            <div className="news-detail-container">
+                <button onClick={() => navigate(-1)} className="back-btn">
+                    &larr; Назад к новостям
+                </button>
+
+                {loading ? (
+                    <div className="loading">
+                        <p>Загрузка новости...</p>
+                    </div>
+                ) : error ? (
+                    <div className="error">
+                        <p>{error}</p>
+                        <button onClick={() => navigate("/news")} className="back-to-news-btn">
+                            Вернуться к новостям
+                        </button>
+                    </div>
+                ) : news ? (
+                    <article className="news-detail">
+                        <header className="news-header">
+                            <h1>{news.title}</h1>
+                            {isAuthenticated && isAdmin && (
+                                <div className="news-actions">
+                                    <button onClick={handleEditNews} className="edit-btn" title="Редактировать новость">
+                                        ✏️ Редактировать
+                                    </button>
+                                    <button onClick={handleDeleteNews} className="delete-btn" title="Удалить новость">
+                                        🗑️ Удалить
+                                    </button>
+                                </div>
+                            )}
+                        </header>
+
+                        <div className="news-meta">
+                            {news.author_email && <span className="author">Автор: {news.author_email}</span>}
+                            {news.created_at && <span className="date">Опубликовано: {formatDate(news.created_at)}</span>}
+                            {news.updated_at && news.updated_at !== news.created_at && (
+                                <span className="updated">Обновлено: {formatDate(news.updated_at)}</span>
+                            )}
+                        </div>
+
+                        <div className="news-content">
+                            <MarkdownText text={news.content} />
+                        </div>
+                    </article>
+                ) : null}
             </div>
-            
-            <div className="news-content">
-              <MarkdownText text={news.content} />
-            </div>
-          </article>
-        ) : null}
-      </div>
-    </MainLayout>
-  );
+        </MainLayout>
+    );
 };
 
 export default NewsDetailPage;
