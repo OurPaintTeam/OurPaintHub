@@ -168,8 +168,15 @@ def log_action(user, action, entity, metadata=None):
     )
 
 
-def serialize_user(user):
+def serialize_user(user, request=None):
     profile = getattr(user, "profile", None)
+
+    avatar_url = None
+    if profile and profile.avatar:
+        avatar_url = profile.avatar.url
+        if request:
+            avatar_url = request.build_absolute_uri(profile.avatar.url)
+
     return {
         "id": user.id,
         "username": user.username,
@@ -182,7 +189,7 @@ def serialize_user(user):
         "is_superuser": user.is_superuser,
         "bio": profile.bio if profile else None,
         "date_of_birth": profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None,
-        "avatar": profile.avatar.url if profile and profile.avatar else None,
+        "avatar": avatar_url,
     }
 
 
@@ -818,7 +825,7 @@ def get_user_profile(request):
     if error:
         return error
 
-    return Response(serialize_user(user), status=status.HTTP_200_OK)
+    return Response(serialize_user(user, request), status=status.HTTP_200_OK)
 
 
 @api_view(["PUT"])

@@ -118,11 +118,11 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
                     <button onClick={() => { navigate("/account"); setMenuOpen(false); }} type="button">
                         Профиль
                     </button>
-                    <button onClick={() => { navigate("/projects"); setMenuOpen(false); }} type="button">
-                        Проекты
+                    <button onClick={() => { navigate("/repositories"); setMenuOpen(false); }} type="button">
+                        Репозитории
                     </button>
-                    <button onClick={() => { navigate("/friends"); setMenuOpen(false); }} type="button">
-                        Контакты
+                    <button onClick={() => { navigate("/companies"); setMenuOpen(false); }} type="button">
+                        Компании
                     </button>
                 </div>
             )}

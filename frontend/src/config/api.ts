@@ -130,10 +130,12 @@ export const apiFetch = async <T = unknown>(
     const { auth = false, redirectOnError = true, headers, ...fetchOptions } = options;
 
     try {
+        const isFormData = fetchOptions.body instanceof FormData;
+
         const response = await fetch(apiUrl(path), {
             ...fetchOptions,
             headers: {
-                ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+                ...(!isFormData ? { "Content-Type": "application/json" } : {}),
                 ...(auth ? getAuthHeaders() : {}),
                 ...headers,
             },

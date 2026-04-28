@@ -1,5 +1,5 @@
 .qa-container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -10,7 +10,7 @@
 
   h1 {
     font-size: 28px;
-    color: #333;
+    color: #222;
   }
 }
 
@@ -20,142 +20,124 @@
   margin-bottom: 30px;
 
   textarea {
-    resize: vertical;
-    min-height: 60px;
+    min-height: 80px;
     padding: 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid #ccc;
-    margin-bottom: 10px;
+    resize: vertical;
     font-size: 14px;
   }
 
   button {
+    margin-top: 10px;
     align-self: flex-end;
-    background-color: #4caf50;
+    background: #4caf50;
     color: white;
-    border: none;
     padding: 8px 16px;
+    border: none;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s;
 
     &:hover {
-      background-color: #43a047;
+      background: #43a047;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   }
 }
 
 .qa-content {
-  .qa-item {
-    background: #f8f8f8;
-    padding: 15px 20px;
-    border-radius: 12px;
-    margin-bottom: 15px;
-    border-left: 4px solid #4caf50;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
 
-    &.unanswered {
-      border-left-color: #ff9800;
-      background: #fff3e0;
-    }
+.qa-item {
+  background: #f7f7f7;
+  border-radius: 12px;
+  padding: 15px;
+  border-left: 4px solid #4caf50;
+}
 
-    .qa-title {
-      margin: 0 0 10px;
-      font-size: 18px;
-      font-weight: 600;
-    }
+.qa-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
 
-    .qa-body {
-      margin-bottom: 10px;
+.qa-body {
+  margin-bottom: 10px;
+}
 
-      .qa-answer {
-        background: #e8f5e9;
-        padding: 10px;
-        border-radius: 8px;
-        font-style: italic;
-      }
+.qa-answer {
+  background: #e8f5e9;
+  padding: 10px;
+  border-radius: 8px;
+}
 
-      .qa-no-answer {
-        color: #ff9800;
-        font-style: italic;
-      }
+.answer-form {
+  display: flex;
+  flex-direction: column;
 
-      .answer-form {
-        display: flex;
-        flex-direction: column;
-
-        textarea {
-          min-height: 50px;
-          margin-bottom: 8px;
-          padding: 8px;
-          border-radius: 6px;
-          border: 1px solid #ccc;
-        }
-
-        button {
-          align-self: flex-end;
-          background-color: #2196f3;
-          color: white;
-          border: none;
-          padding: 6px 14px;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: background 0.2s;
-
-          &:hover {
-            background-color: #1976d2;
-          }
-        }
-      }
-    }
-
-    .qa-meta {
-      font-size: 12px;
-      color: #666;
-      display: flex;
-      gap: 10px;
-    }
+  textarea {
+    min-height: 60px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
   }
 }
 
 .answer-actions {
   display: flex;
-  gap: 8px;
   justify-content: flex-end;
-}
+  gap: 10px;
+  margin-top: 8px;
 
-.answer-actions button {
-  min-height: 36px; /* одинаковая высота */
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  border: none;
-  transition: background 0.2s;
-}
+  button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+  }
 
-.answer-actions button:first-child {
-  background-color: #2196f3;
-  color: white;
+  button:last-child {
+    background: #2196f3;
+    color: white;
 
-  &:hover {
-    background-color: #1976d2;
+    &:hover {
+      background: #1976d2;
+    }
   }
 }
 
 .delete-btn {
-  background-color: #f44336 !important;
+  background: #f44336;
   color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  box-shadow: none;
-  cursor: pointer;
-  text-align: center;
-  margin-left: auto;
-  margin-right: 0;
-  transition: background-color 0.3s ease;
 
   &:hover {
-    background-color: #d32f2f !important;
+    background: #d32f2f;
   }
+}
+
+.qa-meta {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.message {
+  margin: 10px 0;
+}
+
+.message.error {
+  color: #f44336;
+}
+
+.message.success {
+  color: #4caf50;
 }

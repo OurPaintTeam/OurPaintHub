@@ -1,304 +1,311 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
+import { apiFetch } from "../config/api";
 import "./SettingsPage.scss";
 
 interface ProfileData {
-  id: number;
-  email: string;
-  nickname: string;
-  bio: string | null;
-  date_of_birth: string | null;
-  avatar: string | null;
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    bio: string | null;
+    date_of_birth: string | null;
+    avatar: string | null;
 }
 
 const SettingsPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [avatarError, setAvatarError] = useState("");
+    const navigate = useNavigate();
 
-  const [nickname, setNickname] = useState("");
-  const [bio, setBio] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [avatarData, setAvatarData] = useState<string | null>(null);
-  const [avatarChanged, setAvatarChanged] = useState(false);
+    const [profile, setProfile] = useState<ProfileData | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-          void  loadUserProfile(user.id);
-      } catch (error) {
-        console.error("Ошибка при парсинге данных пользователя:", error);
-        navigate('/login');
-      }
-    } else {
-      navigate('/login');
-    }
-  }, [navigate]);
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [bio, setBio] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
 
-  const loadUserProfile = async (userId: number) => {
-    try {
-      const response = await fetch(`https://localhost:8000/api/profile/?user_id=${userId}`);
-      if (response.ok) {
-        const profileData = await response.json();
-        setProfile(profileData);
-        setNickname(profileData.nickname || "");
-        setBio(profileData.bio || "");
-        setDateOfBirth(profileData.date_of_birth || "");
-        setAvatarData(profileData.avatar || null);
-        setAvatarChanged(false);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [avatarError, setAvatarError] = useState("");
+
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    useEffect(() => {
+        const userData = localStorage.getItem("user");
+
+        if (!userData) {
+            navigate("/login");
+            return;
+        }
+
+        try {
+            const user = JSON.parse(userData);
+            void loadProfile(user.id);
+        } catch {
+            navigate("/login");
+        }
+    }, [navigate]);
+
+    const loadProfile = async (userId: number) => {
+        try {
+            const data = await apiFetch<ProfileData>(`/profile/?user_id=${userId}`, {
+                auth: true,
+            });
+
+            setProfile(data);
+
+            setFirstName(data.first_name || "");
+            setLastName(data.last_name || "");
+            setBio(data.bio || "");
+            setDateOfBirth(data.date_of_birth || "");
+            setAvatarPreview(data.avatar || null);
+        } catch (e) {
+            console.error(e);
+            setMessage("Ошибка загрузки профиля");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectAvatar = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 3 * 1024 * 1024) {
+            setAvatarError("Файл больше 3MB");
+            return;
+        }
+
         setAvatarError("");
-      } else {
-        setMessage("Ошибка при загрузке профиля");
-      }
-    } catch (error) {
-      console.error("Ошибка при загрузке профиля:", error);
-      setMessage("Ошибка сети при загрузке профиля");
-    } finally {
-      setLoading(false);
-    }
-  };
+        setAvatarFile(file);
 
-  const handleSave = async () => {
-    if (!profile) return;
-    
-    setSaving(true);
-    setMessage("");
-    setAvatarError("");
-
-    try {
-      const payload: Record<string, unknown> = {
-        user_id: profile.id,
-        nickname: nickname.trim(),
-        bio: bio.trim(),
-        date_of_birth: dateOfBirth
-      };
-
-      if (avatarChanged) {
-        payload.avatar = avatarData ?? "";
-      }
-
-      const response = await fetch("https://localhost:8000/api/profile/update/", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
-        return;
-      }
-
-      setMessage("Настройки успешно сохранены!");
-
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const user = JSON.parse(userData);
-        user.nickname = nickname.trim();
-        if (avatarChanged) {
-          user.avatar = data.avatar || null;
-        }
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        // Отправляем событие для обновления аватара в верхней панели
-        if (avatarChanged) {
-          window.dispatchEvent(new Event('avatarUpdated'));
-        }
-      }
-
-      setProfile(prev => prev ? {
-        ...prev,
-        nickname: nickname.trim(),
-        bio: bio.trim() || null,
-        date_of_birth: dateOfBirth || null,
-        avatar: data.avatar ?? prev.avatar
-      } : null);
-      setAvatarData((data.avatar ?? null) as string | null);
-      setAvatarChanged(false);
-      
-    } catch (error) {
-      setMessage("Ошибка сети: " + error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 3 * 1024 * 1024) {
-      setAvatarError("Размер файла не должен превышать 3 МБ");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setAvatarData(result);
-      setAvatarChanged(true);
-      setAvatarError("");
+        const reader = new FileReader();
+        reader.onload = () => {
+            setAvatarPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
     };
-    reader.onerror = () => {
-      setAvatarError("Не удалось прочитать файл");
+
+    const handleSave = async () => {
+        if (!profile) return;
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            const formData = new FormData();
+
+            formData.append("user_id", String(profile.id));
+            formData.append("first_name", firstName);
+            formData.append("last_name", lastName);
+            formData.append("bio", bio);
+            formData.append("date_of_birth", dateOfBirth);
+
+            if (avatarFile) {
+                formData.append("avatar", avatarFile);
+            }
+
+            const data = await apiFetch("/profile/update/", {
+                method: "PUT",
+                auth: true,
+                body: formData,
+            });
+
+            setMessage("Профиль сохранён");
+
+            if ((data as any)?.user) {
+                setProfile((data as any).user);
+            }
+        } catch (e) {
+            console.error(e);
+            setMessage("Ошибка сохранения");
+        } finally {
+            setSaving(false);
+        }
     };
-    reader.readAsDataURL(file);
-  };
 
-  const handleAvatarUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleAvatarRemove = () => {
-    setAvatarData(null);
-    setAvatarChanged(true);
-    setAvatarError("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (loading) {
+        return (
+            <MainLayout isAuthenticated={true}>
+                <div className="settings-container">
+                    <p>Загрузка...</p>
+                </div>
+            </MainLayout>
+        );
     }
-  };
 
-  const handleCancel = () => {
-    navigate('/account');
-  };
+    if (!profile) {
+        return (
+            <MainLayout isAuthenticated={true}>
+                <div className="settings-container">
+                    <p>Профиль не найден</p>
+                </div>
+            </MainLayout>
+        );
+    }
 
-  if (loading) {
     return (
-      <MainLayout isAuthenticated={true}>
-        <div className="settings-container">
-          <p>Загрузка настроек...</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <MainLayout isAuthenticated={true}>
-        <div className="settings-container">
-          <p>Ошибка загрузки профиля</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  return (
-    <MainLayout isAuthenticated={true}>
-      <div className="settings-container">
-        <button onClick={() => navigate(-1)} className="back-btn">Назад</button>
-        <h1>Настройки профиля</h1>
-        
-        <div className="settings-form">
-          <div className="form-group avatar-group">
-            <label>Аватар</label>
-            <div className="avatar-preview" aria-label="Предпросмотр аватара">
-              {avatarData ? (
-                <img src={avatarData} alt="Текущий аватар" />
-              ) : (
-                <div className="avatar-placeholder">Нет аватара</div>
-              )}
-            </div>
-            <div className="avatar-actions">
-              <button
-                type="button"
-                className="avatar-upload-btn"
-                onClick={handleAvatarUploadClick}
-                disabled={saving}
-              >
-                Загрузить изображение
-              </button>
-              {avatarData && (
+        <MainLayout isAuthenticated={true}>
+            <div className="settings-container">
                 <button
-                  type="button"
-                  className="avatar-remove-btn"
-                  onClick={handleAvatarRemove}
-                  disabled={saving}
+                    className="back-btn"
+                    onClick={() => navigate("/account")}
                 >
-                  Удалить
+                    Назад
                 </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="avatar-file-input"
-                onChange={handleAvatarSelect}
-              />
+
+                <h1>Настройки профиля</h1>
+
+                <div className="settings-form">
+
+                    <div className="form-group avatar-group">
+                        <label>Аватар</label>
+
+                        <div className="avatar-preview">
+                            {avatarPreview ? (
+                                <img
+                                    src={avatarPreview}
+                                    alt="avatar"
+                                />
+                            ) : (
+                                <div className="avatar-placeholder">
+                                    Нет аватара
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            className="avatar-upload-btn"
+                            onClick={() =>
+                                fileInputRef.current?.click()
+                            }
+                        >
+                            Выбрать файл
+                        </button>
+
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={handleSelectAvatar}
+                        />
+
+                        {avatarError && (
+                            <p className="avatar-error">
+                                {avatarError}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Username</label>
+                        <input
+                            className="form-input"
+                            value={profile.username}
+                            disabled
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>Имя</label>
+                        <input
+                            className="form-input"
+                            value={firstName}
+                            onChange={(e) =>
+                                setFirstName(e.target.value)
+                            }
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>Фамилия</label>
+                        <input
+                            className="form-input"
+                            value={lastName}
+                            onChange={(e) =>
+                                setLastName(e.target.value)
+                            }
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>Email</label>
+                        <input
+                            className="form-input"
+                            value={profile.email}
+                            disabled
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>О себе</label>
+                        <textarea
+                            className="form-textarea"
+                            rows={4}
+                            value={bio}
+                            onChange={(e) =>
+                                setBio(e.target.value)
+                            }
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label>Дата рождения</label>
+                        <input
+                            type="date"
+                            className="form-input"
+                            value={dateOfBirth}
+                            onChange={(e) =>
+                                setDateOfBirth(e.target.value)
+                            }
+                        />
+                    </div>
+
+                    <div className="form-actions">
+                        <button
+                            className="save-btn"
+                            onClick={handleSave}
+                            disabled={saving}
+                        >
+                            {saving
+                                ? "Сохранение..."
+                                : "Сохранить"}
+                        </button>
+
+                        <button
+                            className="cancel-btn"
+                            onClick={() =>
+                                navigate("/account")
+                            }
+                        >
+                            Отмена
+                        </button>
+                    </div>
+
+                    {message && (
+                        <p
+                            className={`message ${
+                                message.includes("Ошибка")
+                                    ? "error"
+                                    : "success"
+                            }`}
+                        >
+                            {message}
+                        </p>
+                    )}
+                </div>
             </div>
-            {avatarError && <p className="avatar-error">{avatarError}</p>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="nickname">Имя пользователя (nickname)</label>
-            <input
-              id="nickname"
-              type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="Введите имя пользователя"
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="bio">О себе</label>
-            <textarea
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Расскажите о себе..."
-              rows={4}
-              className="form-textarea"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="dateOfBirth">Дата рождения</label>
-            <input
-              id="dateOfBirth"
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-actions">
-            <button 
-              onClick={handleSave} 
-              disabled={saving || !nickname.trim()}
-              className="save-btn"
-            >
-              {saving ? "Сохранение..." : "Сохранить"}
-            </button>
-            
-            <button 
-              onClick={handleCancel}
-              disabled={saving}
-              className="cancel-btn"
-            >
-              Отмена
-            </button>
-          </div>
-
-          {message && (
-            <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
-              {message}
-            </p>
-          )}
-        </div>
-      </div>
-    </MainLayout>
-  );
+        </MainLayout>
+    );
 };
 
 export default SettingsPage;

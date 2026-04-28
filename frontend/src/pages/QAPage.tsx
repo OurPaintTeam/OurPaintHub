@@ -1,11 +1,7 @@
-import React, {useState, useEffect} from "react";
-import {useNavigate} from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
+import { apiFetch } from "../config/api";
 import "./QAPage.scss";
-
-interface QAPageProps {
-    isAuthenticated?: boolean;
-}
 
 interface QAItem {
     id: number;
@@ -13,78 +9,88 @@ interface QAItem {
     answered: boolean;
     answer_text?: string | null;
     user_email?: string;
-    admin_email?: string;
     created_at?: string;
 }
 
 interface UserData {
     id: number;
     email: string;
-    nickname?: string;
 }
 
-const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
-    const navigate = useNavigate();
+interface RoleData {
+    is_admin?: boolean;
+    is_app_admin?: boolean;
+}
+
+interface QAPageProps {
+    isAuthenticated?: boolean;
+}
+
+const QAPage: React.FC<QAPageProps> = ({ isAuthenticated = false }) => {
     const [qa, setQA] = useState<QAItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [savingQuestion, setSavingQuestion] = useState(false);
-    const [savingAnswerIds, setSavingAnswerIds] = useState<{ [key: number]: boolean }>({});
-    const [newQuestion, setNewQuestion] = useState("");
-    const [adminAnswers, setAdminAnswers] = useState<{ [key: number]: string }>({});
+
     const [user, setUser] = useState<UserData | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+
+    const [newQuestion, setNewQuestion] = useState("");
+    const [savingQuestion, setSavingQuestion] = useState(false);
+
+    const [adminAnswers, setAdminAnswers] = useState<{ [key: number]: string }>({});
+    const [savingAnswerIds, setSavingAnswerIds] = useState<{ [key: number]: boolean }>({});
+
     const [message, setMessage] = useState("");
 
-    // Загрузка пользователя и QA
     useEffect(() => {
         const init = async () => {
             const userData = localStorage.getItem("user");
 
             if (userData) {
-                const parsedUser = JSON.parse(userData);
-                setUser(parsedUser);
-                await checkAdminRole(parsedUser);
-            }
+                try {
+                    const parsed = JSON.parse(userData);
+                    setUser(parsed);
 
-            await fetchQA();
+                    const role = await apiFetch<RoleData>("/user/role/", {
+                        auth: true,
+                        redirectOnError: false,
+                    });
+
+                    const admin = Boolean(role.is_app_admin ?? role.is_admin);
+                    setIsAdmin(admin);
+
+                    await loadQA(admin);
+                } catch {
+                    localStorage.removeItem("user");
+                    await loadQA(false);
+                }
+            } else {
+                await loadQA(false);
+            }
         };
-        void init();
-    }, [navigate]);
 
-    const checkAdminRole = async (u: UserData) => {
+        void init();
+    }, []);
+
+    const checkRole = async () => {
         try {
-            const res = await fetch(
-                `https://localhost:8000/api/user/role/?user_id=${u.id}`
-            );
-            const data = await res.json();
-            if (res.ok && data?.is_admin === true) {
-                setIsAdmin(true);
-            }
-        } catch (err) {
-            console.error("Ошибка проверки роли:", err);
+            const role = await apiFetch<RoleData>("/user/role/", {
+                auth: true,
+                redirectOnError: false,
+            });
+
+            setIsAdmin(Boolean(role.is_app_admin ?? role.is_admin));
+        } catch {
+            setIsAdmin(false);
         }
     };
 
-    const fetchQA = async () => {
+    const loadQA = async (admin: boolean) => {
         setLoading(true);
+
         try {
-            const res = await fetch("https://localhost:8000/api/QA/");
-            const text = await res.text();
-            let data: QAItem[] | string = [];
-            if (text) {
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = text.trim();
-                }
-            }
-            if (res.ok && Array.isArray(data)) {
-                setQA(data);
-            } else {
-                console.error("Ошибка загрузки QA:", data);
-            }
-        } catch (err) {
-            console.error("Ошибка сети при загрузке QA:", err);
+            const url = admin ? "/QA/" : "/QA/answered/";
+            const data = await apiFetch<QAItem[]>(url);
+            setQA(data);
         } finally {
             setLoading(false);
         }
@@ -96,136 +102,90 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
         setSavingQuestion(true);
         setMessage("");
 
-        const payload = {text_question: newQuestion.trim(), user_id: user.id};
         try {
-            const res = await fetch("https://localhost:8000/api/QA/create/", {
+            await apiFetch("/QA/create/", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload),
+                auth: true,
+                body: JSON.stringify({
+                    text_question: newQuestion.trim(),
+                    user_id: user.id,
+                }),
             });
 
-            const text = await res.text();
-            let data: any = null;
-            if (text) {
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = text.trim();
-                }
-            }
-
-            if (!res.ok) {
-                const errorMsg =
-                    typeof data === "object" && data !== null && "error" in data
-                        ? data.error
-                        : typeof data === "string"
-                            ? data
-                            : "Неизвестная ошибка";
-                setMessage("Ошибка: " + errorMsg);
-                return;
-            }
-
             setNewQuestion("");
-            void fetchQA();
-            setMessage("Вопрос успешно отправлен!");
-        } catch (err) {
-            console.error(err);
-            setMessage("Ошибка сети при отправке вопроса");
+            setMessage("Вопрос отправлен!");
+        } catch (e) {
+            console.error(e);
+            setMessage("Ошибка отправки вопроса");
         } finally {
             setSavingQuestion(false);
         }
     };
 
-    const handleDelete = async (qaId: number) => {
-        if (!isAdmin || !user) return;
+    const handleAnswer = async (id: number) => {
+        const answer = adminAnswers[id];
+        if (!answer?.trim() || !user) return;
 
-        const confirmed = window.confirm("Вы уверены, что хотите удалить этот вопрос?");
-        if (!confirmed) return;
+        setSavingAnswerIds((p) => ({ ...p, [id]: true }));
 
         try {
-            const response = await fetch(`https://localhost:8000/api/QA/${qaId}/delete/`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: user.id }),
+            await apiFetch(`/QA/${id}/answer/`, {
+                method: "PATCH",
+                auth: true,
+                body: JSON.stringify({
+                    answer_text: answer.trim(),
+                    user_id: user.id,
+                }),
             });
 
-            if (!response.ok) {
-                const data = await response.json();
-                alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
-                return;
-            }
-
-            alert("Вопрос успешно удалён!");
-            void fetchQA();
-
-        } catch (error) {
-            alert("Ошибка: " + error);
+            setAdminAnswers((p) => ({ ...p, [id]: "" }));
+            setMessage("Ответ сохранён!");
+            await loadQA(true);
+        } catch (e) {
+            console.error(e);
+            setMessage("Ошибка ответа");
+        } finally {
+            setSavingAnswerIds((p) => ({ ...p, [id]: false }));
         }
     };
 
-    const handleAnswer = async (qaId: number) => {
-        const answer = adminAnswers[qaId];
-        if (!answer || !answer.trim() || !user) return;
+    const handleDelete = async (id: number) => {
+        if (!user) return;
 
-        setSavingAnswerIds(prev => ({...prev, [qaId]: true}));
-        setMessage("");
+        const ok = window.confirm("Удалить вопрос?");
+        if (!ok) return;
 
         try {
-            const payload = {answer_text: answer.trim(), user_id: user.id};
-            const res = await fetch(`https://localhost:8000/api/QA/${qaId}/answer/`, {
-                method: "PATCH",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload),
+            await apiFetch(`/QA/${id}/delete/`, {
+                method: "DELETE",
+                auth: true,
+                body: JSON.stringify({ user_id: user.id }),
             });
 
-            const text = await res.text();
-            let data: any = null;
-            if (text) {
-                try {
-                    data = JSON.parse(text);
-                } catch {
-                    data = text.trim();
-                }
-            }
-
-            if (!res.ok) {
-                const errorMsg =
-                    typeof data === "object" && data !== null && "error" in data
-                        ? data.error
-                        : typeof data === "string"
-                            ? data
-                            : "Неизвестная ошибка";
-                setMessage("Ошибка: " + errorMsg);
-                return;
-            }
-
-            setAdminAnswers(prev => ({...prev, [qaId]: ""}));
-            void fetchQA();
-            setMessage("Ответ успешно сохранен!");
-        } catch (err) {
-            console.error(err);
-            setMessage("Ошибка сети при сохранении ответа");
-        } finally {
-            setSavingAnswerIds(prev => ({...prev, [qaId]: false}));
+            await loadQA(true);
+        } catch (e) {
+            console.error(e);
+            setMessage("Ошибка удаления");
         }
     };
 
     return (
         <MainLayout isAuthenticated={isAuthenticated}>
             <div className="qa-container">
+
                 <div className="qa-header">
                     <h1>Вопросы и ответы</h1>
                 </div>
 
-                {(isAuthenticated && !isAdmin) && (
+                {isAuthenticated && !isAdmin && (
                     <div className="qa-new-question">
                         <textarea
-                            placeholder="Задайте свой вопрос..."
+                            placeholder="Ваш вопрос..."
                             value={newQuestion}
-                            onChange={e => setNewQuestion(e.target.value)}
+                            onChange={(e) => setNewQuestion(e.target.value)}
                         />
                         <button onClick={handleAskQuestion} disabled={savingQuestion}>
-                            {savingQuestion ? "Отправка..." : "Отправить вопрос"}
+                            {savingQuestion ? "Отправка..." : "Задать вопрос"}
                         </button>
                     </div>
                 )}
@@ -238,72 +198,68 @@ const QAPage: React.FC<QAPageProps> = ({isAuthenticated = false}) => {
 
                 <div className="qa-content">
                     {loading ? (
-                        <p>Загрузка данных...</p>
+                        <p>Загрузка...</p>
                     ) : qa.length === 0 ? (
-                        <p>Раздел пуст</p>
-                        ) : (
-                        qa.map(item => (
-                            <div key={item.id} className={`qa-item ${!item.answered ? "unanswered" : ""}`}>
-                                <h2 className="qa-title">{item.text_question}</h2>
+                        <p>Нет вопросов</p>
+                    ) : (
+                        qa.map((item) => (
+                            <div key={item.id} className="qa-item">
+
+                                <div className="qa-title">
+                                    {item.text_question}
+                                </div>
 
                                 <div className="qa-body">
                                     {item.answered && item.answer_text ? (
-                                        <div className="qa-answer">{item.answer_text}</div>
+                                        <div className="qa-answer">
+                                            {item.answer_text}
+                                        </div>
                                     ) : isAdmin ? (
                                         <div className="answer-form">
+
                                             <textarea
-                                                placeholder="Введите ответ..."
+                                                placeholder="Ответ..."
                                                 value={adminAnswers[item.id] || ""}
-                                                onChange={e =>
-                                                    setAdminAnswers(prev => ({ ...prev, [item.id]: e.target.value }))
+                                                onChange={(e) =>
+                                                    setAdminAnswers((p) => ({
+                                                        ...p,
+                                                        [item.id]: e.target.value,
+                                                    }))
                                                 }
                                             />
+
                                             <div className="answer-actions">
+
                                                 <button
-                                                    onClick={e => {
-                                                        e.stopPropagation();
-                                                        void handleDelete(item.id);
-                                                    }}
                                                     className="delete-btn"
-                                                    title="Удалить вопрос"
+                                                    onClick={() => handleDelete(item.id)}
                                                 >
                                                     🗑️
                                                 </button>
+
                                                 <button
                                                     onClick={() => handleAnswer(item.id)}
                                                     disabled={savingAnswerIds[item.id]}
                                                 >
-                                                    {savingAnswerIds[item.id] ? "Сохранение..." : "Ответить"}
+                                                    {savingAnswerIds[item.id] ? "..." : "Ответить"}
                                                 </button>
+
                                             </div>
                                         </div>
                                     ) : null}
                                 </div>
 
                                 <div className="qa-meta">
-                                    {item.user_email && <small>Автор: {item.user_email}</small>}
+                                    {item.user_email && (
+                                        <small>{item.user_email}</small>
+                                    )}
                                     {item.created_at && (
                                         <small>
-                                            •{" "}
-                                            {new Date(item.created_at).toLocaleString("ru-RU", {
-                                                year: "numeric",
-                                                month: "2-digit",
-                                                day: "2-digit",
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            })}
+                                            {new Date(item.created_at).toLocaleString("ru-RU")}
                                         </small>
                                     )}
-                                    {isAdmin && item.answered  && (
-                                        <button
-                                            onClick={() => handleDelete(item.id)}
-                                            className="delete-btn"
-                                            title="Удалить вопрос"
-                                        >
-                                            🗑️
-                                        </button>
-                                    )}
                                 </div>
+
                             </div>
                         ))
                     )}

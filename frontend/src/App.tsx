@@ -18,9 +18,10 @@ import NewsDetailPage from "./pages/NewsDetailPage";
 import DocumentationDetailPage from "./pages/DocumentationDetailPage";
 import EditDocumentationPage from "./pages/EditDocumentationPage";
 import AddVersionPage from "./pages/AddVersionPage";
-import ProjectsPage from "./pages/ProjectsPage";
 import MainPage from "./pages/MainPage";
 import ErrorPage from "./pages/ErrorPage";
+import RepositoriesPage from "./pages/RepositoriesPage";
+import CompaniesPage from "./pages/CompaniesPage";
 
 import "./styles/toast.scss";
 
@@ -68,6 +69,9 @@ function App() {
                     <Route path="/account/id/:id" element={<PublicAccountPage />} />
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
 
+                    <Route path="/repositories" element={requireAuth(<RepositoriesPage />)} />
+                    <Route path="/companies" element={requireAuth(<CompaniesPage />)} />
+
                     <Route path="/news/add" element={requireAdmin(<ContentEditorPage />)} />
                     <Route path="/docs/add" element={requireAdmin(<ContentEditorPage />)} />
                     <Route path="/news/edit/:id" element={requireAdmin(<EditNewsPage />)} />
@@ -84,7 +88,6 @@ function App() {
                         element={isAuthenticated ? <Navigate to="/account" replace /> : <RegistrationPage />}
                     />
 
-                    <Route path="/projects" element={requireAuth(<ProjectsPage />)} />
                     <Route path="/main" element={requireAuth(<MainPage />)} />
 
                     <Route path="/error" element={<ErrorPage />} />

@@ -3,13 +3,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faPenRuler,
-    faBell,
     faBars,
     faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
 import IconMenuButton from "../IconMenuButton/IconMenuButton";
-import { apiUrl, getAuthHeaders } from "../../config/api";
 import { useAuth } from "../../contexts/AuthContext";
 
 import "./NavigationBox.scss";
@@ -26,25 +24,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
     const location = useLocation();
     const { logout } = useAuth();
 
-    const [requestsCount, setRequestsCount] = useState<number>(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            setRequestsCount(0);
-            return;
-        }
-
-        fetch(apiUrl("/friends/requests/"), {
-            headers: getAuthHeaders(),
-            credentials: "include",
-        })
-            .then((response) => (response.ok ? response.json() : []))
-            .then((list) =>
-                setRequestsCount(Array.isArray(list) ? list.length : 0),
-            )
-            .catch(() => setRequestsCount(0));
-    }, [isAuthenticated, location.pathname]);
 
     useEffect(() => {
         setMobileMenuOpen(false);
@@ -124,24 +104,6 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
 
                     {isAuthenticated && (
                         <div className="nav-user">
-                            <button
-                                className="nav-link"
-                                onClick={() => handleNavClick("/friends")}
-                                title={
-                                    requestsCount > 0
-                                        ? `Заявки: ${requestsCount}`
-                                        : "Заявок нет"
-                                }
-                                type="button"
-                            >
-                                <FontAwesomeIcon icon={faBell} />
-                                {requestsCount > 0 && (
-                                    <span className="notification-badge">
-                                        {requestsCount}
-                                    </span>
-                                )}
-                            </button>
-
                             <IconMenuButton isAuthenticated={true} />
 
                             <button

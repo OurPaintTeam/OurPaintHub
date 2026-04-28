@@ -40,14 +40,14 @@ interface RoleData {
     is_app_admin?: boolean;
 }
 
-const CATEGORY_ICONS: Record<DocumentationCategory, IconDefinition> = {
-    Примитивы: faDotCircle,
-    Требования: faShapes,
+const CATEGORY_ICONS = {
+    "Примитивы": faDotCircle,
+    "Требования": faShapes,
     "Горячие клавиши": faKeyboard,
     "Работа по сети": faNetworkWired,
-    Сохранение: faSave,
+    "Сохранение": faSave,
     "Консольные команды": faTerminal,
-};
+} satisfies Record<DocumentationCategory, IconDefinition>;
 
 const DocumentationPage: React.FC<DocumentationPageProps> = ({
                                                                  isAuthenticated = false,
