@@ -22,8 +22,13 @@ import MainPage from "./pages/MainPage";
 import ErrorPage from "./pages/ErrorPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import CompaniesPage from "./pages/CompaniesPage";
+import RepositoriesMyPage from "./pages/RepositoriesMyPage";
+import RepositoryPage from "./pages/RepositoryPage";
 
 import "./styles/toast.scss";
+import PublicRepositoriesPage from "./pages/PublicRepositoriesPage";
+import CompanyPage from "./pages/CompanyPage";
+
 
 function App() {
     const { isAuthenticated, isLoading, user } = useAuth();
@@ -70,7 +75,12 @@ function App() {
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
 
                     <Route path="/repositories" element={requireAuth(<RepositoriesPage />)} />
+                    <Route path="/repositories/my" element={requireAuth(<RepositoriesMyPage />)} />
+                    <Route path="/repositories/public" element={requireAuth(<PublicRepositoriesPage />)} />
+                    <Route path="/repositories/:id" element={requireAuth(<RepositoryPage />)} />
+
                     <Route path="/companies" element={requireAuth(<CompaniesPage />)} />
+                    <Route path="/companies/:id" element={requireAuth(<CompanyPage />)} />
 
                     <Route path="/news/add" element={requireAdmin(<ContentEditorPage />)} />
                     <Route path="/docs/add" element={requireAdmin(<ContentEditorPage />)} />
@@ -78,11 +88,7 @@ function App() {
                     <Route path="/docs/edit/:id" element={requireAdmin(<EditDocumentationPage />)} />
                     <Route path="/download/add" element={requireAdmin(<AddVersionPage />)} />
 
-                    <Route
-                        path="/login"
-                        element={isAuthenticated ? <Navigate to="/account" replace /> : <LoginPage />}
-                    />
-
+                    <Route path="/login" element={isAuthenticated ? <Navigate to="/account" replace /> : <LoginPage />} />
                     <Route
                         path="/registration"
                         element={isAuthenticated ? <Navigate to="/account" replace /> : <RegistrationPage />}

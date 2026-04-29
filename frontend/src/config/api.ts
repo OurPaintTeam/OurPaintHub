@@ -1,4 +1,5 @@
-export const API_BASE_URL = "https://localhost:8000/api";
+export const API_BASE_URL =  "https://localhost:8000/api";
+export const BACKEND_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export type AppErrorType = "network" | "backend" | "database" | "unauthorized" | "forbidden" | "not_found";
 
@@ -42,6 +43,19 @@ export const getAuthHeaders = (): HeadersInit => {
 export const apiUrl = (path: string): string => {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     return `${API_BASE_URL}${normalizedPath}`;
+};
+
+export const mediaUrl = (path?: string | null): string | null => {
+    if (!path) {
+        return null;
+    }
+
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+        return path;
+    }
+
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${BACKEND_BASE_URL}${normalizedPath}`;
 };
 
 export const getErrorPageUrl = (error: AppErrorState): string => {
@@ -128,14 +142,13 @@ export const apiFetch = async <T = unknown>(
     options: ApiFetchOptions = {},
 ): Promise<T> => {
     const { auth = false, redirectOnError = true, headers, ...fetchOptions } = options;
+    const isFormData = fetchOptions.body instanceof FormData;
 
     try {
-        const isFormData = fetchOptions.body instanceof FormData;
-
         const response = await fetch(apiUrl(path), {
             ...fetchOptions,
             headers: {
-                ...(!isFormData ? { "Content-Type": "application/json" } : {}),
+                ...(fetchOptions.body && !isFormData ? { "Content-Type": "application/json" } : {}),
                 ...(auth ? getAuthHeaders() : {}),
                 ...headers,
             },
@@ -172,7 +185,7 @@ export const apiFetch = async <T = unknown>(
                 title: "Страница или объект не найден",
                 message: getErrorMessage(data, "Запрошенный ресурс не найден."),
                 status: response.status,
-                returnTo: "/news",
+                returnTo: window.location.pathname,
             };
         } else if (response.status >= 500) {
             const dbIsAlive = await checkBackendHealth();
@@ -195,7 +208,7 @@ export const apiFetch = async <T = unknown>(
             error = {
                 type: "backend",
                 title: "Ошибка запроса",
-                message: getErrorMessage(data, "Запрос завершился ошибкой."),
+                message: getErrorMessage(data, "Запрос не удалось выполнить."),
                 status: response.status,
                 returnTo: window.location.pathname,
             };
@@ -211,15 +224,21 @@ export const apiFetch = async <T = unknown>(
             throw error;
         }
 
-        const appError: AppErrorState = {
-            type: navigator.onLine ? "backend" : "network",
-            title: navigator.onLine ? "Backend недоступен" : "Нет интернета",
-            message: navigator.onLine
-                ? "Не удалось подключиться к backend. Проверьте, запущен ли сервер."
-                : "Проверьте подключение к интернету и попробуйте ещё раз.",
-            returnTo: window.location.pathname,
-            details: String(error),
-        };
+        const appError: AppErrorState = navigator.onLine
+            ? {
+                type: "network",
+                title: "Backend недоступен",
+                message: "Не удалось подключиться к backend. Проверьте, запущен ли сервер.",
+                details: error instanceof Error ? error.message : String(error),
+                returnTo: window.location.pathname,
+            }
+            : {
+                type: "network",
+                title: "Нет подключения к интернету",
+                message: "Проверьте подключение к сети и попробуйте снова.",
+                details: error instanceof Error ? error.message : String(error),
+                returnTo: window.location.pathname,
+            };
 
         if (redirectOnError) {
             redirectToErrorPage(appError);

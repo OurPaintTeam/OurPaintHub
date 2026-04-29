@@ -1,102 +1,159 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
+import { apiFetch, getAccessToken } from "../config/api";
 import "./CompaniesPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBuilding } from "@fortawesome/free-solid-svg-icons";
+import { faBuilding, faPlus } from "@fortawesome/free-solid-svg-icons";
 
-interface UserData {
+interface User {
     id: number;
     email: string;
-    username?: string;
 }
 
 interface Company {
     id: number;
     name: string;
+    description?: string;
     owner_id: number;
+}
+
+interface CreateCompanyResponse {
+    message?: string;
+    company: Company;
 }
 
 const CompaniesPage: React.FC = () => {
     const navigate = useNavigate();
-
-    const [user, setUser] = useState<UserData | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [showCreate, setShowCreate] = useState(false);
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [message, setMessage] = useState("");
+    const isAuthenticated = Boolean(getAccessToken());
 
     useEffect(() => {
-        const userData = localStorage.getItem("user");
-
-        if (!userData) {
+        if (!isAuthenticated) {
             navigate("/login");
             return;
         }
 
-        try {
-            const parsed = JSON.parse(userData);
-            setUser(parsed);
+        const userData = localStorage.getItem("user");
+        if (userData) {
+            try {
+                setUser(JSON.parse(userData));
+            } catch {
+                localStorage.removeItem("user");
+            }
+        }
 
-            // пока без API — просто заглушка
-            setCompanies([]);
-        } catch {
-            navigate("/login");
+        void loadCompanies();
+    }, [isAuthenticated, navigate]);
+
+    const loadCompanies = async () => {
+        setLoading(true);
+        try {
+            const data = await apiFetch<Company[]>("/companies/", { auth: true });
+            setCompanies(data || []);
         } finally {
             setLoading(false);
         }
-    }, [navigate]);
+    };
 
-    if (loading) {
-        return (
-            <MainLayout isAuthenticated={!!user}>
-                <p>Загрузка...</p>
-            </MainLayout>
-        );
-    }
+    const createCompany = async () => {
+        if (!name.trim()) {
+            setMessage("Название компании обязательно");
+            return;
+        }
+
+        setCreating(true);
+        setMessage("");
+        try {
+            const data = await apiFetch<CreateCompanyResponse>("/companies/create/", {
+                method: "POST",
+                auth: true,
+                body: JSON.stringify({
+                    name: name.trim(),
+                    description: description.trim(),
+                }),
+                redirectOnError: false,
+            });
+
+            setName("");
+            setDescription("");
+            setShowCreate(false);
+            setMessage(data.message || "Компания создана");
+            await loadCompanies();
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка создания компании");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    if (!isAuthenticated) return null;
 
     return (
-        <MainLayout isAuthenticated={!!user}>
+        <MainLayout isAuthenticated={true}>
             <div className="companies-page page">
-
                 <div className="page-header">
                     <h1>Компании</h1>
-                    <p>Управление командами и организациями</p>
+                    <p>Ваши организации и команды</p>
                 </div>
+
+                {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
 
                 <div className="companies-grid">
-
-                    <div className="company-card">
-                        <div className="card-icon">
-                            <FontAwesomeIcon icon={faBuilding} />
-                        </div>
-
-                        <h3>Мои компании</h3>
-                        <p>Список компаний, которыми вы владеете</p>
-
-                        <button
-                            className="card-btn"
-                            onClick={() => navigate("/companies/owned")}
-                        >
-                            Открыть
-                        </button>
+                    <div className="company-card create" onClick={() => setShowCreate(true)}>
+                        <FontAwesomeIcon icon={faPlus} />
+                        <h3>Создать компанию</h3>
+                        <p>Новая организация</p>
                     </div>
 
-                    <div className="company-card">
-                        <div className="card-icon">
-                            <FontAwesomeIcon icon={faBuilding} />
-                        </div>
-
-                        <h3>Участие</h3>
-                        <p>Компании, где вы участник</p>
-
-                        <button
-                            className="card-btn"
-                            onClick={() => navigate("/companies/member")}
-                        >
-                            Открыть
-                        </button>
-                    </div>
-
+                    {loading ? (
+                        <div className="empty-state">Загрузка...</div>
+                    ) : companies.length === 0 ? (
+                        <div className="empty-state">У вас пока нет компаний</div>
+                    ) : (
+                        companies.map((company) => (
+                            <div key={company.id} className="company-card" onClick={() => navigate(`/companies/${company.id}`)}>
+                                <FontAwesomeIcon icon={faBuilding} />
+                                <h3>{company.name}</h3>
+                                {company.description && <p>{company.description}</p>}
+                                {company.owner_id === user?.id ? (
+                                    <span className="badge owner">Владелец</span>
+                                ) : (
+                                    <span className="badge member">Участник</span>
+                                )}
+                            </div>
+                        ))
+                    )}
                 </div>
+
+                {showCreate && (
+                    <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                        <div className="modal" onClick={(event) => event.stopPropagation()}>
+                            <h2>Создать компанию</h2>
+                            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Название компании" />
+                            <textarea
+                                value={description}
+                                onChange={(event) => setDescription(event.target.value)}
+                                placeholder="Описание"
+                            />
+                            <div className="modal-actions">
+                                <button onClick={createCompany} disabled={creating || !name.trim()} className="card-btn">
+                                    {creating ? "Создание..." : "Создать"}
+                                </button>
+                                <button onClick={() => setShowCreate(false)} disabled={creating} className="secondary-btn">
+                                    Отмена
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </MainLayout>
     );

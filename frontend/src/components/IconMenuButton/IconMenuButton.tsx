@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
-import { apiUrl, getAuthHeaders } from "../../config/api";
+import {apiUrl, getAuthHeaders, mediaUrl} from "../../config/api";
 import "./IconMenuButton.scss";
 
 interface IconMenuButtonProps {
@@ -66,6 +66,8 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
         }
     };
 
+    const avatarSrc = mediaUrl(user?.avatar);
+
     useEffect(() => {
         void loadUserAvatar();
 
@@ -99,6 +101,8 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // @ts-ignore
+    // @ts-ignore
     return (
         <div className="icon-menu-button">
             <button
@@ -106,11 +110,7 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
                 onClick={() => setMenuOpen((prev) => !prev)}
                 type="button"
             >
-                {user?.avatar ? (
-                    <img src={user.avatar} alt="Аватар пользователя" />
-                ) : (
-                    <FontAwesomeIcon icon={faUserCircle} className="avatar-fallback-icon" />
-                )}
+                {avatarSrc ? <img src={avatarSrc} alt={""} /> : <FontAwesomeIcon icon={faUserCircle} />}
             </button>
 
             {menuOpen && (

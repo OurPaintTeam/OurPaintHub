@@ -1,101 +1,34 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import "./RepositoriesPage.scss";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderTree } from "@fortawesome/free-solid-svg-icons";
-
-interface UserData {
-    id: number;
-    email: string;
-    username?: string;
-}
-
-interface Repository {
-    id: number;
-    name: string;
-    description?: string;
-}
 
 const RepositoriesPage: React.FC = () => {
     const navigate = useNavigate();
 
-    const [user, setUser] = useState<UserData | null>(null);
-    const [repos, setRepos] = useState<Repository[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const userData = localStorage.getItem("user");
-
-        if (!userData) {
-            navigate("/login");
-            return;
-        }
-
-        try {
-            const parsed = JSON.parse(userData);
-            setUser(parsed);
-
-            // пока без API
-            setRepos([]);
-        } catch {
-            navigate("/login");
-        } finally {
-            setLoading(false);
-        }
-    }, [navigate]);
-
-    if (loading) {
-        return (
-            <MainLayout isAuthenticated={!!user}>
-                <p>Загрузка...</p>
-            </MainLayout>
-        );
-    }
-
     return (
-        <MainLayout isAuthenticated={!!user}>
+        <MainLayout isAuthenticated={true}>
             <div className="repos-page page">
-
                 <div className="page-header">
                     <h1>Репозитории</h1>
-                    <p>Хранение и управление проектами</p>
+                    <p>Личные, публичные и командные проекты</p>
                 </div>
 
                 <div className="repos-grid">
-
-                    <div className="repo-card">
-                        <div className="card-icon">
-                            <FontAwesomeIcon icon={faFolderTree} />
-                        </div>
-
+                    <div className="repo-card" onClick={() => navigate("/repositories/my")}>
                         <h3>Мои репозитории</h3>
-                        <p>Ваши проекты и код</p>
-
-                        <button
-                            className="card-btn"
-                            onClick={() => navigate("/repositories/my")}
-                        >
-                            Открыть
-                        </button>
+                        <p>Создать личный репозиторий, добавить файлы первым коммитом, редактировать и удалять.</p>
                     </div>
 
-                    <div className="repo-card">
-                        <div className="card-icon">
-                            <FontAwesomeIcon icon={faFolderTree} />
-                        </div>
-
-                        <h3>Общие репозитории</h3>
-                        <p>Проекты команды</p>
-
-                        <button
-                            className="card-btn"
-                            onClick={() => navigate("/repositories/shared")}
-                        >
-                            Открыть
-                        </button>
+                    <div className="repo-card" onClick={() => navigate("/repositories/public")}>
+                        <h3>Публичные репозитории</h3>
+                        <p>Смотреть публичные проекты, открывать владельца и скачивать ZIP.</p>
                     </div>
 
+                    <div className="repo-card" onClick={() => navigate("/companies")}>
+                        <h3>Репозитории компаний</h3>
+                        <p>Открой компанию, где ты участник, и работай с командными репозиториями.</p>
+                    </div>
                 </div>
             </div>
         </MainLayout>

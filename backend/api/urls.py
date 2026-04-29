@@ -12,6 +12,7 @@ urlpatterns = [
     path("logout/", views.logout_user, name="logout_user"),
     path("checkDB/", views.check_db, name="check_db"),
     path("users/", views.get_all_users, name="get_all_users"),
+    path("users/<int:user_id>/profile/", views.get_public_user_profile, name="get_public_user_profile"),
     path("user/role/", views.check_user_role, name="check_user_role"),
     path("profile/", views.get_user_profile, name="get_user_profile"),
     path("profile/update/", views.update_user_profile, name="update_user_profile"),
@@ -33,21 +34,29 @@ urlpatterns = [
     # Companies
     path("companies/", views.get_companies, name="get_companies"),
     path("companies/create/", views.create_company, name="create_company"),
-    path("companies/<int:company_id>/", views.update_company, name="update_company"),
+    path("companies/<int:company_id>/", views.update_company, name="company_detail"),
     path("companies/<int:company_id>/delete/", views.delete_company, name="delete_company"),
     path("companies/<int:company_id>/members/", views.get_company_members, name="get_company_members"),
     path("companies/<int:company_id>/members/add/", views.add_company_member, name="add_company_member"),
     path("companies/<int:company_id>/members/remove/", views.remove_company_member, name="remove_company_member"),
+    path("companies/<int:company_id>/repositories/", views.get_company_repositories, name="get_company_repositories"),
 
     # Repositories
     path("repositories/", views.get_repositories, name="get_repositories"),
+    path("repositories/my/", views.get_my_repositories, name="get_my_repositories"),
+    path("repositories/public/", views.get_public_repositories, name="get_public_repositories"),
     path("repositories/create/", views.create_repository, name="create_repository"),
     path("repositories/<int:repository_id>/", views.get_repository, name="get_repository"),
+    path("repositories/<int:repository_id>/detail/", views.get_repository_detail, name="get_repository_detail"),
     path("repositories/<int:repository_id>/update/", views.update_repository, name="update_repository"),
     path("repositories/<int:repository_id>/delete/", views.delete_repository, name="delete_repository"),
+    path("repositories/<int:repository_id>/download/", views.download_repository, name="download_repository"),
+    path("repositories/<int:repository_id>/commits/<int:commit_id>/revert/",views.revert_repository_to_commit,name="revert_repository_to_commit"),
+    path("commits/<int:commit_id>/snapshot/", views.get_commit_snapshot),
 
     # Repository files / commits
     path("repositories/<int:repository_id>/files/", views.get_repository_files, name="get_repository_files"),
+    path("repositories/<int:repository_id>/files/delete/", views.delete_repository_file, name="delete_repository_file"),
     path("repositories/<int:repository_id>/commits/", views.get_repository_commits, name="get_repository_commits"),
     path("repositories/<int:repository_id>/commits/create/", views.create_commit, name="create_commit"),
     path("commits/<int:commit_id>/files/", views.get_commit_files, name="get_commit_files"),

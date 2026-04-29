@@ -1,24 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./AccountPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
 
-interface PublicProfile {
+interface UserProfile {
     id: number;
     username: string;
     email: string;
-
     first_name: string;
     last_name: string;
-
     role: string;
-    is_admin: boolean;
-    is_staff: boolean;
-    is_superuser: boolean;
-
     bio?: string | null;
     date_of_birth?: string | null;
     avatar?: string | null;
@@ -29,79 +23,60 @@ interface Repository {
     id: number;
     name: string;
     description?: string;
+    visibility: "private" | "public";
 }
 
 interface Company {
     id: number;
     name: string;
-    owner_id: number;
+    description?: string;
+}
+
+interface PublicProfileResponse {
+    user: UserProfile;
+    repositories: Repository[];
+    companies: Company[];
 }
 
 const PublicAccountPage: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { id } = useParams();
-
-    const [profile, setProfile] = useState<PublicProfile | null>(null);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [repositories, setRepositories] = useState<Repository[]>([]);
-    const [companiesOwned, setCompaniesOwned] = useState<Company[]>([]);
-    const [companiesMember, setCompaniesMember] = useState<Company[]>([]);
-
+    const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
-
-    const isAuthenticated = Boolean(localStorage.getItem("user"));
 
     useEffect(() => {
         if (!id) {
-            navigate("/");
+            navigate("/404");
             return;
         }
 
-        void loadAll(Number(id));
-    }, [id]);
+        void loadProfile();
+    }, [id, navigate]);
 
-    const loadAll = async (userId: number) => {
+    const loadProfile = async () => {
+        if (!id) return;
+
         setLoading(true);
-
         try {
-            const user = await apiFetch<PublicProfile>(`/profile/?user_id=${userId}`, {
+            const data = await apiFetch<PublicProfileResponse>(`/users/${id}/profile/`, {
                 auth: true,
-                redirectOnError: false,
             });
 
-            setProfile(user);
-
-            const repos = await apiFetch<Repository[]>(`/repositories/?user_id=${userId}`, {
-                auth: true,
-                redirectOnError: false,
-            });
-
-            setRepositories(Array.isArray(repos) ? repos : []);
-
-            const companies = await apiFetch<Company[]>("/companies/", {
-                auth: true,
-                redirectOnError: false,
-            });
-
-            const safe = Array.isArray(companies) ? companies : [];
-
-            setCompaniesOwned(
-                safe.filter((c) => c.owner_id === userId)
-            );
-
-            setCompaniesMember(
-                safe.filter((c) => c.owner_id !== userId)
-            );
-
-        } catch (e) {
-            console.error("LOAD PUBLIC PROFILE ERROR", e);
+            setProfile(data.user);
+            setRepositories(data.repositories || []);
+            setCompanies(data.companies || []);
         } finally {
             setLoading(false);
         }
     };
 
+    const avatarSrc = mediaUrl(profile?.avatar);
+
     if (loading) {
         return (
-            <MainLayout isAuthenticated={isAuthenticated}>
+            <MainLayout isAuthenticated={true}>
                 <p>Загрузка...</p>
             </MainLayout>
         );
@@ -109,108 +84,77 @@ const PublicAccountPage: React.FC = () => {
 
     if (!profile) {
         return (
-            <MainLayout isAuthenticated={isAuthenticated}>
-                <p>Пользователь не найден</p>
+            <MainLayout isAuthenticated={true}>
+                <div className="profile-page page">Пользователь не найден</div>
             </MainLayout>
         );
     }
 
     return (
-        <MainLayout isAuthenticated={isAuthenticated}>
+        <MainLayout isAuthenticated={true}>
             <div className="profile-page page">
+                <button onClick={() => navigate(-1)} className="back-btn">
+                    &larr; Назад
+                </button>
 
                 <div className="page-header">
-                    <h1>Профиль пользователя</h1>
+                    <h1>Публичный профиль</h1>
                 </div>
 
                 <div className="profile-info">
                     <div className="profile-avatar">
-                        {profile.avatar ? (
-                            <img
-                                src={profile.avatar}
-                                alt="Фото профиля"
-                            />
-                        ) : (
-                            <FontAwesomeIcon icon={faUserCircle} />
-                        )}
+                        {avatarSrc ? <img src={avatarSrc} alt={profile.username} /> : <FontAwesomeIcon icon={faUserCircle} />}
                     </div>
 
                     <div className="profile-details">
                         <h2>{profile.username}</h2>
-
                         <p>{profile.email}</p>
-
                         <p>
                             {profile.first_name} {profile.last_name}
                         </p>
-
-                        <p>Role: {profile.role}</p>
-
                         {profile.bio && <p>{profile.bio}</p>}
-
-                        {profile.date_of_birth && (
-                            <p>
-                                ДР:{" "}
-                                {new Date(profile.date_of_birth).toLocaleDateString("ru-RU")}
-                            </p>
-                        )}
-
-                        {profile.date_joined && (
-                            <p>
-                                Регистрация:{" "}
-                                {new Date(profile.date_joined).toLocaleDateString("ru-RU")}
-                            </p>
-                        )}
+                        {profile.date_joined && <p>Регистрация: {new Date(profile.date_joined).toLocaleDateString("ru-RU")}</p>}
                     </div>
                 </div>
 
                 <div className="profile-stats">
                     <div className="stat-card">
-                        <div className="stat-number">
-                            {repositories.length}
-                        </div>
-                        <div className="stat-label">
-                            Репозитории
-                        </div>
+                        <div className="stat-number">{repositories.length}</div>
+                        <div className="stat-label">Публичные репозитории</div>
                     </div>
-
                     <div className="stat-card">
-                        <div className="stat-number">
-                            {companiesOwned.length}
-                        </div>
-                        <div className="stat-label">
-                            Личные компании
-                        </div>
-                    </div>
-
-                    <div className="stat-card">
-                        <div className="stat-number">
-                            {companiesMember.length}
-                        </div>
-                        <div className="stat-label">
-                            Участие в компаниях
-                        </div>
+                        <div className="stat-number">{companies.length}</div>
+                        <div className="stat-label">Компании</div>
                     </div>
                 </div>
 
-                <div className="action-buttons">
-                    <button
-                        className="settings-btn"
-                        onClick={() => navigate(-1)}
-                    >
-                        Назад
-                    </button>
-
-                    {isAuthenticated && (
-                        <button
-                            className="settings-btn"
-                            onClick={() => navigate("/account")}
-                        >
-                            Мой профиль
-                        </button>
+                <section className="profile-section">
+                    <h2>Публичные репозитории</h2>
+                    {repositories.length === 0 ? (
+                        <p>Публичных репозиториев нет</p>
+                    ) : (
+                        repositories.map((repo) => (
+                            <div key={repo.id} className="profile-list-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
+                                <h3>{repo.name}</h3>
+                                <p>{repo.description || "Без описания"}</p>
+                            </div>
+                        ))
                     )}
-                </div>
+                </section>
 
+                <section className="profile-section">
+                    <h2>Компании</h2>
+                    {companies.length === 0 ? (
+                        <p>Компаний нет</p>
+                    ) : (
+                        companies.map((company) => (
+                            <div key={company.id} className="profile-list-card" onClick={() => navigate(`/companies/${company.id}`)}>
+                                <h3>{company.name}</h3>
+                                <p>{company.description || "Без описания"}</p>
+                            </div>
+                        ))
+                    )}
+                </section>
             </div>
         </MainLayout>
     );
