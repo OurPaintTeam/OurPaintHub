@@ -41,7 +41,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
 
     const menuItems = isAuthenticated
         ? [
-            { label: "Главная", path: "/main" },
+            { label: "Главная", path: "/general" },
             { label: "Новости", path: "/news" },
             { label: "Документация", path: "/docs" },
             { label: "Приложение", path: "/download" },

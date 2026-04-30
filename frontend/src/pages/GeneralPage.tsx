@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import "./MainPage.scss";
+import "./GeneralPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faNewspaper,
@@ -15,7 +15,7 @@ interface UserData {
     username?: string;
 }
 
-const MainPage: React.FC = () => {
+const GeneralPage: React.FC = () => {
     const navigate = useNavigate();
 
     const [user, setUser] = useState<UserData | null>(null);
@@ -123,4 +123,4 @@ const MainPage: React.FC = () => {
     );
 };
 
-export default MainPage;
+export default GeneralPage;

@@ -18,7 +18,7 @@ import NewsDetailPage from "./pages/NewsDetailPage";
 import DocumentationDetailPage from "./pages/DocumentationDetailPage";
 import EditDocumentationPage from "./pages/EditDocumentationPage";
 import AddVersionPage from "./pages/AddVersionPage";
-import MainPage from "./pages/MainPage";
+import GeneralPage from "./pages/GeneralPage";
 import ErrorPage from "./pages/ErrorPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import CompaniesPage from "./pages/CompaniesPage";
@@ -94,7 +94,7 @@ function App() {
                         element={isAuthenticated ? <Navigate to="/account" replace /> : <RegistrationPage />}
                     />
 
-                    <Route path="/main" element={requireAuth(<MainPage />)} />
+                    <Route path="/general" element={requireAuth(<GeneralPage />)} />
 
                     <Route path="/error" element={<ErrorPage />} />
                     <Route path="/404" element={<ErrorPage />} />
