@@ -6,6 +6,8 @@ from django.utils import timezone
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from .choices import (
     CommitFileOperation,
@@ -14,12 +16,26 @@ from .choices import (
     NotificationStatus,
     RepositoryVisibility,
     UserRole,
+    CompanyInviteStatus
 )
 
+def validate_5mb(file):
+    if file.size > 5 * 1024 * 1024:
+        raise ValidationError("Max file size is 5 MB")
 
-# =========================================================
+
+def validate_50mb(file):
+    if file.size > 50 * 1024 * 1024:
+        raise ValidationError("Max file size is 50 MB")
+
+
+def validate_500mb(file):
+    if file.size > 500 * 1024 * 1024:
+        raise ValidationError("Max file size is 500 MB")
+
+
 # BASE MODEL
-# =========================================================
+
 class TimeStampedModel(models.Model):
     """
     Базовая абстрактная модель для времени создания/обновления.
@@ -37,9 +53,9 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
-# =========================================================
+
 # USER
-# =========================================================
+
 class UserManager(DjangoUserManager):
     """
     Manager пользователя.
@@ -215,9 +231,9 @@ class Notification(TimeStampedModel):
         return self.title
 
 
-# =========================================================
+
 # COMPANY
-# =========================================================
+
 class Company(TimeStampedModel):
     """
     Компания — организация/пространство.
@@ -236,14 +252,35 @@ class Company(TimeStampedModel):
     - история репозиториев компании тоже удаляется каскадом.
     """
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="owned_companies")
+    owner = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE,
+        related_name="owned_companies"
+    )
+
     name = models.CharField(max_length=255, db_index=True)
     description = models.TextField(null=True, blank=True)
 
+    logo = models.ImageField(
+        upload_to="companies/logos/",
+        null=True,
+        blank=True,
+        validators=[validate_5mb]
+    )
+
+    cover = models.ImageField(
+        upload_to="companies/covers/",
+        null=True,
+        blank=True,
+        validators=[validate_5mb]
+    )
+
     class Meta:
-        indexes = [
-            models.Index(fields=["name"]),
-            models.Index(fields=["owner"]),
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                name="unique_company_name_ci"
+            )
         ]
 
     def __str__(self):
@@ -260,25 +297,160 @@ class CompanyMember(TimeStampedModel):
     - управление компанией остаётся только у owner.
     """
 
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="members")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="company_memberships")
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE
+    )
+
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE
+    )
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["company", "user"], name="unique_company_member"),
+            models.UniqueConstraint(
+                fields=["company", "user"],
+                name="unique_company_member"
+            )
         ]
+
+
+
+class CompanyInvite(TimeStampedModel):
+    """
+    Приглашение пользователя в компанию.
+
+    Логика:
+    - нельзя приглашать owner компании;
+    - нельзя приглашать действующего участника;
+    - нельзя создать второй pending invite;
+    - accept добавляет пользователя в компанию;
+    - reject/cancel отправляют уведомления инициатору;
+    - защита от race condition через select_for_update;
+    """
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="invites"
+    )
+
+    invited_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="company_invites"
+    )
+
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_company_invites"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=CompanyInviteStatus.choices,
+        default=CompanyInviteStatus.PENDING,
+        db_index=True
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "invited_user"],
+                condition=models.Q(status=CompanyInviteStatus.PENDING),
+                name="unique_pending_company_invite"
+            )
+        ]
+
         indexes = [
-            models.Index(fields=["company", "user"]),
-            models.Index(fields=["user"]),
+            models.Index(fields=["company", "invited_user"]),
+            models.Index(fields=["status"]),
         ]
+
+    def clean(self):
+        if self.company.owner_id == self.invited_user_id:
+            raise ValidationError("Owner cannot be invited.")
+
+        if CompanyMember.objects.filter(
+                company=self.company,
+                user=self.invited_user
+        ).exists():
+            raise ValidationError("User is already a member.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @transaction.atomic
+    def accept(self, user):
+        invite = CompanyInvite.objects.select_for_update().get(pk=self.pk)
+
+        if invite.invited_user_id != user.id:
+            raise ValidationError("You cannot accept this invite.")
+
+        if invite.status != CompanyInviteStatus.PENDING:
+            raise ValidationError("Invite is no longer active.")
+
+        CompanyMember.objects.get_or_create(
+            company=invite.company,
+            user=invite.invited_user
+        )
+
+        invite.status = CompanyInviteStatus.ACCEPTED
+        invite.save(update_fields=["status", "updated_at"])
+
+        if invite.invited_by:
+            Notification.objects.create(
+                recipient=invite.invited_by,
+                actor=invite.invited_user,
+                title="Invitation accepted",
+                text=f"{invite.invited_user.username} joined {invite.company.name}.",
+            )
+
+    @transaction.atomic
+    def reject(self, user):
+        invite = CompanyInvite.objects.select_for_update().get(pk=self.pk)
+
+        if invite.invited_user_id != user.id:
+            raise ValidationError("You cannot reject this invite.")
+
+        if invite.status != CompanyInviteStatus.PENDING:
+            raise ValidationError("Invite is no longer active.")
+
+        invite.status = CompanyInviteStatus.REJECTED
+        invite.save(update_fields=["status", "updated_at"])
+
+        if invite.invited_by:
+            Notification.objects.create(
+                recipient=invite.invited_by,
+                actor=invite.invited_user,
+                title="Invitation declined",
+                text=f"{invite.invited_user.username} declined invitation to {invite.company.name}.",
+            )
+
+    @transaction.atomic
+    def cancel(self, user):
+        invite = CompanyInvite.objects.select_for_update().get(pk=self.pk)
+
+        if invite.invited_by_id != user.id and invite.company.owner_id != user.id:
+            raise ValidationError("You cannot cancel this invite.")
+
+        if invite.status != CompanyInviteStatus.PENDING:
+            raise ValidationError("Invite is no longer active.")
+
+        invite.status = CompanyInviteStatus.CANCELLED
+        invite.save(update_fields=["status", "updated_at"])
 
     def __str__(self):
-        return f"{self.user.username} @ {self.company.name}"
+        return f"{self.invited_user.username} -> {self.company.name} ({self.status})"
 
 
-# =========================================================
 # REPOSITORY
-# =========================================================
+
 class Repository(TimeStampedModel):
     """
     Репозиторий проекта.
@@ -302,24 +474,29 @@ class Repository(TimeStampedModel):
     """
 
     owner_user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
+        "User",
         null=True,
         blank=True,
-        related_name="personal_repositories",
+        on_delete=models.CASCADE,
+        related_name="repositories"
     )
+
     owner_company = models.ForeignKey(
         Company,
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name="repositories",
+        on_delete=models.CASCADE,
+        related_name="repositories"
     )
+
     created_by = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="created_repositories",
+        "User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_repositories"
     )
+
     name = models.CharField(max_length=255, db_index=True)
     description = models.TextField(null=True, blank=True)
     visibility = models.CharField(
@@ -334,19 +511,21 @@ class Repository(TimeStampedModel):
             models.CheckConstraint(
                 name="repository_has_exactly_one_owner",
                 check=(
-                    Q(owner_user__isnull=False, owner_company__isnull=True)
-                    | Q(owner_user__isnull=True, owner_company__isnull=False)
+                        Q(owner_user__isnull=False, owner_company__isnull=True)
+                        | Q(owner_user__isnull=True, owner_company__isnull=False)
                 ),
             ),
             models.UniqueConstraint(
-                fields=["owner_user", "name"],
+                Lower("name"),
+                "owner_user",
                 condition=Q(owner_user__isnull=False),
-                name="unique_personal_repository_name",
+                name="unique_personal_repo_ci"
             ),
             models.UniqueConstraint(
-                fields=["owner_company", "name"],
+                Lower("name"),
+                "owner_company",
                 condition=Q(owner_company__isnull=False),
-                name="unique_company_repository_name",
+                name="unique_company_repo_ci"
             ),
         ]
         indexes = [
@@ -376,9 +555,9 @@ class Repository(TimeStampedModel):
         return self.name
 
 
-# =========================================================
+
 # FILES AND BLOBS
-# =========================================================
+
 class File(TimeStampedModel):
     """
     Логический файл внутри репозитория.
@@ -419,7 +598,10 @@ class FileBlob(TimeStampedModel):
     """
 
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="blobs")
-    blob = models.FileField(upload_to="repository_blobs/%Y/%m/%d/")
+    blob = models.FileField(
+        upload_to="repository_blobs/",
+        validators=[validate_50mb]
+    )
     sha256 = models.CharField(max_length=64, db_index=True)
     size = models.PositiveBigIntegerField()
     mime_type = models.CharField(max_length=255, null=True, blank=True)
@@ -435,9 +617,7 @@ class FileBlob(TimeStampedModel):
         return self.sha256
 
 
-# =========================================================
-# COMMITS
-# =========================================================
+
 class Commit(TimeStampedModel):
     """
     Коммит — неизменяемый снимок изменения репозитория.
@@ -449,16 +629,33 @@ class Commit(TimeStampedModel):
     - при удалении Repository коммиты удаляются каскадом.
     """
 
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="commits")
+    repository = models.ForeignKey(
+    Repository,
+    on_delete=models.CASCADE,
+    related_name="commits"
+    )
+
     message = models.TextField()
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="commits")
+
+    created_by = models.ForeignKey(
+    "User",
+    null=True,
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name="commits"
+    )
+
+    author_name = models.CharField(max_length=150)
+    author_email = models.EmailField()
+
     commit_hash = models.CharField(max_length=64, unique=True, db_index=True)
+
     parent = models.ForeignKey(
-        "self",
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name="children",
+    "self",
+    null=True,
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name="children",
     )
 
     class Meta:
@@ -506,15 +703,15 @@ class CommitFile(TimeStampedModel):
             models.CheckConstraint(
                 name="commit_file_blob_matches_operation",
                 check=(
-                    Q(operation=CommitFileOperation.DELETED, blob__isnull=True)
-                    | Q(
-                        operation__in=[
-                            CommitFileOperation.ADDED,
-                            CommitFileOperation.MODIFIED,
-                            CommitFileOperation.RENAMED,
-                        ],
-                        blob__isnull=False,
-                    )
+                        Q(operation=CommitFileOperation.DELETED, blob__isnull=True)
+                        | Q(
+                    operation__in=[
+                        CommitFileOperation.ADDED,
+                        CommitFileOperation.MODIFIED,
+                        CommitFileOperation.RENAMED,
+                    ],
+                    blob__isnull=False,
+                )
                 ),
             ),
         ]
@@ -533,9 +730,7 @@ class CommitFile(TimeStampedModel):
         return f"{self.commit.commit_hash}: {self.path}"
 
 
-# =========================================================
-# PERMISSION HELPERS
-# =========================================================
+
 def is_company_member(user, company):
     """
     Проверяет, является ли user участником company.
@@ -631,9 +826,9 @@ def can_create_company_repository(user, company):
     return is_company_member(user, company)
 
 
-# =========================================================
+
 # ENTITY LOG
-# =========================================================
+
 class EntityLog(TimeStampedModel):
     """
     Универсальный audit log.
@@ -670,9 +865,9 @@ class EntityLog(TimeStampedModel):
         return self.action
 
 
-# =========================================================
+
 # MEDIA FILES
-# =========================================================
+
 class MediaFile(TimeStampedModel):
     """
     Медиа-файл: изображение, видео, документ и т.д.
@@ -710,9 +905,9 @@ class MediaMeta(TimeStampedModel):
         return self.name
 
 
-# =========================================================
+
 # APP VERSIONS / DOWNLOADS
-# =========================================================
+
 class AppVersion(TimeStampedModel):
     """
     Версия приложения для download-раздела.
@@ -723,7 +918,10 @@ class AppVersion(TimeStampedModel):
     - создавать/редактировать/удалять версии может только admin приложения.
     """
 
-    file = models.FileField(upload_to="app_versions/%Y/%m/%d/")
+    file = models.FileField(
+        upload_to="app_versions/",
+        validators=[validate_500mb]
+    )
     title = models.CharField(max_length=255)
     content = models.TextField()
     version = models.CharField(max_length=50, db_index=True)
@@ -743,9 +941,9 @@ class AppVersion(TimeStampedModel):
         return f"{self.title} {self.version}"
 
 
-# =========================================================
+
 # DOCUMENTATION
-# =========================================================
+
 class Documentation(TimeStampedModel):
     """
     Документация/новости/справочные материалы.
@@ -779,9 +977,9 @@ class Documentation(TimeStampedModel):
         return self.type
 
 
-# =========================================================
+
 # FAQ
-# =========================================================
+
 class FAQ(TimeStampedModel):
     """
     FAQ: вопрос-ответ система.

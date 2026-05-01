@@ -78,8 +78,8 @@ const SettingsPage: React.FC = () => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (file.size > 3 * 1024 * 1024) {
-            setAvatarError("Файл больше 3MB");
+        if (file.size == 0 ) {
+            setAvatarError("Файл 0MB");
             return;
         }
 

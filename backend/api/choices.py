@@ -1,6 +1,17 @@
 from django.db import models
 
 
+class CompanyInviteStatus(models.TextChoices):
+    """
+    Статус приглашения в компанию.
+    """
+
+    PENDING = "pending", "Pending"
+    ACCEPTED = "accepted", "Accepted"
+    REJECTED = "rejected", "Rejected"
+    CANCELLED = "cancelled", "Cancelled"
+
+
 class UserRole(models.TextChoices):
     """
     Роль пользователя в системе.
