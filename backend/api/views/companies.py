@@ -104,13 +104,19 @@ def create_company(request, user):
     )
 
 
-@api_view(["PUT"])
+@api_view(["GET", "PUT"])
 @with_user
-def update_company(request, user, company_id):
+def get_or_update_company(request, user, company_id):
     try:
         company = Company.objects.get(id=company_id)
     except Company.DoesNotExist:
         return Response({"error": "Компания не найдена"}, status=404)
+
+    if request.method == "GET":
+        if not is_company_member(user, company):
+            return Response({"error": "Недостаточно прав"}, status=403)
+
+        return Response(serialize_company(company, user))
 
     if not can_manage_company(user, company):
         return Response({"error": "Нет прав"}, status=403)
