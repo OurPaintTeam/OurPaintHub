@@ -3,19 +3,37 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q
 
-from api.models import Company, CompanyMember, User, Repository
-from api.permissions import (
+
+from api.models.companies import Company, CompanyMember, User
+from api.models.repositories import Repository
+from api.models.companies import (
     is_company_member,
     can_manage_company,
 )
-from api.auth import get_user_from_request_data
-from api.serializers import (
-    serialize_company,
-    serialize_user,
-    serialize_repository,
-)
-from api.utils import log_action
 
+from api.views.users import get_user_from_request_data
+from api.views.auth import (serialize_user)
+from api.views.repositories import (serialize_repository)
+
+def serialize_company(company, user=None):
+    data = {
+        "id": company.id,
+        "name": company.name,
+        "description": company.description,
+        "owner_id": company.owner_id,
+        "owner_username": company.owner.username,
+    }
+
+    if user:
+        data.update(
+            {
+                "is_owner": company.owner_id == user.id,
+                "is_member": is_company_member(user, company),
+                "can_manage": can_manage_company(user, company),
+            }
+        )
+
+    return data
 
 # =========================================================
 # DECORATOR (убирает повторение user extraction)

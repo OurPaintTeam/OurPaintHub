@@ -1,6 +1,17 @@
+from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from django.db.models.functions import Lower
+from django.db.models import Q
+
+from django.contrib.auth import get_user_model
+
+from api.choices import CompanyInviteStatus, RepositoryVisibility
+from api.models.auth import User
+from api.models.base import TimeStampedModel, validate_5mb
+from api.models.notifications import Notification
+
 
 # COMPANY
-
 class Company(TimeStampedModel):
     """
     Компания — организация/пространство.

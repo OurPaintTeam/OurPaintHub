@@ -7,11 +7,49 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models import Notification, NotificationStatus
-from api.utils.auth import get_user_from_request_data, is_admin  # поправь путь под себя
+from api.models.auth import User
+from api.models.notifications import Notification, NotificationStatus
+from api.views.users import get_user_from_request_data, is_admin
+
+def notification_events(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    def stream():
+        last_count = None
+
+        while True:
+            count = Notification.objects.filter(
+                recipient=user,
+                status=NotificationStatus.UNREAD,
+            ).count()
+
+            if count != last_count:
+                last_count = count
+                yield f"event: notifications_changed\ndata: {count}\n\n"
+
+            time.sleep(5)
+
+    response = StreamingHttpResponse(stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+
+    return response
 
 
-User = get_user_model()
+def serialize_notification(notification):
+    return {
+        "id": notification.id,
+        "recipient_id": notification.recipient_id,
+        "actor_id": notification.actor_id,
+        "title": notification.title,
+        "text": notification.text,
+        "status": notification.status,
+        "metadata": notification.metadata,
+        "created_at": notification.created_at.isoformat(),
+        "updated_at": notification.updated_at.isoformat(),
+    }
 
 @api_view(["GET"])
 def get_notifications(request):
@@ -132,42 +170,20 @@ def mark_notification_read(request, notification_id):
     )
 
 
-def notification_events(request):
+@api_view(["DELETE"])
+def delete_notification(request, notification_id):
+    """
+    Физически удалить уведомление из БД.
+    """
+
     user, error = get_user_from_request_data(request)
     if error:
         return error
 
-    def stream():
-        last_count = None
+    try:
+        notification = Notification.objects.get(id=notification_id, recipient=user)
+    except Notification.DoesNotExist:
+        return Response({"error": "Уведомление не найдено"}, status=status.HTTP_404_NOT_FOUND)
 
-        while True:
-            count = Notification.objects.filter(
-                recipient=user,
-                status=NotificationStatus.UNREAD,
-            ).count()
-
-            if count != last_count:
-                last_count = count
-                yield f"event: notifications_changed\ndata: {count}\n\n"
-
-            time.sleep(5)
-
-    response = StreamingHttpResponse(stream(), content_type="text/event-stream")
-    response["Cache-Control"] = "no-cache"
-    response["X-Accel-Buffering"] = "no"
-
-    return response
-
-
-def serialize_notification(notification):
-    return {
-        "id": notification.id,
-        "recipient_id": notification.recipient_id,
-        "actor_id": notification.actor_id,
-        "title": notification.title,
-        "text": notification.text,
-        "status": notification.status,
-        "metadata": notification.metadata,
-        "created_at": notification.created_at.isoformat(),
-        "updated_at": notification.updated_at.isoformat(),
-    }
+    notification.delete()
+    return Response({"message": "Уведомление удалено"}, status=status.HTTP_200_OK)

@@ -2,14 +2,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models import FAQ
-from api.auth import get_user_from_request_data, is_admin
-from api.utils import log_action
+from api.models.content import FAQ
+from api.views.users import get_user_from_request_data, is_admin
+from api.views.content import log_action
 
-
-# =========================================================
-# SERIALIZER
-# =========================================================
 
 def serialize_faq(faq):
     return {
@@ -23,10 +19,6 @@ def serialize_faq(faq):
         "updated_at": faq.updated_at.isoformat(),
     }
 
-
-# =========================================================
-# PUBLIC LISTS
-# =========================================================
 
 @api_view(["GET"])
 def get_QA_list(request):
@@ -67,11 +59,6 @@ def get_unanswered_QA_list(request):
 
     return Response([serialize_faq(q) for q in qs])
 
-
-# =========================================================
-# CREATE QUESTION (USER)
-# =========================================================
-
 @api_view(["POST"])
 def create_QA(request):
     user, error = get_user_from_request_data(request)
@@ -91,10 +78,6 @@ def create_QA(request):
 
     return Response(serialize_faq(faq), status=201)
 
-
-# =========================================================
-# ANSWER (ADMIN)
-# =========================================================
 
 @api_view(["PATCH"])
 def answer_QA(request, qa_id):
@@ -123,10 +106,6 @@ def answer_QA(request, qa_id):
 
     return Response(serialize_faq(faq))
 
-
-# =========================================================
-# DELETE (ADMIN)
-# =========================================================
 
 @api_view(["DELETE"])
 def delete_QA(request, qa_id):

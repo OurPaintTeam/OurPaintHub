@@ -1,3 +1,201 @@
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from django.db.models import Q
+import hashlib
+import mimetypes
+import os
+import io
+from django.core.files.base import ContentFile
+from django.utils import timezone
+from django.db import transaction
+from django.http import HttpResponse
+import zipfile
+
+from api.choices import CommitFileOperation, RepositoryVisibility
+from api.models.companies import can_view_repository, can_edit_repository, can_delete_repository, \
+    can_create_company_repository, Company
+from api.models.content import File, FileBlob
+from api.models.repositories import CommitFile, Repository, Commit
+from api.views.content import log_action
+from api.views.users import get_user_from_request_data
+
+
+def serialize_repository(repository, user=None):
+    return {
+        "id": repository.id,
+        "name": repository.name,
+        "description": repository.description,
+        "visibility": repository.visibility,
+        "created_by_id": repository.created_by_id,
+        "owner_user_id": repository.owner_user_id,
+        "owner_user_username": repository.owner_user.username if repository.owner_user_id else None,
+        "owner_company_id": repository.owner_company_id,
+        "owner_company_name": repository.owner_company.name if repository.owner_company_id else None,
+        "is_personal": repository.is_personal,
+        "is_company_repository": repository.is_company_repository,
+        **(
+            {
+                "can_view": can_view_repository(user, repository),
+                "can_edit": can_edit_repository(user, repository),
+                "can_delete": can_delete_repository(user, repository),
+            }
+            if user
+            else {}
+        ),
+    }
+
+
+def create_repository_commit(repository, user, message, uploaded_files=None, paths=None, delete_paths=None):
+    uploaded_files = uploaded_files or []
+    paths = paths or []
+    delete_paths = delete_paths or []
+    latest_commit = get_latest_commit(repository)
+    current_file_versions = get_current_repository_file_versions(repository)
+
+    commit = Commit.objects.create(
+        repository=repository,
+        created_by=user,
+        message=message,
+        parent=latest_commit,
+        commit_hash=build_commit_hash(repository, user, message),
+    )
+    changed_files = []
+
+    for delete_path in delete_paths:
+        path = str(delete_path).strip()
+        if not path:
+            continue
+
+        file_obj, _ = File.objects.get_or_create(repository=repository, path=path)
+        commit_file = CommitFile.objects.create(
+            commit=commit,
+            file=file_obj,
+            path=path,
+            operation=CommitFileOperation.DELETED,
+            blob=None,
+        )
+        changed_files.append(
+            {
+                "file_id": file_obj.id,
+                "commit_file_id": commit_file.id,
+                "path": commit_file.path,
+                "previous_path": commit_file.previous_path,
+                "operation": commit_file.operation,
+                "blob_id": None,
+                "size": None,
+                "sha256": None,
+                "download_url": None,
+            }
+        )
+
+    for index, uploaded_file in enumerate(uploaded_files):
+        path = paths[index] if index < len(paths) and paths[index] else uploaded_file.name
+        content = uploaded_file.read()
+        sha256 = hashlib.sha256(content).hexdigest()
+        mime_type, _ = mimetypes.guess_type(uploaded_file.name)
+
+        file_obj, _ = File.objects.get_or_create(repository=repository, path=path)
+        blob = FileBlob.objects.create(
+            repository=repository,
+            blob=ContentFile(content, name=uploaded_file.name),
+            sha256=sha256,
+            size=len(content),
+            mime_type=mime_type,
+            original_name=uploaded_file.name,
+        )
+        commit_file = CommitFile.objects.create(
+            commit=commit,
+            file=file_obj,
+            path=path,
+            operation=CommitFileOperation.MODIFIED if path in current_file_versions else CommitFileOperation.ADDED,
+            blob=blob,
+        )
+        changed_files.append(
+            {
+                "file_id": file_obj.id,
+                "commit_file_id": commit_file.id,
+                "path": commit_file.path,
+                "previous_path": commit_file.previous_path,
+                "operation": commit_file.operation,
+                "blob_id": blob.id,
+                "size": blob.size,
+                "sha256": blob.sha256,
+                "download_url": f"/api/commit-files/{commit_file.id}/download/",
+            }
+        )
+
+    return commit, changed_files
+
+
+def serialize_repository(repository, user=None):
+    return {
+        "id": repository.id,
+        "name": repository.name,
+        "description": repository.description,
+        "visibility": repository.visibility,
+        "created_by_id": repository.created_by_id,
+        "owner_user_id": repository.owner_user_id,
+        "owner_user_username": repository.owner_user.username if repository.owner_user_id else None,
+        "owner_company_id": repository.owner_company_id,
+        "owner_company_name": repository.owner_company.name if repository.owner_company_id else None,
+        "is_personal": repository.is_personal,
+        "is_company_repository": repository.is_company_repository,
+        **(
+            {
+                "can_view": can_view_repository(user, repository),
+                "can_edit": can_edit_repository(user, repository),
+                "can_delete": can_delete_repository(user, repository),
+            }
+            if user
+            else {}
+        ),
+    }
+
+
+def get_latest_commit(repository):
+    return repository.commits.order_by("-created_at", "-id").first()
+
+
+def get_current_repository_file_versions(repository):
+    current_files = {}
+    commit_files = CommitFile.objects.filter(commit__repository=repository).select_related("blob").order_by(
+        "commit__created_at",
+        "commit_id",
+        "id",
+    )
+
+    for commit_file in commit_files:
+        current_files[commit_file.path] = commit_file
+
+    return {
+        path: commit_file
+        for path, commit_file in current_files.items()
+        if commit_file.operation != CommitFileOperation.DELETED
+    }
+
+
+def build_commit_hash(repository, user, message):
+    raw = f"{repository.id}:{user.id}:{message}:{repository.commits.count()}:{timezone.now().timestamp()}".encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def request_get_list(data, key):
+    if hasattr(data, "getlist"):
+        return data.getlist(key)
+
+    value = data.get(key, [])
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def sanitize_archive_path(path):
+    parts = [part for part in str(path).replace("\\", "/").split("/") if part not in ("", ".", "..")]
+    return "/".join(parts) or "file"
+
 
 # =========================================================
 # REPOSITORIES
@@ -302,76 +500,6 @@ def get_repository_commits(request, repository_id):
 
 
 @api_view(["POST"])
-def create_commit(request, repository_id):
-    """
-    Создать линейный commit.
-
-    Request:
-    - Authorization: Bearer <access_token>
-    - message
-    - files[] multipart, опционально
-    - paths[] multipart, опционально
-
-    Упрощение для MVP:
-    каждый загруженный файл создаёт/обновляет File + CommitFile с operation added/modified.
-    """
-
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    try:
-        repository = Repository.objects.get(id=repository_id)
-    except Repository.DoesNotExist:
-        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
-
-    if not can_edit_repository(user, repository):
-        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
-
-    message = (request.data.get("message") or "").strip()
-    if not message:
-        return Response({"error": "Сообщение коммита обязательно"}, status=status.HTTP_400_BAD_REQUEST)
-
-    uploaded_files = request.FILES.getlist("files")
-    paths = request_get_list(request.data, "paths")
-    delete_paths = request_get_list(request.data, "delete_paths")
-
-    if not uploaded_files and not delete_paths:
-        return Response({"error": "Нужно передать files или delete_paths"}, status=status.HTTP_400_BAD_REQUEST)
-
-    with transaction.atomic():
-        commit, changed_files = create_repository_commit(
-            repository=repository,
-            user=user,
-            message=message,
-            uploaded_files=uploaded_files,
-            paths=paths,
-            delete_paths=delete_paths,
-        )
-
-    log_action(user, "add", commit)
-    return Response(
-        {
-            "message": "Коммит создан",
-            "repository": {
-                "id": repository.id,
-                "name": repository.name,
-            },
-            "commit": {
-                "id": commit.id,
-                "hash": commit.commit_hash,
-                "message": commit.message,
-                "parent_id": commit.parent_id,
-                "created_by_id": commit.created_by_id,
-                "created_at": commit.created_at.isoformat(),
-            },
-            "files": changed_files,
-        },
-        status=status.HTTP_201_CREATED,
-    )
-
-
-@api_view(["POST"])
 def delete_repository_file(request, repository_id):
     user, error = get_user_from_request_data(request)
     if error:
@@ -417,64 +545,6 @@ def delete_repository_file(request, repository_id):
         },
         status=status.HTTP_201_CREATED,
     )
-
-
-@api_view(["GET"])
-def get_commit_files(request, commit_id):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    try:
-        commit = Commit.objects.select_related("repository").get(id=commit_id)
-    except Commit.DoesNotExist:
-        return Response({"error": "Коммит не найден"}, status=status.HTTP_404_NOT_FOUND)
-
-    if not can_view_repository(user, commit.repository):
-        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
-
-    commit_files = commit.files.select_related("file", "blob").order_by("path")
-    return Response(
-        [
-            {
-                "id": commit_file.id,
-                "path": commit_file.path,
-                "previous_path": commit_file.previous_path,
-                "operation": commit_file.operation,
-                "file_id": commit_file.file_id,
-                "blob_id": commit_file.blob_id,
-                "size": commit_file.blob.size if commit_file.blob else None,
-                "sha256": commit_file.blob.sha256 if commit_file.blob else None,
-            }
-            for commit_file in commit_files
-        ],
-        status=status.HTTP_200_OK,
-    )
-
-
-@api_view(["GET"])
-def download_commit_file(request, commit_file_id):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    try:
-        commit_file = CommitFile.objects.select_related("commit__repository", "blob").get(id=commit_file_id)
-    except CommitFile.DoesNotExist:
-        return Response({"error": "Файл коммита не найден"}, status=status.HTTP_404_NOT_FOUND)
-
-    if not can_view_repository(user, commit_file.commit.repository):
-        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
-
-    if not commit_file.blob:
-        return Response({"error": "У этой операции нет файла для скачивания"}, status=status.HTTP_404_NOT_FOUND)
-
-    file_handle = commit_file.blob.blob.open("rb")
-    filename = commit_file.blob.original_name or os.path.basename(commit_file.path)
-    mime_type = commit_file.blob.mime_type or "application/octet-stream"
-    response = HttpResponse(file_handle.read(), content_type=mime_type)
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
 
 
 @api_view(["GET"])
@@ -561,7 +631,6 @@ def revert_repository_to_commit(request, repository_id, commit_id):
         # 2. восстанавливаем нужные
         # ------------------------
         for path, f in target_files.items():
-
             file_obj, _ = File.objects.get_or_create(
                 repository=repository,
                 path=path
@@ -597,200 +666,3 @@ def get_commit_snapshot_files(commit):
                 files_map[row.path] = row
 
     return list(files_map.values())
-
-
-@api_view(["GET"])
-def get_commit_snapshot(request, commit_id):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    try:
-        commit = Commit.objects.select_related("repository").get(id=commit_id)
-    except Commit.DoesNotExist:
-        return Response(
-            {"error": "Коммит не найден"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    repository = commit.repository
-
-    if not can_view_repository(user, repository):
-        return Response(
-            {"error": "Недостаточно прав"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
-    snapshot = get_commit_snapshot_files(commit)
-
-    result = []
-
-    for commit_file in snapshot:
-        result.append(
-            {
-                "id": commit_file.file_id,
-                "path": commit_file.path,
-                "name": os.path.basename(commit_file.path),
-                "commit_file_id": commit_file.id,
-                "blob_id": commit_file.blob_id,
-                "size": commit_file.blob.size if commit_file.blob else None,
-                "sha256": commit_file.blob.sha256 if commit_file.blob else None,
-                "download_url": f"/api/commit-files/{commit_file.id}/download/"
-                if commit_file.blob_id
-                else None,
-            }
-        )
-
-    return Response(result, status=status.HTTP_200_OK)
-
-
-def create_repository_commit(repository, user, message, uploaded_files=None, paths=None, delete_paths=None):
-    uploaded_files = uploaded_files or []
-    paths = paths or []
-    delete_paths = delete_paths or []
-    latest_commit = get_latest_commit(repository)
-    current_file_versions = get_current_repository_file_versions(repository)
-
-    commit = Commit.objects.create(
-        repository=repository,
-        created_by=user,
-        message=message,
-        parent=latest_commit,
-        commit_hash=build_commit_hash(repository, user, message),
-    )
-    changed_files = []
-
-    for delete_path in delete_paths:
-        path = str(delete_path).strip()
-        if not path:
-            continue
-
-        file_obj, _ = File.objects.get_or_create(repository=repository, path=path)
-        commit_file = CommitFile.objects.create(
-            commit=commit,
-            file=file_obj,
-            path=path,
-            operation=CommitFileOperation.DELETED,
-            blob=None,
-        )
-        changed_files.append(
-            {
-                "file_id": file_obj.id,
-                "commit_file_id": commit_file.id,
-                "path": commit_file.path,
-                "previous_path": commit_file.previous_path,
-                "operation": commit_file.operation,
-                "blob_id": None,
-                "size": None,
-                "sha256": None,
-                "download_url": None,
-            }
-        )
-
-    for index, uploaded_file in enumerate(uploaded_files):
-        path = paths[index] if index < len(paths) and paths[index] else uploaded_file.name
-        content = uploaded_file.read()
-        sha256 = hashlib.sha256(content).hexdigest()
-        mime_type, _ = mimetypes.guess_type(uploaded_file.name)
-
-        file_obj, _ = File.objects.get_or_create(repository=repository, path=path)
-        blob = FileBlob.objects.create(
-            repository=repository,
-            blob=ContentFile(content, name=uploaded_file.name),
-            sha256=sha256,
-            size=len(content),
-            mime_type=mime_type,
-            original_name=uploaded_file.name,
-        )
-        commit_file = CommitFile.objects.create(
-            commit=commit,
-            file=file_obj,
-            path=path,
-            operation=CommitFileOperation.MODIFIED if path in current_file_versions else CommitFileOperation.ADDED,
-            blob=blob,
-        )
-        changed_files.append(
-            {
-                "file_id": file_obj.id,
-                "commit_file_id": commit_file.id,
-                "path": commit_file.path,
-                "previous_path": commit_file.previous_path,
-                "operation": commit_file.operation,
-                "blob_id": blob.id,
-                "size": blob.size,
-                "sha256": blob.sha256,
-                "download_url": f"/api/commit-files/{commit_file.id}/download/",
-            }
-        )
-
-    return commit, changed_files
-
-
-
-def serialize_repository(repository, user=None):
-    return {
-        "id": repository.id,
-        "name": repository.name,
-        "description": repository.description,
-        "visibility": repository.visibility,
-        "created_by_id": repository.created_by_id,
-        "owner_user_id": repository.owner_user_id,
-        "owner_user_username": repository.owner_user.username if repository.owner_user_id else None,
-        "owner_company_id": repository.owner_company_id,
-        "owner_company_name": repository.owner_company.name if repository.owner_company_id else None,
-        "is_personal": repository.is_personal,
-        "is_company_repository": repository.is_company_repository,
-        **(
-            {
-                "can_view": can_view_repository(user, repository),
-                "can_edit": can_edit_repository(user, repository),
-                "can_delete": can_delete_repository(user, repository),
-            }
-            if user
-            else {}
-        ),
-    }
-
-def get_latest_commit(repository):
-    return repository.commits.order_by("-created_at", "-id").first()
-
-
-def get_current_repository_file_versions(repository):
-    current_files = {}
-    commit_files = CommitFile.objects.filter(commit__repository=repository).select_related("blob").order_by(
-        "commit__created_at",
-        "commit_id",
-        "id",
-    )
-
-    for commit_file in commit_files:
-        current_files[commit_file.path] = commit_file
-
-    return {
-        path: commit_file
-        for path, commit_file in current_files.items()
-        if commit_file.operation != CommitFileOperation.DELETED
-    }
-
-
-def build_commit_hash(repository, user, message):
-    raw = f"{repository.id}:{user.id}:{message}:{repository.commits.count()}:{timezone.now().timestamp()}".encode()
-    return hashlib.sha256(raw).hexdigest()
-
-
-def request_get_list(data, key):
-    if hasattr(data, "getlist"):
-        return data.getlist(key)
-
-    value = data.get(key, [])
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
-
-
-def sanitize_archive_path(path):
-    parts = [part for part in str(path).replace("\\", "/").split("/") if part not in ("", ".", "..")]
-    return "/".join(parts) or "file"
-

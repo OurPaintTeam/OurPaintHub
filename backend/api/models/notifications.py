@@ -1,4 +1,8 @@
+from django.db import models
 
+from api.choices import NotificationStatus
+from api.models.auth import User
+from api.models.base import TimeStampedModel
 
 
 class Notification(TimeStampedModel):

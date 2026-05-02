@@ -1,23 +1,26 @@
 from django.urls import path
-from api import views
+
+from api.views.content import download_view, create_version, download_file, update_version, news_view, create_news, \
+    update_news, documentation_view, create_documentation, delete_version, delete_news, update_documentation, \
+    delete_documentation
 
 urlpatterns = [
     # Download / versions
-    path("download/", views.download_view),
-    path("download/create/", views.create_version),
-    path("download/<int:version_id>/", views.download_file),
-    path("download/<int:version_id>/update/", views.update_version),
-    path("download/<int:version_id>/delete/", views.delete_version),
+    path("download/", download_view),
+    path("download/create/", create_version),
+    path("download/<int:version_id>/", download_file),
+    path("download/<int:version_id>/update/", update_version),
+    path("download/<int:version_id>/delete/", delete_version),
 
     # News
-    path("news/", views.news_view),
-    path("news/create/", views.create_news),
-    path("news/<int:news_id>/", views.update_news),
-    path("news/<int:news_id>/delete/", views.delete_news),
+    path("news/", news_view),
+    path("news/create/", create_news),
+    path("news/<int:news_id>/", update_news),
+    path("news/<int:news_id>/delete/", delete_news),
 
     # Documentation
-    path("documentation/", views.documentation_view),
-    path("documentation/create/", views.create_documentation),
-    path("documentation/<int:doc_id>/", views.update_documentation),
-    path("documentation/<int:doc_id>/delete/", views.delete_documentation),
+    path("documentation/", documentation_view),
+    path("documentation/create/", create_documentation),
+    path("documentation/<int:doc_id>/", update_documentation),
+    path("documentation/<int:doc_id>/delete/", delete_documentation),
 ]
