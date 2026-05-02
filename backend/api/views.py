@@ -172,6 +172,10 @@ def log_action(user, action, entity, metadata=None):
 
 def serialize_user(user):
     profile = getattr(user, "profile", None)
+
+    def serialize_date(value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
+
     return {
         "id": user.id,
         "username": user.username,
@@ -183,8 +187,12 @@ def serialize_user(user):
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
         "bio": profile.bio if profile else None,
-        "date_of_birth": profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None,
+        "date_of_birth": serialize_date(profile.date_of_birth) if profile and profile.date_of_birth else None,
         "avatar": profile.avatar.url if profile and profile.avatar else None,
+        "date_joined": user.date_joined.isoformat() if user.date_joined else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None,
+        "profile_created_at": profile.created_at.isoformat() if profile else None,
+        "profile_updated_at": profile.updated_at.isoformat() if profile else None,
     }
 
 
@@ -944,7 +952,7 @@ def get_public_user_profile(request, user_id):
         return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
 
     repositories = Repository.objects.filter(owner_user=user, visibility=RepositoryVisibility.PUBLIC).order_by("name")
-    companies = Company.objects.filter(Q(owner=user) | Q(members__user=user)).distinct().order_by("name")
+    companies = Company.objects.filter(Q(owner=user) | Q(companymember__user=user)).distinct().order_by("name")
 
     return Response(
         {
@@ -1015,7 +1023,7 @@ def get_companies(request):
     if error:
         return error
 
-    companies = Company.objects.filter(Q(owner=user) | Q(members__user=user)).distinct().order_by("name")
+    companies = Company.objects.filter(Q(owner=user) | Q(companymember__user=user)).distinct().order_by("name")
     return Response([serialize_company(company, user) for company in companies], status=status.HTTP_200_OK)
 
 
@@ -1209,7 +1217,7 @@ def get_repositories(request):
         Q(visibility=RepositoryVisibility.PUBLIC)
         | Q(owner_user=user)
         | Q(owner_company__owner=user)
-        | Q(owner_company__members__user=user)
+        | Q(owner_company__companymember__user=user)
     ).distinct().order_by("name")
 
     return Response([serialize_repository(repository, user) for repository in repositories], status=status.HTTP_200_OK)

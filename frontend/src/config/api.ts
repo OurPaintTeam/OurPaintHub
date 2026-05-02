@@ -1,4 +1,41 @@
-export const API_BASE_URL =  "https://127.0.0.1:8000/api";
+const getDefaultApiBaseUrl = (): string => {
+    if (typeof window === "undefined") {
+        return "https://127.0.0.1:8000/api";
+    }
+
+    const host = window.location.hostname || "127.0.0.1";
+    return `https://${host}:8000/api`;
+};
+
+const getApiBaseUrl = (): string => {
+    const envUrl = import.meta.env.VITE_BACKEND_API_URL as string | undefined;
+    const defaultUrl = getDefaultApiBaseUrl();
+
+    if (!envUrl) {
+        return defaultUrl;
+    }
+
+    if (typeof window !== "undefined") {
+        const currentHost = window.location.hostname;
+        const isLocalFrontend = currentHost === "localhost" || currentHost === "127.0.0.1";
+
+        try {
+            const parsedEnvUrl = new URL(envUrl);
+            const isLocalBackend = parsedEnvUrl.hostname === "localhost" || parsedEnvUrl.hostname === "127.0.0.1";
+
+            if (isLocalFrontend && isLocalBackend && parsedEnvUrl.hostname !== currentHost) {
+                parsedEnvUrl.hostname = currentHost;
+                return parsedEnvUrl.toString().replace(/\/$/, "");
+            }
+        } catch {
+            return defaultUrl;
+        }
+    }
+
+    return envUrl.replace(/\/$/, "");
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 export const BACKEND_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 
 export type AppErrorType = "network" | "backend" | "database" | "unauthorized" | "forbidden" | "not_found";

@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-    faDownload,
+    faClockRotateLeft,
     faDesktop,
+    faDownload,
+    faHardDrive,
     faMobileAlt,
-    faServer,
     faPlus,
+    faServer,
     faTrash,
 } from "@fortawesome/free-solid-svg-icons";
-import { apiFetch } from "../config/api";
+import { apiFetch, apiUrl } from "../config/api";
 import "./DownloadPage.scss";
 
 interface DownloadItem {
@@ -23,6 +25,8 @@ interface DownloadItem {
     file_name?: string;
     file_size?: string;
     author_email?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 interface RoleData {
@@ -57,7 +61,7 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
 
         try {
             const data = await apiFetch<DownloadItem[]>("/download/");
-            setDownloads(data);
+            setDownloads(Array.isArray(data) ? data : []);
         } finally {
             setLoading(false);
         }
@@ -96,8 +100,15 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
         setDownloading(id);
 
         try {
-            const blob = await fetch(`/api/download/${id}/`).then((r) => r.blob());
+            const response = await fetch(apiUrl(`/download/${id}/`), {
+                credentials: "include",
+            });
 
+            if (!response.ok) {
+                throw new Error("Не удалось скачать файл");
+            }
+
+            const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
 
@@ -109,6 +120,8 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
             document.body.removeChild(a);
 
             window.URL.revokeObjectURL(url);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Не удалось скачать файл");
         } finally {
             setDownloading(null);
         }
@@ -126,24 +139,39 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
     };
 
     const formatFileSize = (size?: string) => {
-        if (!size) return "";
+        if (!size) return "Размер не указан";
 
         const n = Number(size);
 
+        if (!Number.isFinite(n)) return size;
         if (n < 1024) return `${n} B`;
         if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
         return `${(n / (1024 * 1024)).toFixed(1)} MB`;
     };
 
+    const formatDate = (date?: string) => {
+        if (!date) return "Дата не указана";
+
+        const parsed = new Date(date);
+
+        if (Number.isNaN(parsed.getTime())) return "Дата не указана";
+        return parsed.toLocaleDateString("ru-RU");
+    };
+
     return (
         <MainLayout isAuthenticated={isAuthenticated}>
             <div className="download-container">
-
                 <div className="download-header">
-                    <h1>Версии приложения</h1>
+                    <div>
+                        <span className="section-label">OurPaint CAD</span>
+                        <h1>Версии приложения</h1>
+                        <p className="download-subtitle">
+                            Скачивайте актуальные сборки и смотрите историю публикаций.
+                        </p>
+                    </div>
 
                     {isAuthenticated && isAdmin && (
-                        <button className="add-version-btn" onClick={handleAddVersion}>
+                        <button className="add-version-btn" onClick={handleAddVersion} type="button">
                             <FontAwesomeIcon icon={faPlus} />
                             Добавить версию
                         </button>
@@ -152,36 +180,32 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
 
                 <div className="download-content">
                     {loading ? (
-                        <p>Загрузка...</p>
+                        <p className="empty-state">Загрузка...</p>
                     ) : downloads.length === 0 ? (
-                        <p>Нет версий</p>
+                        <p className="empty-state">Нет опубликованных версий</p>
                     ) : (
                         downloads.map((item) => (
-                            <div key={item.id} className="download-item">
-
+                            <article key={item.id} className="download-item">
                                 <div className="download-item-header">
-                                    <div>
-                                        <h2>
-                                            {item.title}{" "}
+                                    <div className="download-item-info">
+                                        <div className="download-platform">
+                                            <FontAwesomeIcon icon={getPlatformIcon(item.platform)} />
+                                            {item.platform || "all"}
+                                        </div>
+                                        <h2 className="download-title">
+                                            {item.title}
                                             {item.version && (
-                                                <span>v{item.version}</span>
+                                                <span className="version-badge">v{item.version}</span>
                                             )}
                                         </h2>
-
-                                        {item.platform && (
-                                            <span>
-                                                <FontAwesomeIcon icon={getPlatformIcon(item.platform)} />{" "}
-                                                {item.platform}
-                                            </span>
-                                        )}
                                     </div>
 
-                                    <div>
+                                    <div className="download-item-actions">
                                         <button
-                                            onClick={() =>
-                                                handleDownload(item.id, item.file_name)
-                                            }
+                                            className="download-btn"
+                                            onClick={() => handleDownload(item.id, item.file_name)}
                                             disabled={downloading === item.id}
+                                            type="button"
                                         >
                                             <FontAwesomeIcon icon={faDownload} />
                                             {downloading === item.id ? "..." : "Скачать"}
@@ -189,7 +213,10 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
 
                                         {isAuthenticated && isAdmin && (
                                             <button
+                                                className="delete-version-btn"
                                                 onClick={() => handleDeleteVersion(item.id)}
+                                                title="Удалить версию"
+                                                type="button"
                                             >
                                                 <FontAwesomeIcon icon={faTrash} />
                                             </button>
@@ -197,24 +224,25 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ isAuthenticated = false }) 
                                     </div>
                                 </div>
 
-                                <p>{item.content}</p>
+                                <p className="download-description">{item.content}</p>
 
                                 <div className="download-meta">
-                                    {item.file_size && (
-                                        <span>
-                                            Размер: {formatFileSize(item.file_size)}
-                                        </span>
-                                    )}
+                                    <span className="meta-item">
+                                        <FontAwesomeIcon icon={faHardDrive} />
+                                        {formatFileSize(item.file_size)}
+                                    </span>
+                                    <span className="meta-item">
+                                        <FontAwesomeIcon icon={faClockRotateLeft} />
+                                        {formatDate(item.release_date || item.updated_at || item.created_at)}
+                                    </span>
                                     {item.author_email && (
-                                        <span>Автор: {item.author_email}</span>
+                                        <span className="meta-item">Автор: {item.author_email}</span>
                                     )}
                                 </div>
-
-                            </div>
+                            </article>
                         ))
                     )}
                 </div>
-
             </div>
         </MainLayout>
     );

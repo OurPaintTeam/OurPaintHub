@@ -59,7 +59,7 @@ function App() {
         <ToastProvider>
             <Router>
                 <Routes>
-                    <Route path="/" element={<Navigate to="/news" replace />} />
+                    <Route path="/" element={<Navigate to="/general" replace />} />
 
                     <Route path="/news" element={<NewsPage isAuthenticated={isAuthenticated} />} />
                     <Route path="/news/:id" element={<NewsDetailPage isAuthenticated={isAuthenticated} />} />
@@ -94,7 +94,7 @@ function App() {
                         element={isAuthenticated ? <Navigate to="/account" replace /> : <RegistrationPage />}
                     />
 
-                    <Route path="/general" element={requireAuth(<GeneralPage />)} />
+                    <Route path="/general" element={<GeneralPage />} />
 
                     <Route path="/error" element={<ErrorPage />} />
                     <Route path="/404" element={<ErrorPage />} />

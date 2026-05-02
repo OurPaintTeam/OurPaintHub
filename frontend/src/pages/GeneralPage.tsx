@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import MainLayout from "../layout/MainLayout";
-import "./GeneralPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-    faNewspaper,
+    faBookOpen,
     faBuilding,
-    faFolderTree
+    faChevronRight,
+    faDownload,
+    faFolderTree,
+    faGaugeHigh,
+    faLayerGroup,
+    faNewspaper,
+    faPenRuler,
+    faPeopleGroup,
 } from "@fortawesome/free-solid-svg-icons";
+import MainLayout from "../layout/MainLayout";
+import InteractiveCadPreview from "../components/CadPreview/InteractiveCadPreview";
+import { apiFetch, apiUrl } from "../config/api";
+import "./GeneralPage.scss";
 
 interface UserData {
     id: number;
@@ -15,17 +24,33 @@ interface UserData {
     username?: string;
 }
 
+interface DownloadItem {
+    id: number;
+    title: string;
+    content: string;
+    version?: string;
+    platform?: string;
+    file_name?: string;
+    file_size?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 const GeneralPage: React.FC = () => {
     const navigate = useNavigate();
 
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+    const [downloadsLoading, setDownloadsLoading] = useState(true);
+    const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
 
         if (!userData) {
-            navigate("/login");
+            setUser(null);
+            setLoading(false);
             return;
         }
 
@@ -34,11 +59,78 @@ const GeneralPage: React.FC = () => {
             setUser(parsed);
         } catch (error) {
             console.error("Ошибка чтения user:", error);
-            navigate("/login");
+            localStorage.removeItem("user");
+            setUser(null);
         } finally {
             setLoading(false);
         }
-    }, [navigate]);
+    }, []);
+
+    useEffect(() => {
+        const loadDownloads = async () => {
+            setDownloadsLoading(true);
+
+            try {
+                const data = await apiFetch<DownloadItem[]>("/download/", {
+                    redirectOnError: false,
+                });
+
+                setDownloads(Array.isArray(data) ? data.slice(0, 3) : []);
+            } catch (error) {
+                console.error("Ошибка загрузки версий приложения:", error);
+                setDownloads([]);
+            } finally {
+                setDownloadsLoading(false);
+            }
+        };
+
+        void loadDownloads();
+    }, []);
+
+    const handleDownload = async (item: DownloadItem) => {
+        setDownloadingId(item.id);
+
+        try {
+            const response = await fetch(apiUrl(`/download/${item.id}/`), {
+                credentials: "include",
+            });
+
+            if (!response.ok) {
+                throw new Error("Не удалось скачать файл");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = item.file_name || `${item.title || "ourpaint"}-${item.version || "build"}.zip`;
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Не удалось скачать файл");
+        } finally {
+            setDownloadingId(null);
+        }
+    };
+
+    const formatFileSize = (size?: string) => {
+        if (!size) return "Размер не указан";
+
+        const value = Number(size);
+
+        if (!Number.isFinite(value)) return size;
+        if (value < 1024) return `${value} B`;
+        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const latestVersion = downloads[0]?.version ? `v${downloads[0].version}` : "alpha";
+    const latestDate = downloads[0]?.updated_at || downloads[0]?.created_at;
 
     if (loading) {
         return (
@@ -51,15 +143,120 @@ const GeneralPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={!!user}>
             <div className="main-page page">
+                <section className="general-hero">
+                    <div className="general-hero-copy">
+                        <span className="general-eyebrow">
+                            <span /> Current build · {latestVersion}
+                        </span>
+                        <h1>OurPaint CAD</h1>
+                        <p className="general-lead">
+                            Система автоматизированного проектирования для 2D-геометрии, координатной сетки и проектных файлов.
+                        </p>
+                        <p className="general-description">
+                            Создавайте построения, храните проекты в репозиториях, делитесь сборками и работайте с форматом <code>.ourp</code> в едином пространстве OurPaint.
+                        </p>
 
-                <div className="page-header">
-                    <h1>Добро пожаловать в OurPaintHUB!</h1>
-                    <p>Платформа для командной работы и хранения проектов</p>
-                </div>
+                        <div className="general-hero-actions">
+                            <button className="btn-primary" onClick={() => navigate("/repositories")} type="button">
+                                <FontAwesomeIcon icon={faPenRuler} />
+                                Открыть проекты
+                            </button>
+                            <button className="secondary-btn" onClick={() => navigate("/download")} type="button">
+                                <FontAwesomeIcon icon={faDownload} />
+                                Все версии
+                            </button>
+                            <button className="link-btn" onClick={() => navigate("/docs")} type="button">
+                                <FontAwesomeIcon icon={faBookOpen} />
+                                Документация
+                            </button>
+                        </div>
 
-                <div className="dashboard-grid">
+                        <p className="general-meta">
+                            {latestVersion}
+                            {latestDate && (
+                                <>
+                                    {" "}· обновлено {new Date(latestDate).toLocaleDateString("ru-RU")}
+                                </>
+                            )}
+                            {" "}· project format <span>.ourp</span>
+                        </p>
+                    </div>
 
-                    <div className="dashboard-card">
+                    <InteractiveCadPreview />
+                </section>
+
+                <section className="general-version-panel">
+                    <div>
+                        <p className="section-label">Текущие сборки</p>
+                        <h2>Последние 3 версии</h2>
+                        <p>
+                            Эти файлы берутся из вкладки «Приложение» и доступны для скачивания прямо с главной.
+                        </p>
+                    </div>
+
+                    <div className="general-build-list">
+                        {downloadsLoading ? (
+                            <div className="general-build-empty">Загрузка версий...</div>
+                        ) : downloads.length === 0 ? (
+                            <div className="general-build-empty">Пока нет опубликованных сборок</div>
+                        ) : (
+                            downloads.map((item) => (
+                                <article className="general-build" key={item.id}>
+                                    <div>
+                                        <span className="badge">{item.platform || "all"}</span>
+                                        <h3>{item.title}</h3>
+                                        <p>{item.content}</p>
+                                        <div className="general-build-meta">
+                                            <span>{item.version ? `v${item.version}` : "version n/a"}</span>
+                                            <span>{formatFileSize(item.file_size)}</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        className="download-action-primary"
+                                        disabled={downloadingId === item.id}
+                                        onClick={() => handleDownload(item)}
+                                        type="button"
+                                    >
+                                        <FontAwesomeIcon icon={faDownload} />
+                                        {downloadingId === item.id ? "..." : "Скачать"}
+                                    </button>
+                                </article>
+                            ))
+                        )}
+                    </div>
+                </section>
+
+                <section className="general-capabilities">
+                    <div>
+                        <p className="section-label">Возможности CAD</p>
+                        <h2>Рабочий контур OurPaint</h2>
+                        <p>
+                            Главная собирает быстрые переходы к материалам, проектам и командам, сохраняя стиль CAD-интерфейса из приложения.
+                        </p>
+                    </div>
+
+                    <div className="general-cap-grid">
+                        <div className="general-cap">
+                            <FontAwesomeIcon icon={faGaugeHigh} />
+                            <h3>Координатная сетка</h3>
+                            <p>Оси, точки и числовые метки для точного позиционирования объектов.</p>
+                        </div>
+                        <div className="general-cap">
+                            <FontAwesomeIcon icon={faLayerGroup} />
+                            <h3>Формат .ourp</h3>
+                            <p>Проектные файлы, версии и ZIP-сборки хранятся рядом с историей изменений.</p>
+                        </div>
+                        <div className="general-cap">
+                            <FontAwesomeIcon icon={faPeopleGroup} />
+                            <h3>Командная работа</h3>
+                            <p>Компании и репозитории помогают вести общие CAD-проекты без хаоса.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="dashboard-grid general-navigation-grid">
+                    <div className="dashboard-card" onClick={() => navigate("/news")}>
                         <div className="card-icon">
                             <FontAwesomeIcon icon={faNewspaper} />
                         </div>
@@ -67,18 +264,23 @@ const GeneralPage: React.FC = () => {
                         <h3>Новости</h3>
 
                         <p>
-                            Последние обновления системы, публикации и важные объявления.
+                            Обновления OurPaint, релизы, публикации и важные объявления команды.
                         </p>
 
                         <button
-                            className="card-link"
-                            onClick={() => navigate("/news")}
+                            className="card-link mt-5"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                navigate("/news");
+                            }}
+                            type="button"
                         >
                             Открыть новости
+                            <FontAwesomeIcon icon={faChevronRight} />
                         </button>
                     </div>
 
-                    <div className="dashboard-card">
+                    <div className="dashboard-card" onClick={() => navigate("/repositories")}>
                         <div className="card-icon">
                             <FontAwesomeIcon icon={faFolderTree} />
                         </div>
@@ -86,18 +288,23 @@ const GeneralPage: React.FC = () => {
                         <h3>Репозитории</h3>
 
                         <p>
-                            Управляйте кодом, файлами, версиями и историей изменений.
+                            Храните проектные файлы, версии, ZIP-сборки и историю изменений.
                         </p>
 
                         <button
-                            className="card-link"
-                            onClick={() => navigate("/repositories")}
+                            className="card-link mt-5"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                navigate("/repositories");
+                            }}
+                            type="button"
                         >
                             Перейти к репозиториям
+                            <FontAwesomeIcon icon={faChevronRight} />
                         </button>
                     </div>
 
-                    <div className="dashboard-card">
+                    <div className="dashboard-card" onClick={() => navigate("/companies")}>
                         <div className="card-icon">
                             <FontAwesomeIcon icon={faBuilding} />
                         </div>
@@ -105,19 +312,22 @@ const GeneralPage: React.FC = () => {
                         <h3>Компании</h3>
 
                         <p>
-                            Создавайте команды, назначайте участников и работайте вместе.
+                            Создавайте команды, управляйте участниками и ведите общие проекты.
                         </p>
 
                         <button
-                            className="card-link"
-                            onClick={() => navigate("/companies")}
+                            className="card-link mt-5"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                navigate("/companies");
+                            }}
+                            type="button"
                         >
                             Открыть компании
+                            <FontAwesomeIcon icon={faChevronRight} />
                         </button>
                     </div>
-
-                </div>
-
+                </section>
             </div>
         </MainLayout>
     );

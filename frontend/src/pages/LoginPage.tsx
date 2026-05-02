@@ -80,6 +80,7 @@ const LoginPage: React.FC = () => {
                                 type="text"
                                 placeholder="Email или username"
                                 required
+                                autoComplete="username"
                                 value={loginValue}
                                 onChange={(event) => setLoginValue(event.target.value)}
                             />
@@ -90,6 +91,7 @@ const LoginPage: React.FC = () => {
                                 type="password"
                                 placeholder="Пароль"
                                 required
+                                autoComplete="current-password"
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
                             />

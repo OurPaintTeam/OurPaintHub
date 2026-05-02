@@ -1,36 +1,11 @@
 .main-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f8f9fb;
-}
-
-.navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #7C3AED;
-  color: white;
-  padding: 0.8rem 2rem;
-  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.2);
-  flex-shrink: 0;
-}
-
-.nav-logo {
-  display: flex;
-  align-items: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  gap: 0.5rem;
-}
-
-.nav-user {
-  font-weight: 600;
+  min-height: 100vh;
+  background: var(--paint-page);
 }
 
 .content {
   flex: 1;
-  padding: 2rem;
-  overflow-y: auto;
+  width: 100%;
 }
