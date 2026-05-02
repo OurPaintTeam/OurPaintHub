@@ -15,7 +15,13 @@ class ApiExceptionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        return self.get_response(request)
+        response = self.get_response(request)
+
+        if request.path.startswith("/api/") and response.status_code == 404:
+            message = "Запрошенный API endpoint не найден"
+            return JsonResponse({"error": message, "message": message, "status": 404}, status=404)
+
+        return response
 
     def process_exception(self, request, exception):
         if not request.path.startswith("/api/"):
