@@ -1,5 +1,4 @@
 from django.db.models import Q
-from django.core import signing
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -7,48 +6,15 @@ from rest_framework import status
 
 from api.models.user import UserProfile
 
-from api.models.auth import AuthRefreshSession
 from api.models.repositories import Repository
 from api.models.companies import Company
 
 from api.choices import RepositoryVisibility
-from api.utils.constants import ACCESS_TOKEN_TTL_SECONDS
+from api.utils.auth_service import get_user_from_request_data
 from api.utils.serializers import serialize_user,serialize_repository,serialize_company
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
-
-
-def parse_access_token(token):
-    try:
-        payload = signing.loads(token, salt="access-token", max_age=ACCESS_TOKEN_TTL_SECONDS)
-    except signing.SignatureExpired:
-        return None, "expired"
-    except signing.BadSignature:
-        return None, "invalid"
-
-    if payload.get("type") != "access":
-        return None, "invalid"
-
-    try:
-        session = AuthRefreshSession.objects.select_related("user").get(
-            id=payload.get("session_id"),
-            user_id=payload.get("user_id"),
-        )
-    except AuthRefreshSession.DoesNotExist:
-        return None, "invalid"
-
-    if not session.is_active:
-        return None, "revoked"
-
-    return session.user, None
-
-def get_bearer_token(request):
-    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header.replace("Bearer ", "", 1).strip()
-
-    return request.GET.get("access_token")
 
 
 @api_view(["GET"])
