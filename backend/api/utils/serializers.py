@@ -2,7 +2,7 @@ from api.models.companies import is_company_member, can_manage_company, can_view
     can_delete_repository
 
 
-def serialize_user(user):
+def serialize_user(user, request=None):
     profile = getattr(user, "profile", None)
 
     def serialize_date(value):
@@ -20,7 +20,10 @@ def serialize_user(user):
         "is_superuser": user.is_superuser,
         "bio": profile.bio if profile else None,
         "date_of_birth": serialize_date(profile.date_of_birth) if profile and profile.date_of_birth else None,
-        "avatar": profile.avatar.url if profile and profile.avatar else None,
+        "avatar": (request.build_absolute_uri(profile.avatar.url)
+            if profile and profile.avatar and request
+            else None
+        ),
         "date_joined": user.date_joined.isoformat() if user.date_joined else None,
         "last_login": user.last_login.isoformat() if user.last_login else None,
         "profile_created_at": profile.created_at.isoformat() if profile else None,

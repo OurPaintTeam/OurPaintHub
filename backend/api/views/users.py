@@ -20,7 +20,7 @@ User = get_user_model()
 @api_view(["GET"])
 def get_all_users(request):
     users = User.objects.order_by("username")
-    return Response([serialize_user(user) for user in users], status=status.HTTP_200_OK)
+    return Response([serialize_user(user, request=request) for user in users], status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -39,7 +39,7 @@ def get_public_user_profile(request, user_id):
 
     return Response(
         {
-            "user": serialize_user(user),
+            "user": serialize_user(user, request=request),
             "repositories": [serialize_repository(repository, requester) for repository in repositories],
             "companies": [serialize_company(company, requester) for company in companies],
         },
@@ -71,7 +71,7 @@ def get_user_profile(request):
     if error:
         return error
 
-    return Response(serialize_user(user), status=status.HTTP_200_OK)
+    return Response(serialize_user(user, request=request), status=status.HTTP_200_OK)
 
 
 @api_view(["GET", "PUT"])
@@ -94,4 +94,4 @@ def update_user_profile(request):
         profile.avatar = request.FILES["avatar"]
     profile.save()
 
-    return Response({"message": "Профиль обновлён", "user": serialize_user(user)}, status=status.HTTP_200_OK)
+    return Response({"message": "Профиль обновлён", "user": serialize_user(user, request=request)}, status=status.HTTP_200_OK)
