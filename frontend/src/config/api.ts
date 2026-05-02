@@ -77,9 +77,52 @@ export const getAuthHeaders = (): HeadersInit => {
     };
 };
 
+const rewriteLegacyApiPath = (path: string): string => {
+    const rewritePrefix = (prefix: string, replacement: string): string | null => {
+        if (path === prefix || path === `${prefix}/`) {
+            return `${replacement}/`;
+        }
+
+        if (path.startsWith(`${prefix}/`)) {
+            return `${replacement}${path.slice(prefix.length)}`;
+        }
+
+        if (path.startsWith(`${prefix}?`)) {
+            return `${replacement}/${path.slice(prefix.length)}`;
+        }
+
+        return null;
+    };
+
+    const exactRewrites: Record<string, string> = {
+        "/checkDB/": "/health/",
+        "/login/": "/auth/login/",
+        "/logout/": "/auth/logout/",
+        "/refresh/": "/auth/refresh/",
+        "/registration/": "/auth/registration/",
+        "/validate/": "/auth/validate/",
+        "/profile/": "/users/profile/",
+        "/profile/update/": "/users/profile/update/",
+        "/user/role/": "/users/role/",
+    };
+
+    if (exactRewrites[path]) {
+        return exactRewrites[path];
+    }
+
+    return (
+        rewritePrefix("/download", "/content/download")
+        ?? rewritePrefix("/documentation", "/content/documentation")
+        ?? rewritePrefix("/news", "/content/news")
+        ?? rewritePrefix("/profile", "/users/profile")
+        ?? rewritePrefix("/QA", "/faq")
+        ?? path
+    );
+};
+
 export const apiUrl = (path: string): string => {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${API_BASE_URL}${normalizedPath}`;
+    return `${API_BASE_URL}${rewriteLegacyApiPath(normalizedPath)}`;
 };
 
 export const mediaUrl = (path?: string | null): string | null => {
@@ -163,7 +206,7 @@ export const checkBackendHealth = async (): Promise<boolean> => {
         }
 
         const data = await response.json();
-        return data.database === "ok";
+        return data.database === "ok" || data.db === "ok";
     } catch {
         return false;
     }
