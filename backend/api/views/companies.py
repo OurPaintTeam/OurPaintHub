@@ -348,4 +348,3 @@ def cancel_invite(request, invite_id):
         return Response({"error": str(e)}, status=400)
 
     return Response({"message": "cancelled"})
-
