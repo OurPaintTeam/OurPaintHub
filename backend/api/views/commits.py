@@ -52,6 +52,19 @@ def create_commit(request, repository_id):
     if not uploaded_files and not delete_paths:
         return Response({"error": "Нужно передать files или delete_paths"}, status=status.HTTP_400_BAD_REQUEST)
 
+    uploaded_paths = [
+        str(paths[index] if index < len(paths) and paths[index] else uploaded_file.name).strip()
+        for index, uploaded_file in enumerate(uploaded_files)
+    ]
+    requested_paths = [path for path in uploaded_paths + [str(path).strip() for path in delete_paths] if path]
+    duplicate_paths = sorted({path for path in requested_paths if requested_paths.count(path) > 1})
+
+    if duplicate_paths:
+        return Response(
+            {"error": f"В одном коммите нельзя повторять путь файла: {', '.join(duplicate_paths)}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     with transaction.atomic():
         commit, changed_files = create_repository_commit(
             repository=repository,

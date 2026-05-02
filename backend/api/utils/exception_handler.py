@@ -23,6 +23,10 @@ def _integrity_error_message(exc):
         return "Пользователь уже состоит в этой компании"
     if "unique_pending_company_invite" in text:
         return "Приглашение этому пользователю уже отправлено"
+    if "unique_file_path_per_commit" in text:
+        return "В одном коммите нельзя повторять один и тот же путь файла"
+    if "unique_file_path_in_repository" in text:
+        return "Файл с таким путём уже существует в репозитории"
 
     return "Невозможно сохранить данные: нарушено ограничение уникальности"
 

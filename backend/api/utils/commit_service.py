@@ -123,35 +123,4 @@ def create_repository_commit(
 
         changed_files.append(_serialize_commit_file(commit_file, file_obj, blob))
 
-    for index, uploaded_file in enumerate(uploaded_files):
-        path = paths[index] if index < len(paths) and paths[index] else uploaded_file.name
-
-        content = uploaded_file.read()
-        sha256 = hashlib.sha256(content).hexdigest()
-        mime_type, _ = mimetypes.guess_type(uploaded_file.name)
-
-        file_obj, _ = File.objects.get_or_create(repository=repository, path=path)
-
-        blob = FileBlob.objects.create(
-            repository=repository,
-            blob=ContentFile(content, name=uploaded_file.name),
-            sha256=sha256,
-            size=len(content),
-            mime_type=mime_type,
-            original_name=uploaded_file.name,
-        )
-
-        commit_file = CommitFile.objects.create(
-            commit=commit,
-            file=file_obj,
-            path=path,
-            operation=(
-                CommitFileOperation.MODIFIED
-                if path in current_file_versions
-                else CommitFileOperation.ADDED
-            ),
-            blob=blob,
-        )
-
-        changed_files.append(_serialize_commit_file(commit_file, file_obj, blob))
     return commit, changed_files
