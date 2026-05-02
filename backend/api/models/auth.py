@@ -14,7 +14,7 @@ class AuthRefreshSession(TimeStampedModel):
     """
 
     user = models.ForeignKey("api.User", on_delete=models.CASCADE, related_name="refresh_sessions")
-    token_hash = models.CharField(max_length=129, unique=True, db_index=True)
+    token_hash = models.CharField(max_length=128, unique=True, db_index=True)
     expires_at = models.DateTimeField(db_index=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
