@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Q
 
 
@@ -27,6 +27,15 @@ def with_user(view_func):
             return error
         return view_func(request, user, *args, **kwargs)
     return wrapper
+
+
+def company_name_taken(name, exclude_company_id=None):
+    queryset = Company.objects.filter(name__iexact=name)
+
+    if exclude_company_id:
+        queryset = queryset.exclude(id=exclude_company_id)
+
+    return queryset.exists()
 
 
 @api_view(["GET"])
@@ -72,11 +81,17 @@ def create_company(request, user):
     if not name:
         return Response({"error": "Название обязательно"}, status=400)
 
-    company = Company.objects.create(
-        owner=user,
-        name=name,
-        description=description
-    )
+    if company_name_taken(name):
+        return Response({"error": "Компания с таким названием уже существует"}, status=400)
+
+    try:
+        company = Company.objects.create(
+            owner=user,
+            name=name,
+            description=description
+        )
+    except IntegrityError:
+        return Response({"error": "Компания с таким названием уже существует"}, status=400)
 
     CompanyMember.objects.create(company=company, user=user)
 
@@ -99,9 +114,21 @@ def update_company(request, user, company_id):
     if not can_manage_company(user, company):
         return Response({"error": "Нет прав"}, status=403)
 
-    company.name = request.data.get("name", company.name)
-    company.description = request.data.get("description", company.description)
-    company.save()
+    name = (request.data.get("name", company.name) or "").strip()
+
+    if not name:
+        return Response({"error": "Название обязательно"}, status=400)
+
+    if company_name_taken(name, exclude_company_id=company.id):
+        return Response({"error": "Компания с таким названием уже существует"}, status=400)
+
+    company.name = name
+    company.description = (request.data.get("description", company.description) or "").strip()
+
+    try:
+        company.save()
+    except IntegrityError:
+        return Response({"error": "Компания с таким названием уже существует"}, status=400)
 
     log_action(user, "update", company)
 

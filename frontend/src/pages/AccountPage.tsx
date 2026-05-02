@@ -7,12 +7,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faBuilding,
     faCalendarDays,
-    faClockRotateLeft,
     faEnvelope,
     faFolderTree,
     faGear,
     faIdBadge,
-    faShieldHalved,
     faTrash,
     faUserCircle,
 } from "@fortawesome/free-solid-svg-icons";
@@ -126,20 +124,13 @@ const AccountPage: React.FC = () => {
         if (!account) return [];
 
         return [
-            { label: "ID", value: String(account.id) },
             { label: "Username", value: account.username },
             { label: "Email", value: account.email },
             { label: "Имя", value: account.first_name || "Не указано" },
             { label: "Фамилия", value: account.last_name || "Не указано" },
             { label: "Роль", value: account.role || "user" },
-            { label: "Админ приложения", value: account.is_admin ? "Да" : "Нет" },
-            { label: "Django staff", value: account.is_staff ? "Да" : "Нет" },
-            { label: "Superuser", value: account.is_superuser ? "Да" : "Нет" },
             { label: "Дата рождения", value: formatDate(account.date_of_birth) },
             { label: "Регистрация", value: formatDate(account.date_joined, true) },
-            { label: "Последний вход", value: formatDate(account.last_login, true) },
-            { label: "Профиль создан", value: formatDate(account.profile_created_at, true) },
-            { label: "Профиль обновлён", value: formatDate(account.profile_updated_at, true) },
         ];
     }, [account]);
 
@@ -194,14 +185,6 @@ const AccountPage: React.FC = () => {
                                     <FontAwesomeIcon icon={faCalendarDays} />
                                     Регистрация: {formatDate(account.date_joined)}
                                 </span>
-                                <span>
-                                    <FontAwesomeIcon icon={faClockRotateLeft} />
-                                    Последний вход: {formatDate(account.last_login, true)}
-                                </span>
-                                <span>
-                                    <FontAwesomeIcon icon={faShieldHalved} />
-                                    Права: {account.is_admin ? "admin" : "user"}
-                                </span>
                             </div>
 
                             <button className="delete-btn profile-danger" onClick={handleDeleteAccount} type="button">
@@ -244,10 +227,6 @@ const AccountPage: React.FC = () => {
                                     <div className="profile-info-row profile-info-row-wide">
                                         <span>О себе</span>
                                         <strong>{account.bio || "Не указано"}</strong>
-                                    </div>
-                                    <div className="profile-info-row profile-info-row-wide">
-                                        <span>Аватар</span>
-                                        <strong>{account.avatar || "Не загружен"}</strong>
                                     </div>
                                 </div>
                             </section>
