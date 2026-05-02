@@ -14,7 +14,7 @@ from api.utils.constants import ACCESS_TOKEN_TTL_SECONDS, ACCESS_SALT
 
 def hash_token(token: str) -> str:
     """Hash a token with a random salt using PBKDF2"""
-    salt = secrets.token_bytes(32)
+    salt = secrets.token_bytes(16)
     hash_value = hashlib.pbkdf2_hmac(
         "sha256",
         token.encode(),

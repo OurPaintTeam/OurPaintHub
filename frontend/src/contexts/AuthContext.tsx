@@ -135,8 +135,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             return;
         }
 
-        void refresh().finally(() => setIsLoading(false));
-    }, [refresh, validate]);
+        clearAuth();
+        setIsLoading(false);
+    }, [clearAuth, validate]);
 
     const login = (token: string, userData: User) => {
         saveAuth(token, userData);

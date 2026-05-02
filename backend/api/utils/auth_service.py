@@ -1,7 +1,9 @@
-from rest_framework.response import Response
 from rest_framework import status
-from api.utils.token import parse_access_token
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.response import Response
+
 from api.utils.session import get_bearer_token
+from api.utils.token import parse_access_token
 
 
 def get_user_from_access_token(request):
@@ -9,16 +11,16 @@ def get_user_from_access_token(request):
 
     if not token:
         return None, Response(
-            {"error": "Access token обязателен"},
-            status=status.HTTP_401_UNAUTHORIZED
+            {"error": "Access token required"},
+            status=status.HTTP_401_UNAUTHORIZED,
         )
 
-    user, error_code = parse_access_token(token)
-
-    if error_code:
+    try:
+        user, _session = parse_access_token(token)
+    except AuthenticationFailed as exc:
         return None, Response(
-            {"error": "Access token недействителен", "code": error_code},
-            status=status.HTTP_401_UNAUTHORIZED
+            {"error": "Access token invalid", "code": str(exc.detail)},
+            status=status.HTTP_401_UNAUTHORIZED,
         )
 
     return user, None

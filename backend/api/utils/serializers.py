@@ -4,6 +4,10 @@ from api.models.companies import is_company_member, can_manage_company, can_view
 
 def serialize_user(user):
     profile = getattr(user, "profile", None)
+
+    def serialize_date(value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
+
     return {
         "id": user.id,
         "username": user.username,
@@ -15,8 +19,12 @@ def serialize_user(user):
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
         "bio": profile.bio if profile else None,
-        "date_of_birth": profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None,
+        "date_of_birth": serialize_date(profile.date_of_birth) if profile and profile.date_of_birth else None,
         "avatar": profile.avatar.url if profile and profile.avatar else None,
+        "date_joined": user.date_joined.isoformat() if user.date_joined else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None,
+        "profile_created_at": profile.created_at.isoformat() if profile else None,
+        "profile_updated_at": profile.updated_at.isoformat() if profile else None,
     }
 
 def serialize_repository(repository, user=None):

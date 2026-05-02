@@ -4,7 +4,14 @@ import MainLayout from "../layout/MainLayout";
 import { apiFetch, mediaUrl } from "../config/api";
 import "./AccountPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import {
+    faArrowLeft,
+    faBuilding,
+    faCalendarDays,
+    faEnvelope,
+    faFolderTree,
+    faUserCircle,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface UserProfile {
     id: number;
@@ -17,6 +24,9 @@ interface UserProfile {
     date_of_birth?: string | null;
     avatar?: string | null;
     date_joined?: string | null;
+    last_login?: string | null;
+    profile_created_at?: string | null;
+    profile_updated_at?: string | null;
 }
 
 interface Repository {
@@ -73,6 +83,25 @@ const PublicAccountPage: React.FC = () => {
     };
 
     const avatarSrc = mediaUrl(profile?.avatar);
+    const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ");
+
+    const formatDate = (value?: string | null, withTime = false) => {
+        if (!value) return "Не указано";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) return "Не указано";
+
+        return withTime
+            ? date.toLocaleString("ru-RU", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+            })
+            : date.toLocaleDateString("ru-RU");
+    };
 
     if (loading) {
         return (
@@ -93,68 +122,154 @@ const PublicAccountPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="profile-page page">
-                <button onClick={() => navigate(-1)} className="back-btn">
-                    &larr; Назад
+                <button onClick={() => navigate(-1)} className="back-btn" type="button">
+                    <FontAwesomeIcon icon={faArrowLeft} />
+                    Назад
                 </button>
 
                 <div className="page-header">
-                    <h1>Публичный профиль</h1>
-                </div>
-
-                <div className="profile-info">
-                    <div className="profile-avatar">
-                        {avatarSrc ? <img src={avatarSrc} alt={profile.username} /> : <FontAwesomeIcon icon={faUserCircle} />}
-                    </div>
-
-                    <div className="profile-details">
-                        <h2>{profile.username}</h2>
-                        <p>{profile.email}</p>
-                        <p>
-                            {profile.first_name} {profile.last_name}
-                        </p>
-                        {profile.bio && <p>{profile.bio}</p>}
-                        {profile.date_joined && <p>Регистрация: {new Date(profile.date_joined).toLocaleDateString("ru-RU")}</p>}
+                    <div>
+                        <span className="section-label">Public profile</span>
+                        <h1>Публичный профиль</h1>
                     </div>
                 </div>
 
-                <div className="profile-stats">
-                    <div className="stat-card">
-                        <div className="stat-number">{repositories.length}</div>
-                        <div className="stat-label">Публичные репозитории</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-number">{companies.length}</div>
-                        <div className="stat-label">Компании</div>
-                    </div>
-                </div>
+                <div className="profile-layout">
+                    <aside className="profile-sidebar">
+                        <div className="profile-avatar profile-avatar-large">
+                            {avatarSrc ? <img src={avatarSrc} alt={profile.username} /> : <FontAwesomeIcon icon={faUserCircle} />}
+                        </div>
 
-                <section className="profile-section">
-                    <h2>Публичные репозитории</h2>
-                    {repositories.length === 0 ? (
-                        <p>Публичных репозиториев нет</p>
-                    ) : (
-                        repositories.map((repo) => (
-                            <div key={repo.id} className="profile-list-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
-                                <h3>{repo.name}</h3>
-                                <p>{repo.description || "Без описания"}</p>
+                        <div className="profile-identity">
+                            <h2>{fullName || profile.username}</h2>
+                            <p>@{profile.username}</p>
+                        </div>
+
+                        {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+
+                        <div className="profile-meta-list">
+                            <span>
+                                <FontAwesomeIcon icon={faEnvelope} />
+                                {profile.email}
+                            </span>
+                            <span>
+                                <FontAwesomeIcon icon={faCalendarDays} />
+                                Регистрация: {formatDate(profile.date_joined)}
+                            </span>
+                        </div>
+                    </aside>
+
+                    <main className="profile-main">
+                        <div className="profile-stats">
+                            <div className="stat-card">
+                                <div className="stat-number">{repositories.length}</div>
+                                <div className="stat-label">Публичные репозитории</div>
                             </div>
-                        ))
-                    )}
-                </section>
-
-                <section className="profile-section">
-                    <h2>Компании</h2>
-                    {companies.length === 0 ? (
-                        <p>Компаний нет</p>
-                    ) : (
-                        companies.map((company) => (
-                            <div key={company.id} className="profile-list-card" onClick={() => navigate(`/companies/${company.id}`)}>
-                                <h3>{company.name}</h3>
-                                <p>{company.description || "Без описания"}</p>
+                            <div className="stat-card">
+                                <div className="stat-number">{companies.length}</div>
+                                <div className="stat-label">Компании</div>
                             </div>
-                        ))
-                    )}
-                </section>
+                        </div>
+
+                        <section className="profile-section">
+                            <div className="profile-section-header">
+                                <div>
+                                    <span className="section-label">Profile data</span>
+                                    <h2>Информация</h2>
+                                </div>
+                            </div>
+
+                            <div className="profile-info-grid">
+                                <div className="profile-info-row">
+                                    <span>ID</span>
+                                    <strong>{profile.id}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Username</span>
+                                    <strong>{profile.username}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Email</span>
+                                    <strong>{profile.email}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Имя</span>
+                                    <strong>{profile.first_name || "Не указано"}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Фамилия</span>
+                                    <strong>{profile.last_name || "Не указано"}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Роль</span>
+                                    <strong>{profile.role || "user"}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Дата рождения</span>
+                                    <strong>{formatDate(profile.date_of_birth)}</strong>
+                                </div>
+                                <div className="profile-info-row">
+                                    <span>Профиль обновлён</span>
+                                    <strong>{formatDate(profile.profile_updated_at, true)}</strong>
+                                </div>
+                                <div className="profile-info-row profile-info-row-wide">
+                                    <span>О себе</span>
+                                    <strong>{profile.bio || "Не указано"}</strong>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="profile-section">
+                            <div className="profile-section-header">
+                                <div>
+                                    <span className="section-label">Repositories</span>
+                                    <h2>Публичные репозитории</h2>
+                                </div>
+                            </div>
+
+                            <div className="profile-list">
+                                {repositories.length === 0 ? (
+                                    <p className="empty-state">Публичных репозиториев нет</p>
+                                ) : (
+                                    repositories.map((repo) => (
+                                        <article key={repo.id} className="profile-list-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
+                                            <FontAwesomeIcon icon={faFolderTree} />
+                                            <div>
+                                                <h3>{repo.name}</h3>
+                                                <p>{repo.description || "Без описания"}</p>
+                                            </div>
+                                        </article>
+                                    ))
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="profile-section">
+                            <div className="profile-section-header">
+                                <div>
+                                    <span className="section-label">Companies</span>
+                                    <h2>Компании</h2>
+                                </div>
+                            </div>
+
+                            <div className="profile-list">
+                                {companies.length === 0 ? (
+                                    <p className="empty-state">Компаний нет</p>
+                                ) : (
+                                    companies.map((company) => (
+                                        <article key={company.id} className="profile-list-card" onClick={() => navigate(`/companies/${company.id}`)}>
+                                            <FontAwesomeIcon icon={faBuilding} />
+                                            <div>
+                                                <h3>{company.name}</h3>
+                                                <p>{company.description || "Без описания"}</p>
+                                            </div>
+                                        </article>
+                                    ))
+                                )}
+                            </div>
+                        </section>
+                    </main>
+                </div>
             </div>
         </MainLayout>
     );

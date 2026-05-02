@@ -12,6 +12,3 @@ def health(request):
         return Response({"db": "down"}, status=503)
 
     return Response({"db": "ok"})
-
-
-

@@ -38,7 +38,7 @@ def get_repositories(request):
         Q(visibility=RepositoryVisibility.PUBLIC)
         | Q(owner_user=user)
         | Q(owner_company__owner=user)
-        | Q(owner_company__members__user=user)
+        | Q(owner_company__companymember__user=user)
     ).distinct().order_by("name")
 
     return Response([serialize_repository(repository, user) for repository in repositories], status=status.HTTP_200_OK)

@@ -69,7 +69,7 @@ def get_public_user_profile(request, user_id):
         return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
 
     repositories = Repository.objects.filter(owner_user=user, visibility=RepositoryVisibility.PUBLIC).order_by("name")
-    companies = Company.objects.filter(Q(owner=user) | Q(members__user=user)).distinct().order_by("name")
+    companies = Company.objects.filter(Q(owner=user) | Q(companymember__user=user)).distinct().order_by("name")
 
     return Response(
         {
@@ -129,4 +129,3 @@ def update_user_profile(request):
     profile.save()
 
     return Response({"message": "Профиль обновлён", "user": serialize_user(user)}, status=status.HTTP_200_OK)
-

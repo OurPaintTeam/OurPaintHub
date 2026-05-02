@@ -105,6 +105,7 @@ const RegistrationPage: React.FC = () => {
                                 type="text"
                                 placeholder="Username"
                                 required
+                                autoComplete="username"
                                 value={username}
                                 onChange={(event) => setUsername(event.target.value)}
                             />
@@ -114,6 +115,7 @@ const RegistrationPage: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Имя"
+                                autoComplete="given-name"
                                 value={firstName}
                                 onChange={(event) => setFirstName(event.target.value)}
                             />
@@ -123,6 +125,7 @@ const RegistrationPage: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Фамилия"
+                                autoComplete="family-name"
                                 value={lastName}
                                 onChange={(event) => setLastName(event.target.value)}
                             />
@@ -133,6 +136,7 @@ const RegistrationPage: React.FC = () => {
                                 type="email"
                                 placeholder="Email"
                                 required
+                                autoComplete="email"
                                 value={email}
                                 onChange={(event) => setEmail(event.target.value)}
                             />
@@ -142,6 +146,7 @@ const RegistrationPage: React.FC = () => {
                             <input
                                 type="date"
                                 placeholder="Дата рождения"
+                                autoComplete="bday"
                                 value={dateOfBirth}
                                 onChange={(event) => setDateOfBirth(event.target.value)}
                             />
@@ -153,6 +158,7 @@ const RegistrationPage: React.FC = () => {
                                 placeholder="Пароль"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
                             />
@@ -164,6 +170,7 @@ const RegistrationPage: React.FC = () => {
                                 placeholder="Подтвердите пароль"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                                 value={confirmPassword}
                                 onChange={(event) => {
                                     setConfirmPassword(event.target.value);

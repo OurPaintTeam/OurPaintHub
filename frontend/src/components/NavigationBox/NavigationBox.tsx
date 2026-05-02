@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+    faArrowRightFromBracket,
     faPenRuler,
     faBars,
     faTimes,
@@ -48,6 +49,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
             { label: "Вопросы", path: "/QA" },
         ]
         : [
+            { label: "Главная", path: "/general" },
             { label: "Новости", path: "/news" },
             { label: "Документация", path: "/docs" },
             { label: "Приложение", path: "/download" },
@@ -64,10 +66,20 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
     return (
         <nav className="navbar">
             <div className="nav-container">
-                <div className="nav-logo">
-                    <FontAwesomeIcon icon={faPenRuler} />
-                    <span>OurPaintHUB</span>
-                </div>
+                <button
+                    className="nav-logo"
+                    onClick={() => navigate("/general")}
+                    aria-label="OurPaintHUB"
+                    type="button"
+                >
+                    <span className="nav-logo-mark">
+                        <FontAwesomeIcon icon={faPenRuler} />
+                    </span>
+                    <span className="nav-logo-copy">
+                        <span className="nav-logo-title">OurPaint</span>
+                        <span className="nav-logo-subtitle">CAD Hub</span>
+                    </span>
+                </button>
 
                 <button
                     className="mobile-menu-toggle"
@@ -110,9 +122,10 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
                                 className="btn-logout"
                                 onClick={handleLogout}
                                 type="button"
+                                title="Выйти"
                             >
-                                <i className="fas fa-sign-out-alt"></i>
-                                <span className="logout-text">Выход</span>
+                                <FontAwesomeIcon icon={faArrowRightFromBracket} />
+                                <span className="logout-text">Выйти</span>
                             </button>
                         </div>
                     )}
