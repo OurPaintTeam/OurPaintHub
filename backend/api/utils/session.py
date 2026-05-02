@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from api.models.auth import AuthRefreshSession
-from api.utils.token import hash_token
+from api.utils.token import hash_token, verify_token
 from api.utils.constants import REFRESH_TOKEN_TTL_SECONDS, REFRESH_COOKIE_NAME
 
 def request_get_list(data, key):
@@ -46,14 +46,10 @@ def create_refresh_session(request, user):
 
 
 def rotate_refresh_session(request, raw_token):
-    token_hash = hash_token(raw_token)
-
     with transaction.atomic():
-        session = AuthRefreshSession.objects.select_for_update().select_related("user").get(
-            token_hash=token_hash
-        )
+        session = find_refresh_session(raw_token, for_update=True)
 
-        if not session.is_active:
+        if not session or not session.is_active:
             return None, None
 
         user = session.user
@@ -66,12 +62,27 @@ def rotate_refresh_session(request, raw_token):
 
 
 def revoke_refresh_session(raw_token):
-    token_hash = hash_token(raw_token)
+    session = find_refresh_session(raw_token, for_update=False)
 
-    AuthRefreshSession.objects.filter(
-        token_hash=token_hash,
-        revoked_at__isnull=True
-    ).update(revoked_at=timezone.now())
+    if session and session.revoked_at is None:
+        session.revoked_at = timezone.now()
+        session.save(update_fields=["revoked_at", "updated_at"])
+
+
+def find_refresh_session(raw_token, for_update=False):
+    sessions = AuthRefreshSession.objects.filter(
+        revoked_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).select_related("user")
+
+    if for_update:
+        sessions = sessions.select_for_update()
+
+    for session in sessions:
+        if verify_token(raw_token, session.token_hash):
+            return session
+
+    return None
 
 
 def set_refresh_cookie(response, token):

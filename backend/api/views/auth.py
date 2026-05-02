@@ -1,31 +1,24 @@
-from django.contrib.auth.models import BaseUserManager
-from django.conf import settings
-from django.db import transaction
-from django.utils import timezone
-from django.core import signing
 from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.exceptions import AuthenticationFailed
 
-from api.models.auth import AuthRefreshSession
 from api.models.user import UserProfile
+from api.utils.auth_service import get_user_from_request_data
+from api.utils.constants import ACCESS_TOKEN_TTL_SECONDS, REFRESH_COOKIE_NAME
+from api.utils.serializers import serialize_user
+from api.utils.session import (
+    clear_refresh_cookie,
+    create_refresh_session,
+    revoke_refresh_session,
+    rotate_refresh_session,
+    set_refresh_cookie,
+)
 from api.utils.token import (
     create_access_token,
-    hash_token,
-    ACCESS_TOKEN_TTL_SECONDS
 )
-from api.utils.session import (
-    create_refresh_session,
-    set_refresh_cookie,
-    clear_refresh_cookie,
-    revoke_refresh_session
-)
-from api.utils.constants import REFRESH_COOKIE_NAME
-from api.utils.serializers import serialize_user
 
-from django.contrib.auth import get_user_model
 User = get_user_model()
 
 def serialize_auth_response(user, session):
@@ -93,7 +86,10 @@ def login_user(request):
 
 @api_view(["GET"])
 def validate_token(request):
-    user = get_user_from_request_data(request)
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
     return Response({"valid": True, "user": serialize_user(user)})
 
 
@@ -104,31 +100,14 @@ def refresh_token(request):
     if not raw_token:
         return Response({"error": "missing_refresh_token"}, status=401)
 
-    token_hash = hash_token(raw_token)
+    new_token, new_session = rotate_refresh_session(request, raw_token)
 
-    try:
-        with transaction.atomic():
-            session = AuthRefreshSession.objects.select_for_update().select_related("user").get(
-                token_hash=token_hash
-            )
-
-            if not session.is_active:
-                return Response({"error": "refresh_revoked"}, status=401)
-
-            user = session.user
-
-            # revoke old session
-            session.revoke()
-
-            # create new session
-            new_token, new_session = create_refresh_session(request, user)
-
-    except AuthRefreshSession.DoesNotExist:
+    if not new_token or not new_session:
         return Response({"error": "invalid_refresh_token"}, status=401)
 
     response = Response({
         "message": "token_refreshed",
-        **serialize_auth_response(user, new_session),
+        **serialize_auth_response(new_session.user, new_session),
     })
 
     return set_refresh_cookie(response, new_token)
