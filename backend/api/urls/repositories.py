@@ -1,6 +1,6 @@
 from django.urls import path
 
-from api.repositories import get_repositories
+from api.views.repositories import get_repositories
 
 from api.views.commits import create_commit
 from api.views.repositories import revert_repository_to_commit, get_repository_commits, delete_repository_file, \

@@ -7,9 +7,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models.auth import User
 from api.models.notifications import Notification, NotificationStatus
-from api.views.users import get_user_from_request_data, is_admin
+
+from django.contrib.auth import get_user_model
+
+from api.utils.auth_service import get_user_from_request_data, is_admin
+
+User = get_user_model()
 
 def notification_events(request):
     user, error = get_user_from_request_data(request)

@@ -6,7 +6,6 @@ from django.db.models import Q
 from django.contrib.auth import get_user_model
 
 from api.choices import CompanyInviteStatus, RepositoryVisibility
-from api.models.auth import User
 from api.models.base import TimeStampedModel, validate_5mb
 from api.models.notifications import Notification
 
@@ -31,7 +30,7 @@ class Company(TimeStampedModel):
     """
 
     owner = models.ForeignKey(
-        "User",
+        "api.User",
         on_delete=models.CASCADE,
         related_name="owned_companies"
     )
@@ -81,7 +80,7 @@ class CompanyMember(TimeStampedModel):
     )
 
     user = models.ForeignKey(
-        "User",
+        "api.User",
         on_delete=models.CASCADE
     )
 
@@ -115,13 +114,13 @@ class CompanyInvite(TimeStampedModel):
     )
 
     invited_user = models.ForeignKey(
-        User,
+        "api.User",
         on_delete=models.CASCADE,
         related_name="company_invites"
     )
 
     invited_by = models.ForeignKey(
-        User,
+        "api.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

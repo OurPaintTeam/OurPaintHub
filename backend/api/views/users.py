@@ -5,18 +5,19 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models.users import User, UserProfile
+from api.models.user import UserProfile
 
 from api.models.auth import AuthRefreshSession
 from api.models.repositories import Repository
 from api.models.companies import Company
 
 from api.choices import RepositoryVisibility
-from api.views.repositories import serialize_repository
-from api.views.companies import serialize_company
+from api.utils.constants import ACCESS_TOKEN_TTL_SECONDS
+from api.utils.serializers import serialize_user,serialize_repository,serialize_company
 
-def is_admin(user):
-    return bool(user and user.is_authenticated and user.is_app_admin)
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
 
 def parse_access_token(token):
     try:
@@ -49,36 +50,6 @@ def get_bearer_token(request):
 
     return request.GET.get("access_token")
 
-def get_user_from_access_token(request):
-    token = get_bearer_token(request)
-    if not token:
-        return None, Response({"error": "Access token обязателен"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user, error_code = parse_access_token(token)
-    if error_code:
-        return None, Response({"error": "Access token недействителен", "code": error_code}, status=status.HTTP_401_UNAUTHORIZED)
-
-    return user, None
-
-def get_user_from_request_data(request):
-    return get_user_from_access_token(request)
-
-def serialize_user(user):
-    profile = getattr(user, "profile", None)
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "role": user.role,
-        "is_admin": user.is_app_admin,
-        "is_staff": user.is_staff,
-        "is_superuser": user.is_superuser,
-        "bio": profile.bio if profile else None,
-        "date_of_birth": profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None,
-        "avatar": profile.avatar.url if profile and profile.avatar else None,
-    }
 
 @api_view(["GET"])
 def get_all_users(request):

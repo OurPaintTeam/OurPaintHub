@@ -5,11 +5,13 @@ from django.http import HttpResponse
 from rest_framework import status
 import os
 
+from api.models.commit import Commit, CommitFile
 from api.models.companies import can_edit_repository, can_view_repository
-from api.models.repositories import Repository, Commit, CommitFile
-from api.views.content import log_action
-from api.views.repositories import request_get_list, create_repository_commit, get_commit_snapshot_files
-from api.views.users import get_user_from_request_data
+from api.models.repositories import Repository
+from api.utils.auth_service import get_user_from_request_data
+from api.utils.commit_service import get_commit_snapshot_files, create_repository_commit
+from api.utils.logging_service import log_action
+from api.utils.session import request_get_list
 
 
 @api_view(["POST"])

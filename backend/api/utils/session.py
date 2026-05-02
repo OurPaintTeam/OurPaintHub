@@ -4,9 +4,23 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from api.models.users import AuthRefreshSession
-from api.views.token import hash_token
-from api.views.constants import REFRESH_TOKEN_TTL_SECONDS, REFRESH_COOKIE_NAME
+from api.models.auth import AuthRefreshSession
+from api.utils.token import hash_token
+from api.utils.constants import REFRESH_TOKEN_TTL_SECONDS, REFRESH_COOKIE_NAME
+
+def request_get_list(data, key):
+    if hasattr(data, "getlist"):
+        return data.getlist(key)
+
+    value = data.get(key, [])
+
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return value
+
+    return [value]
 
 def get_client_ip(request):
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")

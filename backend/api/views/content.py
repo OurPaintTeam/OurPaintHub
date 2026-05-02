@@ -7,18 +7,11 @@ from api.choices import ContentAudience
 from api.models.content import (
     Documentation,
     AppVersion,
-    DocumentationType, EntityLog,
+    DocumentationType,
 )
-from api.views.users import get_user_from_request_data, is_admin
+from api.utils.auth_service import get_user_from_request_data, is_admin
+from api.utils.logging_service import log_action
 
-
-def log_action(user, action, entity, metadata=None):
-    EntityLog.objects.create(
-        action=action,
-        user=user,
-        entity=entity,
-        metadata=metadata or {},
-    )
 
 def build_document_text(title, content, category=None):
     parts = [f"# {title}", "", content]
@@ -231,27 +224,6 @@ def update_documentation(request, doc_id):
     log_action(user, "change", doc)
     return Response({"message": "Документация обновлена", "documentation": serialize_documentation(doc)}, status=status.HTTP_200_OK)
 
-
-
-@api_view(["DELETE"])
-def delete_documentation(request, doc_id):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    if not is_admin(user):
-        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
-
-    try:
-        doc = Documentation.objects.get(id=doc_id, type=DocumentationType.REFERENCE)
-    except Documentation.DoesNotExist:
-        return Response({"error": "Документация не найдена"}, status=status.HTTP_404_NOT_FOUND)
-
-    log_action(user, "delete", doc, {"documentation_id": doc.id, "text": doc.text})
-    doc.delete()
-    return Response({"message": "Документация удалена"}, status=status.HTTP_200_OK)
-
-
 # =========================================================
 # APP VERSIONS
 # =========================================================
@@ -370,3 +342,21 @@ def delete_version(request, version_id):
     app_version.delete()
 
     return Response({"message": "Версия приложения удалена"}, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+def delete_documentation(request, doc_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    if not is_admin(user):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        doc = Documentation.objects.get(id=doc_id, type=DocumentationType.REFERENCE)
+    except Documentation.DoesNotExist:
+        return Response({"error": "Документация не найдена"}, status=status.HTTP_404_NOT_FOUND)
+
+    log_action(user, "delete", doc, {"documentation_id": doc.id, "text": doc.text})
+    doc.delete()
+    return Response({"message": "Документация удалена"}, status=status.HTTP_200_OK)

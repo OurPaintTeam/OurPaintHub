@@ -1,6 +1,4 @@
-import secrets
-import hashlib
-
+from django.contrib.auth.models import BaseUserManager
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -11,23 +9,24 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 
-from .models import User, UserProfile, AuthRefreshSession
-from api.views.token import (
+from api.models.auth import AuthRefreshSession
+from api.models.user import UserProfile
+from api.utils.token import (
     create_access_token,
-    parse_access_token,
     hash_token,
     ACCESS_TOKEN_TTL_SECONDS
 )
-from api.views.session import (
+from api.utils.session import (
     create_refresh_session,
     set_refresh_cookie,
     clear_refresh_cookie,
     revoke_refresh_session
 )
-from api.views.constants import REFRESH_COOKIE_NAME
-from .users import serialize_user
-from .users import get_user_from_request_data
+from api.utils.constants import REFRESH_COOKIE_NAME
+from api.utils.serializers import serialize_user
 
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 def serialize_auth_response(user, session):
     return {

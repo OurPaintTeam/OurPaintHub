@@ -4,40 +4,20 @@ from rest_framework import status
 from django.db.models import Q
 
 
-from api.models.companies import Company, CompanyMember, User
+from api.models.companies import Company, CompanyMember
 from api.models.repositories import Repository
 from api.models.companies import (
     is_company_member,
     can_manage_company,
 )
+from api.utils.auth_service import get_user_from_request_data
+from api.utils.logging_service import log_action
 
-from api.views.users import get_user_from_request_data
-from api.views.auth import (serialize_user)
-from api.views.repositories import (serialize_repository)
+from api.utils.serializers import serialize_user, serialize_repository, serialize_company
 
-def serialize_company(company, user=None):
-    data = {
-        "id": company.id,
-        "name": company.name,
-        "description": company.description,
-        "owner_id": company.owner_id,
-        "owner_username": company.owner.username,
-    }
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
-    if user:
-        data.update(
-            {
-                "is_owner": company.owner_id == user.id,
-                "is_member": is_company_member(user, company),
-                "can_manage": can_manage_company(user, company),
-            }
-        )
-
-    return data
-
-# =========================================================
-# DECORATOR (убирает повторение user extraction)
-# =========================================================
 
 def with_user(view_func):
     def wrapper(request, *args, **kwargs):
@@ -47,10 +27,6 @@ def with_user(view_func):
         return view_func(request, user, *args, **kwargs)
     return wrapper
 
-
-# =========================================================
-# COMPANIES
-# =========================================================
 
 @api_view(["GET"])
 @with_user

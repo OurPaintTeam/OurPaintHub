@@ -1,7 +1,6 @@
 from django.db import models
 
 from api.choices import NotificationStatus
-from api.models.auth import User
 from api.models.base import TimeStampedModel
 
 
@@ -16,9 +15,9 @@ class Notification(TimeStampedModel):
     Удаление уведомления — физическое удаление строки из БД.
     """
 
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    recipient = models.ForeignKey("api.User", on_delete=models.CASCADE, related_name="notifications")
     actor = models.ForeignKey(
-        User,
+        "api.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

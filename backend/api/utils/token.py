@@ -7,8 +7,9 @@ from django.core import signing
 from django.core.cache import cache
 from rest_framework.exceptions import AuthenticationFailed
 
-from api.models.auth import AuthRefreshSession, User
-from api.views.constants import ACCESS_TOKEN_TTL_SECONDS, ACCESS_SALT
+from api.models.auth import AuthRefreshSession
+from api.models.user import User
+from api.utils.constants import ACCESS_TOKEN_TTL_SECONDS, ACCESS_SALT
 
 
 def hash_token(token: str) -> str:

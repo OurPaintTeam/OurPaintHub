@@ -4,13 +4,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 from api.choices import DocumentationType, ContentAudience
-from api.models.auth import User
 from api.models.base import TimeStampedModel, validate_50mb, validate_500mb
 from api.models.repositories import Repository
 
 
 # FILES AND BLOBS
-
 class File(TimeStampedModel):
     """
     Логический файл внутри репозитория.
@@ -70,47 +68,6 @@ class FileBlob(TimeStampedModel):
         return self.sha256
 
 
-
-
-# ENTITY LOG
-
-class EntityLog(TimeStampedModel):
-    """
-    Универсальный audit log.
-
-    GenericForeignKey позволяет логировать любую модель.
-
-    Важно:
-    - связанные бизнес-объекты могут быть физически удалены;
-    - после удаления entity может вернуть None;
-    - поэтому важные данные нужно дублировать в metadata.
-    """
-
-    action = models.CharField(max_length=255, db_index=True)
-    user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="entity_logs",
-    )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.CharField(max_length=64)
-    entity = GenericForeignKey("content_type", "object_id")
-    metadata = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["action"]),
-            models.Index(fields=["content_type", "object_id"]),
-            models.Index(fields=["user", "created_at"]),
-        ]
-
-    def __str__(self):
-        return self.action
-
-
-
 # MEDIA FILES
 
 class MediaFile(TimeStampedModel):
@@ -122,7 +79,7 @@ class MediaFile(TimeStampedModel):
 
     file = models.FileField(upload_to="media/")
     uploaded_by = models.ForeignKey(
-        User,
+        "api.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -141,7 +98,7 @@ class MediaMeta(TimeStampedModel):
     Удаляется физически.
     """
 
-    admin = models.ForeignKey(User, on_delete=models.PROTECT, related_name="managed_media_meta")
+    admin = models.ForeignKey("api.User", on_delete=models.PROTECT, related_name="managed_media_meta")
     media = models.OneToOneField(MediaFile, on_delete=models.CASCADE, related_name="meta")
     description = models.TextField(null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -150,9 +107,7 @@ class MediaMeta(TimeStampedModel):
         return self.name
 
 
-
 # APP VERSIONS / DOWNLOADS
-
 class AppVersion(TimeStampedModel):
     """
     Версия приложения для download-раздела.
@@ -173,7 +128,7 @@ class AppVersion(TimeStampedModel):
     platform = models.CharField(max_length=100, default="all", db_index=True)
     file_size = models.PositiveBigIntegerField()
     original_name = models.CharField(max_length=255)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_app_versions")
+    created_by = models.ForeignKey("api.User", on_delete=models.PROTECT, related_name="created_app_versions")
 
     class Meta:
         indexes = [
@@ -203,7 +158,7 @@ class Documentation(TimeStampedModel):
         default=DocumentationType.GUIDE,
         db_index=True,
     )
-    admin = models.ForeignKey(User, on_delete=models.PROTECT, related_name="documentation_items")
+    admin = models.ForeignKey("api.User", on_delete=models.PROTECT, related_name="documentation_items")
     target_audience = models.CharField(
         max_length=20,
         choices=ContentAudience.choices,
@@ -221,10 +176,7 @@ class Documentation(TimeStampedModel):
     def __str__(self):
         return self.type
 
-
-
 # FAQ
-
 class FAQ(TimeStampedModel):
     """
     FAQ: вопрос-ответ система.
@@ -242,9 +194,9 @@ class FAQ(TimeStampedModel):
         default=ContentAudience.ALL,
         db_index=True,
     )
-    questioner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="faq_questions")
+    questioner = models.ForeignKey("api.User", on_delete=models.CASCADE, related_name="faq_questions")
     answerer = models.ForeignKey(
-        User,
+        "api.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from api.models.content import FAQ
-from api.views.users import get_user_from_request_data, is_admin
-from api.views.content import log_action
+from api.utils.auth_service import get_user_from_request_data, is_admin
+from api.utils.logging_service import log_action
 
 
 def serialize_faq(faq):
