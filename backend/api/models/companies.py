@@ -207,23 +207,67 @@ class CompanyInvite(TimeStampedModel):
                 actor=invite.invited_user,
                 title="Invitation declined",
                 text=f"{invite.invited_user.username} declined invitation to {invite.company.name}.",
+                metadata={"company_id": invite.company_id},
             )
 
     @transaction.atomic
-    def cancel(self, user):
+    def accept(self, user):
         invite = CompanyInvite.objects.select_for_update().get(pk=self.pk)
 
-        if invite.invited_by_id != user.id and invite.company.owner_id != user.id:
-            raise ValidationError("You cannot cancel this invite.")
+        if invite.invited_user_id != user.id:
+            raise ValidationError("You cannot accept this invite.")
 
         if invite.status != CompanyInviteStatus.PENDING:
             raise ValidationError("Invite is no longer active.")
 
-        invite.status = CompanyInviteStatus.CANCELLED
+        CompanyMember.objects.get_or_create(
+            company=invite.company,
+            user=invite.invited_user
+        )
+
+        invite.status = CompanyInviteStatus.ACCEPTED
         invite.save(update_fields=["status", "updated_at"])
 
-    def __str__(self):
-        return f"{self.invited_user.username} -> {self.company.name} ({self.status})"
+        # уведомление пригласившему
+        if invite.invited_by:
+            Notification.objects.create(
+                recipient=invite.invited_by,
+                actor=invite.invited_user,
+                title="Invitation accepted",
+                text=f"{invite.invited_user.username} joined {invite.company.name}.",
+                metadata={"company_id": invite.company_id},
+            )
+
+        # уведомление пользователю
+        Notification.objects.create(
+            recipient=invite.invited_user,
+            actor=invite.invited_by,
+            title="You joined a company",
+            text=f"You have been added to {invite.company.name}.",
+            metadata={"company_id": invite.company_id},
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def create_invite(company, invited_user, invited_by):
+        invite = CompanyInvite.objects.create(
+            company=company,
+            invited_user=invited_user,
+            invited_by=invited_by,
+        )
+
+        Notification.objects.create(
+            recipient=invited_user,
+            actor=invited_by,
+            title="Company invitation",
+            text=f"You were invited to join {company.name}.",
+            metadata={
+                "company_id": company.id,
+                "invite_id": invite.id,
+            },
+        )
+
+        return invite
 
 
 

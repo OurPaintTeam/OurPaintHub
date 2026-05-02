@@ -1,10 +1,11 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 
-from api.models.companies import Company, CompanyMember
+from api.models.companies import Company, CompanyMember, CompanyInvite
 from api.models.repositories import Repository
 from api.models.companies import (
     is_company_member,
@@ -212,3 +213,139 @@ def get_company_repositories(request, user, company_id):
     repos = Repository.objects.filter(owner_company=company).order_by("name")
 
     return Response([serialize_repository(r, user) for r in repos])
+
+
+@api_view(["POST"])
+def create_company_invite(request, company_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "company_not_found"}, status=404)
+
+    if not can_manage_company(user, company) and not is_company_member(user, company):
+        return Response({"error": "forbidden"}, status=403)
+
+    invited_user_id = request.data.get("user_id")
+
+    try:
+        invited_user = User.objects.get(id=invited_user_id)
+    except User.DoesNotExist:
+        return Response({"error": "user_not_found"}, status=404)
+
+    try:
+        invite = CompanyInvite.create_invite(
+            company=company,
+            invited_user=invited_user,
+            invited_by=user,
+        )
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=400)
+
+    return Response({
+        "id": invite.id,
+        "status": invite.status,
+    }, status=201)
+
+
+@api_view(["GET"])
+def get_incoming_invites(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    invites = CompanyInvite.objects.filter(
+        invited_user=user,
+        status=CompanyInviteStatus.PENDING
+    ).select_related("company", "invited_by")
+
+    return Response([
+        {
+            "id": i.id,
+            "company": i.company.name,
+            "company_id": i.company_id,
+            "invited_by": i.invited_by.username if i.invited_by else None,
+            "status": i.status,
+            "created_at": i.created_at,
+        }
+        for i in invites
+    ])
+
+
+@api_view(["GET"])
+def get_sent_invites(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    invites = CompanyInvite.objects.filter(
+        invited_by=user
+    ).select_related("company", "invited_user")
+
+    return Response([
+        {
+            "id": i.id,
+            "company": i.company.name,
+            "invited_user": i.invited_user.username,
+            "status": i.status,
+            "created_at": i.created_at,
+        }
+        for i in invites
+    ])
+
+
+
+@api_view(["POST"])
+def accept_invite(request, invite_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        invite = CompanyInvite.objects.get(id=invite_id)
+        invite.accept(user)
+    except CompanyInvite.DoesNotExist:
+        return Response({"error": "not_found"}, status=404)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=400)
+
+    return Response({"message": "accepted"})
+
+
+
+@api_view(["POST"])
+def reject_invite(request, invite_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        invite = CompanyInvite.objects.get(id=invite_id)
+        invite.reject(user)
+    except CompanyInvite.DoesNotExist:
+        return Response({"error": "not_found"}, status=404)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=400)
+
+    return Response({"message": "rejected"})
+
+
+@api_view(["POST"])
+def cancel_invite(request, invite_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        invite = CompanyInvite.objects.get(id=invite_id)
+        invite.cancel(user)
+    except CompanyInvite.DoesNotExist:
+        return Response({"error": "not_found"}, status=404)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=400)
+
+    return Response({"message": "cancelled"})
+
