@@ -3,7 +3,7 @@ from django.urls import path
 from api.views.faq import get_QA_list, get_answered_QA_list, get_unanswered_QA_list, create_QA, answer_QA, delete_QA
 
 urlpatterns = [
-    path("", get_QA_list),
+    path("list/", get_QA_list),
     path("answered/", get_answered_QA_list),
     path("unanswered/", get_unanswered_QA_list),
 
