@@ -49,6 +49,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
             { label: "Вопросы", path: "/QA" },
         ]
         : [
+            { label: "Главная", path: "/general" },
             { label: "Новости", path: "/news" },
             { label: "Документация", path: "/docs" },
             { label: "Приложение", path: "/download" },
@@ -67,7 +68,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
             <div className="nav-container">
                 <button
                     className="nav-logo"
-                    onClick={() => navigate(isAuthenticated ? "/general" : "/news")}
+                    onClick={() => navigate("/general")}
                     aria-label="OurPaintHUB"
                     type="button"
                 >

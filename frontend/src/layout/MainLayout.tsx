@@ -1,5 +1,6 @@
 import React from "react";
 import NavigationBox from "../components/NavigationBox/NavigationBox";
+import { useAuth } from "../contexts/AuthContext";
 import "./MainLayout.scss";
 
 interface MainLayoutProps {
@@ -9,9 +10,11 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, isAuthenticated, userName }) => {
+  const { isAuthenticated: authIsAuthenticated } = useAuth();
+
   return (
     <div className="main-layout">
-      <NavigationBox isAuthenticated={isAuthenticated} userName={userName} />
+      <NavigationBox isAuthenticated={authIsAuthenticated} userName={userName} />
 
       <main className="content">
         {children}
