@@ -1,76 +1,97 @@
-from api.models.companies import is_company_member, can_manage_company, can_view_repository, can_edit_repository, \
-    can_delete_repository
+from django.db.models import Q
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
+from api.models.user import UserProfile
+
+from api.models.repositories import Repository
+from api.models.companies import Company
+
+from api.choices import RepositoryVisibility
+from api.utils.auth_service import get_user_from_request_data
+from api.utils.serializers import serialize_user,serialize_repository,serialize_company
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 
-def serialize_user(user, request=None):
-    profile = getattr(user, "profile", None)
-
-    def serialize_date(value):
-        return value.isoformat() if hasattr(value, "isoformat") else value
-
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "role": user.role,
-        "is_admin": user.is_app_admin,
-        "is_staff": user.is_staff,
-        "is_superuser": user.is_superuser,
-        "bio": profile.bio if profile else None,
-        "date_of_birth": serialize_date(profile.date_of_birth) if profile and profile.date_of_birth else None,
-        "avatar": (request.build_absolute_uri(profile.avatar.url)
-            if profile and profile.avatar and request
-            else None
-        ),
-        "date_joined": user.date_joined.isoformat() if user.date_joined else None,
-        "last_login": user.last_login.isoformat() if user.last_login else None,
-        "profile_created_at": profile.created_at.isoformat() if profile else None,
-        "profile_updated_at": profile.updated_at.isoformat() if profile else None,
-    }
-
-def serialize_repository(repository, user=None):
-    return {
-        "id": repository.id,
-        "name": repository.name,
-        "description": repository.description,
-        "visibility": repository.visibility,
-        "created_by_id": repository.created_by_id,
-        "owner_user_id": repository.owner_user_id,
-        "owner_user_username": repository.owner_user.username if repository.owner_user_id else None,
-        "owner_company_id": repository.owner_company_id,
-        "owner_company_name": repository.owner_company.name if repository.owner_company_id else None,
-        "is_personal": repository.is_personal,
-        "is_company_repository": repository.is_company_repository,
-        **(
-            {
-                "can_view": can_view_repository(user, repository),
-                "can_edit": can_edit_repository(user, repository),
-                "can_delete": can_delete_repository(user, repository),
-            }
-            if user
-            else {}
-        ),
-    }
+@api_view(["GET"])
+def get_all_users(request):
+    users = User.objects.order_by("username")
+    return Response([serialize_user(user) for user in users], status=status.HTTP_200_OK)
 
 
-def serialize_company(company, user=None):
-    data = {
-        "id": company.id,
-        "name": company.name,
-        "description": company.description,
-        "owner_id": company.owner_id,
-        "owner_username": company.owner.username,
-    }
+@api_view(["GET"])
+def get_public_user_profile(request, user_id):
+    requester, error = get_user_from_request_data(request)
+    if error:
+        return error
 
-    if user:
-        data.update(
-            {
-                "is_owner": company.owner_id == user.id,
-                "is_member": is_company_member(user, company),
-                "can_manage": can_manage_company(user, company),
-            }
-        )
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-    return data
+    repositories = Repository.objects.filter(owner_user=user, visibility=RepositoryVisibility.PUBLIC).order_by("name")
+    companies = Company.objects.filter(Q(owner=user) | Q(companymember__user=user)).distinct().order_by("name")
+
+    return Response(
+        {
+            "user": serialize_user(user),
+            "repositories": [serialize_repository(repository, requester) for repository in repositories],
+            "companies": [serialize_company(company, requester) for company in companies],
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+def check_user_role(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    return Response(
+        {
+            "user_id": user.id,
+            "role": user.role,
+            "is_admin": user.is_app_admin,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+def get_user_profile(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    return Response(serialize_user(user), status=status.HTTP_200_OK)
+
+
+@api_view(["GET", "PUT"])
+def update_user_profile(request):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+
+    user.first_name = request.data.get("first_name", user.first_name)
+    user.last_name = request.data.get("last_name", user.last_name)
+    user.save(update_fields=["first_name", "last_name"])
+
+    if "bio" in request.data:
+        profile.bio = request.data.get("bio")
+    if "date_of_birth" in request.data:
+        profile.date_of_birth = request.data.get("date_of_birth") or None
+    if "avatar" in request.FILES:
+        profile.avatar = request.FILES["avatar"]
+    profile.save()
+
+    return Response({"message": "Профиль обновлён", "user": serialize_user(user)}, status=status.HTTP_200_OK)
