@@ -70,7 +70,7 @@ const PublicAccountPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const data = await apiFetch<PublicProfileResponse>(`/users/${id}/profile/`, {
+            const data = await apiFetch<PublicProfileResponse>(`/profile/${id}/`, {
                 auth: true,
             });
 

@@ -1,10 +1,10 @@
 const getDefaultApiBaseUrl = (): string => {
     if (typeof window === "undefined") {
-        return "https://127.0.0.1:8000/api";
+        return "http://127.0.0.1:8000/api";
     }
 
     const host = window.location.hostname || "127.0.0.1";
-    return `https://${host}:8000/api`;
+    return `http://${host}:8000/api`;
 };
 
 const getApiBaseUrl = (): string => {

@@ -71,8 +71,8 @@ function App() {
                     <Route path="/download" element={<DownloadPage isAuthenticated={isAuthenticated} />} />
                     <Route path="/QA" element={<QAPage isAuthenticated={isAuthenticated} />} />
 
-                    <Route path="/account" element={requireAuth(<AccountPage />)} />
-                    <Route path="/account/id/:id" element={<PublicAccountPage />} />
+                    <Route path="/profile" element={requireAuth(<AccountPage />)} />
+                    <Route path="/profile/:id" element={<PublicAccountPage />} />
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
                     <Route path="/notification" element={requireAuth(<NotificationPage />)} />
 
@@ -90,10 +90,10 @@ function App() {
                     <Route path="/docs/edit/:id" element={requireAdmin(<EditDocumentationPage />)} />
                     <Route path="/download/add" element={requireAdmin(<AddVersionPage />)} />
 
-                    <Route path="/login" element={isAuthenticated ? <Navigate to="/account" replace /> : <LoginPage />} />
+                    <Route path="/login" element={isAuthenticated ? <Navigate to="/profile" replace /> : <LoginPage />} />
                     <Route
                         path="/registration"
-                        element={isAuthenticated ? <Navigate to="/account" replace /> : <RegistrationPage />}
+                        element={isAuthenticated ? <Navigate to="/profile" replace /> : <RegistrationPage />}
                     />
 
                     <Route path="/general" element={<GeneralPage />} />

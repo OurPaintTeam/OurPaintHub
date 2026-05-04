@@ -156,7 +156,7 @@ const SettingsPage: React.FC = () => {
             <div className="settings-container">
                 <button
                     className="back-btn"
-                    onClick={() => navigate("/account")}
+                    onClick={() => navigate("/profile")}
                 >
                     Назад
                 </button>
@@ -284,7 +284,7 @@ const SettingsPage: React.FC = () => {
                         <button
                             className="cancel-btn"
                             onClick={() =>
-                                navigate("/account")
+                                navigate("/profile")
                             }
                         >
                             Отмена

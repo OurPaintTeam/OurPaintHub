@@ -115,7 +115,7 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
 
             {menuOpen && (
                 <div className="icon-menu" ref={menuRef}>
-                    <button onClick={() => { navigate("/account"); setMenuOpen(false); }} type="button">
+                    <button onClick={() => { navigate("/profile"); setMenuOpen(false); }} type="button">
                         Профиль
                     </button>
                     <button onClick={() => { navigate("/repositories"); setMenuOpen(false); }} type="button">

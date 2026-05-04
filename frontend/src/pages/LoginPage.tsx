@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
+// @ts-ignore
 import opLogo from "../assets/OP_logo.svg";
 import "./LoginPage.scss";
 
@@ -56,7 +57,7 @@ const LoginPage: React.FC = () => {
             window.dispatchEvent(new Event("auth-changed"));
 
             setMessage("Успешная авторизация!");
-            setTimeout(() => navigate("/account"), 1000);
+            setTimeout(() => navigate("/profile"), 1000);
         } catch (error) {
             setMessage(`Ошибка: ${error instanceof Error ? error.message : String(error)}`);
         } finally {

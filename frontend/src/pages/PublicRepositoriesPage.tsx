@@ -70,7 +70,7 @@ const PublicRepositoriesPage: React.FC = () => {
                                         className="link-btn"
                                         onClick={(event) => {
                                             event.stopPropagation();
-                                            navigate(`/account/id/${repo.owner_user_id}`);
+                                            navigate(`/profile/${repo.owner_user_id}/`);
                                         }}
                                     >
                                         Автор: {repo.owner_user_username || repo.owner_user_id}

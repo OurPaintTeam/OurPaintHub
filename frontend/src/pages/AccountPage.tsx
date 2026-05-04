@@ -80,7 +80,7 @@ const AccountPage: React.FC = () => {
             });
             setRepositories(Array.isArray(repos) ? repos : []);
 
-            const companies = await apiFetch<Company[]>("/companies/", {
+            const companies = await apiFetch<Company[]>("/companies/list/", {
                 auth: true,
                 redirectOnError: false,
             });
