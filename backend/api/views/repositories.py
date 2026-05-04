@@ -17,12 +17,49 @@ from api.models.content import File, FileBlob
 from api.models.commit import CommitFile, Commit
 from api.models.repositories import Repository
 from api.utils.auth_service import get_user_from_request_data
-from api.utils.commit_service import create_repository_commit
+from api.utils.commit_service import create_repository_commit, get_commit_snapshot_files
 from api.utils.logging_service import log_action
 from api.utils.repository_service import get_current_repository_file_versions, sanitize_archive_path, build_commit_hash, \
     get_latest_commit
 from api.utils.serializers import serialize_repository
 from api.utils.session import request_get_list
+
+
+@api_view(["GET"])
+def get_commit_snapshot(request, repository_id, commit_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "Репозиторий не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not can_view_repository(user, repository):
+        return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        commit = Commit.objects.get(id=commit_id, repository=repository)
+    except Commit.DoesNotExist:
+        return Response({"error": "Коммит не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+    snapshot = get_commit_snapshot_files(commit)
+
+    return Response([
+        {
+            "id": f.file_id,
+            "path": f.path,
+            "name": os.path.basename(f.path),
+            "commit_file_id": f.id,
+            "blob_id": f.blob_id,
+            "size": f.blob.size if f.blob else None,
+            "sha256": f.blob.sha256 if f.blob else None,
+            "download_url": f"/api/commit-files/{f.id}/download/" if f.blob_id else None,
+        }
+        for f in snapshot
+        if f
+    ])
 
 
 # =========================================================

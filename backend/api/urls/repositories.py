@@ -5,7 +5,7 @@ from api.views.repositories import get_repositories
 from api.views.commits import create_commit
 from api.views.repositories import revert_repository_to_commit, get_repository_commits, delete_repository_file, \
     get_repository_files, download_repository, get_repository, get_repository_detail, update_repository, \
-    delete_repository, get_my_repositories, get_public_repositories, create_repository
+    delete_repository, get_my_repositories, get_public_repositories, create_repository,get_commit_snapshot
 
 urlpatterns = [
     path("list/", get_repositories),
@@ -29,4 +29,6 @@ urlpatterns = [
     path("<int:repository_id>/commits/create/", create_commit),
 
     path("<int:repository_id>/commits/<int:commit_id>/revert/", revert_repository_to_commit, ),
+
+    path("<int:repository_id>/commits/<int:commit_id>/snapshot/", get_commit_snapshot),
 ]
