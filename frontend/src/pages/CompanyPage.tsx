@@ -44,12 +44,14 @@ const CompanyPage: React.FC = () => {
     const [showRepoForm, setShowRepoForm] = useState(false);
     const [companyName, setCompanyName] = useState("");
     const [companyDescription, setCompanyDescription] = useState("");
-    const [memberId, setMemberId] = useState("");
     const [repoName, setRepoName] = useState("");
     const [repoDescription, setRepoDescription] = useState("");
     const [repoVisibility, setRepoVisibility] = useState<"private" | "public">("private");
     const [repoFiles, setRepoFiles] = useState<File[]>([]);
     const [message, setMessage] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<User[]>([]);
+    const [inviteLoading, setInviteLoading] = useState(false);
 
     useEffect(() => {
         if (!id) {
@@ -112,30 +114,56 @@ const CompanyPage: React.FC = () => {
         navigate("/companies");
     };
 
-    const addMember = async () => {
-        if (!company || !memberId.trim()) {
-            setMessage("ID пользователя обязателен");
+    const searchUsers = async (q: string) => {
+        if (!q.trim()) {
+            setSearchResults([]);
             return;
         }
 
-        setSaving(true);
-        setMessage("");
         try {
-            await apiFetch(`/companies/${company.id}/members/add/`, {
-                method: "POST",
+            const data = await apiFetch<User[]>(`/users/search/?q=${q}`, {
                 auth: true,
-                body: JSON.stringify({ member_id: Number(memberId) }),
-                redirectOnError: false,
             });
-            setMemberId("");
-            setMessage("Участник добавлен");
-            await load();
-        } catch (error) {
-            setMessage(error instanceof Error ? error.message : "Ошибка добавления участника");
-        } finally {
-            setSaving(false);
+
+            setSearchResults(data || []);
+        } catch (e) {
+            setSearchResults([]);
         }
     };
+
+    const inviteUser = async (user: User) => {
+        if (!company) return;
+
+        setInviteLoading(true);
+        setMessage("");
+
+        try {
+            await apiFetch(`/companies/${company.id}/invite/`, {
+                method: "POST",
+                auth: true,
+                body: JSON.stringify({
+                    username: user.username,
+                    email: user.email,
+                }),
+            });
+
+            setMessage("Приглашение отправлено");
+            setSearchQuery("");
+            setSearchResults([]);
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : "Ошибка приглашения");
+        } finally {
+            setInviteLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            searchUsers(searchQuery);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const removeMember = async (removedMemberId: number) => {
         if (!company || !window.confirm("Удалить участника?")) return;
@@ -246,13 +274,32 @@ const CompanyPage: React.FC = () => {
                             <p>{company.description || "Без описания"}</p>
                             <p>Владелец: {company.owner_username || company.owner_id}</p>
                             {company.can_manage && (
-                                <div className="company-actions">
-                                    <button onClick={() => setEditing(true)} className="secondary-btn">
-                                        Редактировать
-                                    </button>
-                                    <button onClick={deleteCompany} className="danger-btn">
-                                        Удалить
-                                    </button>
+                                <div className="invite-box">
+                                    <input
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Поиск пользователя (username или email)"
+                                    />
+
+                                    {searchResults.length > 0 && (
+                                        <div className="invite-results">
+                                            {searchResults.map((user) => (
+                                                <div key={user.id} className="invite-row">
+                        <span>
+                            {user.username || user.email}
+                        </span>
+
+                                                    <button
+                                                        onClick={() => inviteUser(user)}
+                                                        disabled={inviteLoading}
+                                                        className="invite-btn"
+                                                    >
+                                                        Пригласить
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </>
@@ -263,25 +310,46 @@ const CompanyPage: React.FC = () => {
 
                 <section className="section card">
                     <h2>Участники</h2>
+
                     {company.can_manage && (
-                        <div className="inline-form">
+                        <div className="invite-box">
                             <input
-                                value={memberId}
-                                onChange={(event) => setMemberId(event.target.value)}
-                                placeholder="ID пользователя"
-                                type="number"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Поиск пользователя (username или email)"
                             />
-                            <button onClick={addMember} disabled={saving || !memberId.trim()} className="card-btn">
-                                Добавить
-                            </button>
+
+                            {searchResults.length > 0 && (
+                                <div className="invite-results">
+                                    {searchResults.map((user) => (
+                                        <div key={user.id} className="invite-row">
+                                            <span>{user.username || user.email}</span>
+
+                                            <button
+                                                onClick={() => inviteUser(user)}
+                                                disabled={inviteLoading}
+                                                className="invite-btn"
+                                            >
+                                                Пригласить
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
+
                     <div className="members-list">
                         {members.map((member) => (
                             <div key={member.id} className="member-row">
                                 <span>{member.username || member.email}</span>
+
                                 {company.can_manage && member.id !== company.owner_id && (
-                                    <button onClick={() => removeMember(member.id)} disabled={saving} className="link-btn danger">
+                                    <button
+                                        onClick={() => removeMember(member.id)}
+                                        disabled={saving}
+                                        className="link-btn danger"
+                                    >
                                         Удалить
                                     </button>
                                 )}

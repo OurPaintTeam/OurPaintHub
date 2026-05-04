@@ -28,6 +28,7 @@ import RepositoryPage from "./pages/RepositoryPage";
 import "./styles/toast.scss";
 import PublicRepositoriesPage from "./pages/PublicRepositoriesPage";
 import CompanyPage from "./pages/CompanyPage";
+import NotificationPage from "./pages/NotificationPage";
 
 
 function App() {
@@ -73,6 +74,7 @@ function App() {
                     <Route path="/account" element={requireAuth(<AccountPage />)} />
                     <Route path="/account/id/:id" element={<PublicAccountPage />} />
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
+                    <Route path="/notification" element={requireAuth(<NotificationPage />)} />
 
                     <Route path="/repositories" element={requireAuth(<RepositoriesPage />)} />
                     <Route path="/repositories/my" element={requireAuth(<RepositoriesMyPage />)} />

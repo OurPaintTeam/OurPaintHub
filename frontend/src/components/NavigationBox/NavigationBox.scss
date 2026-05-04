@@ -13,3 +13,63 @@
 .mobile-menu-toggle {
   box-sizing: border-box;
 }
+
+
+.notification-btn {
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+  border: 1px solid #d0d5dd;
+
+  background: #f3f4f6; // светло-серый фон
+  color: #111827;
+
+  font-size: 18px;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease-in-out;
+
+  // чтобы не было "дёрганья" при hover
+  transform: translateZ(0);
+}
+
+.notification-btn:hover {
+  background: #e5e7eb;
+  border-color: #cbd5e1;
+  transform: scale(1.05);
+}
+
+.notification-btn:active {
+  transform: scale(0.92);
+}
+
+.notification-btn {
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+
+  background: red;
+  color: white;
+
+  font-size: 10px;
+  font-weight: bold;
+
+  width: 16px;
+  height: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+}
