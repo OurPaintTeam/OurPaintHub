@@ -1,18 +1,19 @@
 from django.urls import path
 
-from api.views.companies import get_companies, create_company, get_or_update_company, delete_company, get_company_members, \
-    add_company_member, remove_company_member, get_company_repositories, get_incoming_invites, get_sent_invites, \
-    accept_invite, reject_invite, cancel_invite
+from api.views.companies import get_companies, create_company, get_or_update_company, delete_company, \
+    get_company_members, \
+    remove_company_member, get_company_repositories, get_incoming_invites, get_sent_invites, \
+    accept_invite, reject_invite, cancel_invite, create_company_invite
 
 urlpatterns = [
     path("list/", get_companies),
     path("create/", create_company),
 
     path("<int:company_id>/", get_or_update_company),
+
     path("<int:company_id>/delete/", delete_company),
 
     path("<int:company_id>/members/", get_company_members),
-    path("<int:company_id>/members/add/", add_company_member),
     path("<int:company_id>/members/remove/", remove_company_member),
 
     path("<int:company_id>/repositories/", get_company_repositories),
@@ -31,4 +32,6 @@ urlpatterns = [
 
     # отменить приглашение (owner / inviter)
     path("invites/<int:invite_id>/cancel/", cancel_invite),
+
+    path("<int:company_id>/invite/", create_company_invite),
 ]

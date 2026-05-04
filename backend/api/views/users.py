@@ -11,12 +11,34 @@ from api.models.companies import Company
 
 from api.choices import RepositoryVisibility
 from api.utils.auth_service import get_user_from_request_data
+from api.utils.repository_service import with_user
 from api.utils.serializers import serialize_user, serialize_repository, serialize_company
 
 from django.contrib.auth import get_user_model
-
 User = get_user_model()
 
+
+@api_view(["GET"])
+@with_user
+def search_users(request, user):
+    q = request.GET.get("q", "").strip()
+
+    if not q:
+        return Response([], status=200)
+
+    users = User.objects.filter(
+        Q(username__icontains=q) |
+        Q(email__icontains=q)
+    )[:10]
+
+    return Response([
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email
+        }
+        for u in users
+    ])
 
 @api_view(["GET"])
 def get_all_users(request):

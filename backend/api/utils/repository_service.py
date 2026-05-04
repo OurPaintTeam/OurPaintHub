@@ -4,6 +4,17 @@ from django.core.files.base import ContentFile
 
 from api.choices import CommitFileOperation
 from api.models.commit import CommitFile
+from api.utils.auth_service import get_user_from_request_data
+
+
+def with_user(view_func):
+    def wrapper(request, *args, **kwargs):
+        user, error = get_user_from_request_data(request)
+        if error:
+            return error
+        return view_func(request, user, *args, **kwargs)
+    return wrapper
+
 
 def get_latest_commit(repository):
     return repository.commits.order_by("-created_at", "-id").first()

@@ -4,8 +4,10 @@ from rest_framework import status
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
+from django.contrib.auth import get_user_model
 
-
+from api.choices import CompanyInviteStatus
+from api.models import Notification
 from api.models.companies import Company, CompanyMember, CompanyInvite
 from api.models.repositories import Repository
 from api.models.companies import (
@@ -14,20 +16,12 @@ from api.models.companies import (
 )
 from api.utils.auth_service import get_user_from_request_data
 from api.utils.logging_service import log_action
+from api.utils.repository_service import with_user
 
 from api.utils.serializers import serialize_user, serialize_repository, serialize_company
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
-
-
-def with_user(view_func):
-    def wrapper(request, *args, **kwargs):
-        user, error = get_user_from_request_data(request)
-        if error:
-            return error
-        return view_func(request, user, *args, **kwargs)
-    return wrapper
 
 
 def company_name_taken(name, exclude_company_id=None):
@@ -37,6 +31,81 @@ def company_name_taken(name, exclude_company_id=None):
         queryset = queryset.exclude(id=exclude_company_id)
 
     return queryset.exists()
+
+
+@api_view(["POST"])
+@with_user
+def create_company_invite(request, user, company_id):
+
+    try:
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "company_not_found"}, status=404)
+
+    if not can_manage_company(user, company):
+        return Response({"error": "forbidden"}, status=403)
+
+    username = request.data.get("username")
+    email = request.data.get("email")
+
+    if not username and not email:
+        return Response({"error": "username or email required"}, status=400)
+
+    User = get_user_model()
+
+    invited_user = None
+
+    if username:
+        invited_user = User.objects.filter(username=username).first()
+
+    if email and not invited_user:
+        invited_user = User.objects.filter(email=email).first()
+
+    if not invited_user:
+        return Response({"error": "user_not_found"}, status=404)
+
+    # уже участник
+    if CompanyMember.objects.filter(company=company, user=invited_user).exists():
+        return Response({"error": "already_member"}, status=400)
+
+    existing = CompanyInvite.objects.filter(
+        company=company,
+        invited_user=invited_user,
+        status="pending"
+    ).first()
+
+    if existing:
+        return Response({
+            "error": "invite_already_sent",
+            "invite_id": existing.id
+        }, status=400)
+
+    try:
+        invite = CompanyInvite.create_invite(
+            company=company,
+            invited_user=invited_user,
+            invited_by=user,
+        )
+
+        Notification.objects.create(
+            recipient=invited_user,
+            actor=user,
+            title="Company invitation",
+            text=f"You were invited to join {company.name}.",
+            metadata={
+                "type": "company_invite",
+                "invite_id": invite.id,
+                "company_id": company.id,
+            },
+        )
+
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=400)
+
+    return Response({
+        "id": invite.id,
+        "status": invite.status,
+    }, status=201)
 
 
 @api_view(["GET"])
@@ -179,31 +248,6 @@ def get_company_members(request, user, company_id):
     return Response([serialize_user(m) for m in members])
 
 
-@api_view(["POST"])
-@with_user
-def add_company_member(request, user, company_id):
-    member_id = request.data.get("member_id")
-
-    if not member_id:
-        return Response({"error": "member_id required"}, status=400)
-
-    try:
-        company = Company.objects.get(id=company_id)
-        member = User.objects.get(id=member_id)
-    except Company.DoesNotExist:
-        return Response({"error": "Компания не найдена"}, status=404)
-    except User.DoesNotExist:
-        return Response({"error": "User not found"}, status=404)
-
-    if not can_manage_company(user, company):
-        return Response({"error": "Нет прав"}, status=403)
-
-    CompanyMember.objects.get_or_create(company=company, user=member)
-
-    log_action(user, "add_member", company, {"member_id": member.id})
-
-    return Response({"message": "added"}, status=201)
-
 
 @api_view(["DELETE"])
 @with_user
@@ -260,14 +304,24 @@ def create_company_invite(request, company_id):
     except Company.DoesNotExist:
         return Response({"error": "company_not_found"}, status=404)
 
-    if not can_manage_company(user, company) and not is_company_member(user, company):
+    if not can_manage_company(user, company):
         return Response({"error": "forbidden"}, status=403)
 
-    invited_user_id = request.data.get("user_id")
+    username = request.data.get("username")
+    email = request.data.get("email")
 
-    try:
-        invited_user = User.objects.get(id=invited_user_id)
-    except User.DoesNotExist:
+    if not username and not email:
+        return Response({"error": "username_or_email_required"}, status=400)
+
+    invited_user = None
+
+    if username:
+        invited_user = User.objects.filter(username=username).first()
+
+    if not invited_user and email:
+        invited_user = User.objects.filter(email=email).first()
+
+    if not invited_user:
         return Response({"error": "user_not_found"}, status=404)
 
     try:
