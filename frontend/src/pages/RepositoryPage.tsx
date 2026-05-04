@@ -120,7 +120,7 @@ const RepositoryPage: React.FC = () => {
 
         try {
             const snapshot = await apiFetch<RepoFile[]>(
-                `/commits/${commit.id}/snapshot/`,
+                `repositories/${id}/commits/${commit.id}/snapshot/`,
                 { auth: true }
             );
 

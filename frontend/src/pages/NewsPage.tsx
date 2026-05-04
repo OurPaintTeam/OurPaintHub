@@ -44,7 +44,7 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
         setLoading(true);
 
         try {
-            const data = await apiFetch<NewsItem[]>("/news/");
+            const data = await apiFetch<NewsItem[]>("/news/list/");
             setNews(data);
         } finally {
             setLoading(false);
