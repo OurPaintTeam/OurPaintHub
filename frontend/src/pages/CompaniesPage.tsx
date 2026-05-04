@@ -56,7 +56,7 @@ const CompaniesPage: React.FC = () => {
     const loadCompanies = async () => {
         setLoading(true);
         try {
-            const data = await apiFetch<Company[]>("/companies/", { auth: true });
+            const data = await apiFetch<Company[]>("/companies/list/", { auth: true });
             setCompanies(data || []);
         } finally {
             setLoading(false);

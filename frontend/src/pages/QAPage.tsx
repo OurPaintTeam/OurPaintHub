@@ -92,7 +92,7 @@ const QAPage: React.FC<QAPageProps> = ({ isAuthenticated = false }) => {
         setLoading(true);
 
         try {
-            const url = admin ? "/QA/" : "/QA/answered/";
+            const url = admin ? "/QA/list/" : "/QA/answered/";
             const data = await apiFetch<QAItem[]>(url);
             setQA(Array.isArray(data) ? data : []);
         } finally {
