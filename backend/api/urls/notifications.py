@@ -8,7 +8,6 @@ from api.views.notifications import (
 )
 
 urlpatterns = [
-    path("", get_notifications),
     path("list/", get_notifications),
     path("create/", create_notification),
     path("events/", notification_events),

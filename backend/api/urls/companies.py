@@ -5,7 +5,6 @@ from api.views.companies import get_companies, create_company, get_or_update_com
     accept_invite, reject_invite, cancel_invite
 
 urlpatterns = [
-    path("", get_companies),
     path("list/", get_companies),
     path("create/", create_company),
 

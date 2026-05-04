@@ -14,6 +14,7 @@ def serialize_faq(faq):
         "answered": faq.answered,
         "answer_text": faq.answer_text,
         "questioner_id": faq.questioner_id,
+        "user_email": faq.questioner.email if faq.questioner else None,
         "answerer_id": faq.answerer_id,
         "created_at": faq.created_at.isoformat(),
         "updated_at": faq.updated_at.isoformat(),

@@ -8,7 +8,6 @@ from api.views.repositories import revert_repository_to_commit, get_repository_c
     delete_repository, get_my_repositories, get_public_repositories, create_repository
 
 urlpatterns = [
-    path("", get_repositories),
     path("list/", get_repositories),
     path("my/", get_my_repositories),
     path("public/", get_public_repositories),
