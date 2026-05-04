@@ -8,7 +8,7 @@ urlpatterns = [
     path("profile/", get_user_profile),
     path("profile/update/", update_user_profile),
     path("role/", check_user_role),
-    path("<int:user_id>/profile/", get_public_user_profile),
+    path("profile/<int:user_id>/", get_public_user_profile),
 
     path("search/", search_users),
 ]
