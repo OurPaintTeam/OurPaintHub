@@ -166,6 +166,7 @@ class Documentation(TimeStampedModel):
         db_index=True,
     )
     text = models.TextField(null=True, blank=True)
+    file = models.FileField(upload_to="documentation/", null=True, blank=True)
 
     class Meta:
         indexes = [

@@ -39,3 +39,6 @@ urlpatterns = [
     path("api/download/<int:version_id>/", download_file),
     path("api/download/<int:version_id>/delete/", delete_version),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

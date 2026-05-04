@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import MarkdownText from "../components/MarkdownText";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./NewsPage.scss";
 
 interface NewsPageProps {
@@ -15,6 +15,8 @@ interface NewsItem {
     content: string;
     author_id?: number;
     author_email?: string;
+    file_url?: string | null;
+    file?: string | null;
     created_at?: string;
     updated_at?: string;
 }
@@ -88,27 +90,35 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
         navigate(`/news/${newsId}`);
     };
 
-    const formatDate = (value: string) => {
+    const formatDate = (value?: string) => {
+        if (!value) return "Дата недоступна";
+
         const date = new Date(value);
 
         if (Number.isNaN(date.getTime())) {
             return "Дата недоступна";
         }
 
-        return date.toLocaleString("ru-RU", {
+        return date.toLocaleDateString("ru-RU", {
             year: "numeric",
-            month: "2-digit",
+            month: "long",
             day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
         });
     };
+
+    const featuredNews = news[0];
+    const recentNews = news.slice(0, 5);
+    const gridNews = news.slice(1);
 
     return (
         <MainLayout isAuthenticated={isAuthenticated}>
             <div className="news-container">
                 <div className="news-header">
-                    <h1>Новости</h1>
+                    <div>
+                        <p className="news-kicker">OurPaint News</p>
+                        <h1>Новости и разработки</h1>
+                        <p>Релизы, обновления CAD-инструментов и заметки команды OurPaint.</p>
+                    </div>
                     {isAuthenticated && isAdmin && (
                         <button onClick={handleAddNews} className="add-news-btn">
                             + Добавить новость
@@ -118,58 +128,93 @@ const NewsPage: React.FC<NewsPageProps> = ({ isAuthenticated = false }) => {
 
                 <div className="news-content">
                     {loading ? (
-                        <p>Загрузка новостей...</p>
+                        <div className="news-empty">Загрузка новостей...</div>
+                    ) : news.length === 0 ? (
+                        <div className="news-empty">Пока нет опубликованных новостей.</div>
                     ) : (
-                        news.map((item) => (
-                            <div key={item.id} className="news-item">
-                                <div className="news-header-item">
-                                    <h2
-                                        className="news-title"
-                                        onClick={() => handleNewsClick(item.id)}
-                                        title="Нажмите для просмотра полной новости"
-                                    >
-                                        {item.title}
-                                    </h2>
-                                    {isAuthenticated && isAdmin && (
-                                        <div className="news-actions">
-                                            <button
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    handleEditNews(item.id);
-                                                }}
-                                                className="edit-btn"
-                                                title="Редактировать новость"
-                                            >
-                                                ✏️
-                                            </button>
-                                            <button
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    void handleDeleteNews(item.id);
-                                                }}
-                                                className="delete-btn"
-                                                title="Удалить новость"
-                                            >
-                                                🗑️
-                                            </button>
+                        <>
+                            <section className="news-feature-layout">
+                                {featuredNews && (
+                                    <article className="news-feature">
+                                        <p className="news-category">Development updates</p>
+                                        <h2 onClick={() => handleNewsClick(featuredNews.id)}>
+                                            {featuredNews.title}
+                                        </h2>
+                                        <div className="news-byline">
+                                            {featuredNews.author_email && <span>{featuredNews.author_email}</span>}
+                                            <span>{formatDate(featuredNews.created_at)}</span>
                                         </div>
-                                    )}
-                                </div>
-                                <div
-                                    className="news-preview"
-                                    onClick={() => handleNewsClick(item.id)}
-                                    title="Нажмите для просмотра полной новости"
-                                >
-                                    <MarkdownText text={item.content} preview={true} maxLength={100} />
-                                </div>
-                                {item.author_email && (
-                                    <div className="news-meta">
-                                        <small>Автор: {item.author_email}</small>
-                                        {item.created_at && <small> • {formatDate(item.created_at)}</small>}
-                                    </div>
+                                        <div className="news-feature-preview" onClick={() => handleNewsClick(featuredNews.id)}>
+                                            <MarkdownText text={featuredNews.content} preview={true} maxLength={520} />
+                                        </div>
+                                        <button className="news-read-link" onClick={() => handleNewsClick(featuredNews.id)} type="button">
+                                            Читать полностью
+                                        </button>
+                                        {isAuthenticated && isAdmin && (
+                                            <div className="news-actions">
+                                                <button onClick={() => handleEditNews(featuredNews.id)} className="edit-btn" type="button">
+                                                    Редактировать
+                                                </button>
+                                                <button onClick={() => void handleDeleteNews(featuredNews.id)} className="delete-btn" type="button">
+                                                    Удалить
+                                                </button>
+                                            </div>
+                                        )}
+                                    </article>
                                 )}
-                            </div>
-                        ))
+
+                                <aside className="recent-posts">
+                                    <h2>Recent posts</h2>
+                                    <div className="recent-posts-list">
+                                        {recentNews.map((item) => (
+                                            <button key={item.id} onClick={() => handleNewsClick(item.id)} type="button">
+                                                <span>{item.title}</span>
+                                                <time>{formatDate(item.created_at)}</time>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </aside>
+                            </section>
+
+                            {gridNews.length > 0 && (
+                                <section className="news-grid" aria-label="Все новости">
+                                    {gridNews.map((item) => (
+                                        <article
+                                            key={item.id}
+                                            className={`news-card ${mediaUrl(item.file_url || item.file) ? "has-media" : ""}`}
+                                            onClick={() => handleNewsClick(item.id)}
+                                            style={mediaUrl(item.file_url || item.file)
+                                                ? { "--news-card-media": `url("${mediaUrl(item.file_url || item.file)}")` } as React.CSSProperties
+                                                : undefined}
+                                        >
+                                            <div className="news-card-media">
+                                                <span />
+                                            </div>
+                                            <div className="news-card-body">
+                                                <p className="news-category">OurPaint update</p>
+                                                <h3>{item.title}</h3>
+                                                <div className="news-card-preview">
+                                                    <MarkdownText text={item.content} preview={true} maxLength={150} />
+                                                </div>
+                                                <div className="news-card-footer">
+                                                    <time>{formatDate(item.created_at)}</time>
+                                                    {isAuthenticated && isAdmin && (
+                                                        <div className="news-actions" onClick={(event) => event.stopPropagation()}>
+                                                            <button onClick={() => handleEditNews(item.id)} className="edit-btn" type="button">
+                                                                Редактировать
+                                                            </button>
+                                                            <button onClick={() => void handleDeleteNews(item.id)} className="delete-btn" type="button">
+                                                                Удалить
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </article>
+                                    ))}
+                                </section>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./EditNews.scss";
 
 interface NewsData {
@@ -10,6 +10,8 @@ interface NewsData {
     content: string;
     author_id: number;
     author_email: string;
+    file_url?: string | null;
+    file?: string | null;
 }
 
 interface UserData {
@@ -27,6 +29,7 @@ const EditNewsPage: React.FC = () => {
 
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
+    const [file, setFile] = useState<File | null>(null);
 
     const user: UserData | null = JSON.parse(
         localStorage.getItem("user") || "null"
@@ -70,15 +73,19 @@ const EditNewsPage: React.FC = () => {
         setSaving(true);
         setMessage("");
 
+        const payload = new FormData();
+        payload.append("user_id", String(user?.id ?? ""));
+        payload.append("title", title);
+        payload.append("content", content);
+        if (file) {
+            payload.append("file", file);
+        }
+
         try {
             await apiFetch(`/news/${id}/`, {
                 method: "PUT",
                 auth: true,
-                body: JSON.stringify({
-                    user_id: user?.id,
-                    title,
-                    content,
-                }),
+                body: payload,
             });
 
             setMessage("Сохранено");
@@ -133,6 +140,17 @@ const EditNewsPage: React.FC = () => {
                         onChange={(e) => setContent(e.target.value)}
                         rows={10}
                         placeholder="Содержание"
+                    />
+
+                    {mediaUrl(news.file_url || news.file) && (
+                        <img className="news-editor-preview" src={mediaUrl(news.file_url || news.file) || ""} alt="" />
+                    )}
+
+                    <input
+                        className="input"
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                     />
 
                     <button

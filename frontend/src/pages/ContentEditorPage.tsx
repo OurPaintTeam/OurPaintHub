@@ -34,6 +34,7 @@ const ContentEditorPage: React.FC = () => {
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [category, setCategory] = useState<string>(DOCUMENTATION_CATEGORIES[0] ?? "");
+    const [file, setFile] = useState<File | null>(null);
 
     const mode: EditorMode = location.pathname.includes("/docs") ? "documentation" : "news";
     const hasCategoryFromState = useRef(false);
@@ -114,26 +115,23 @@ const ContentEditorPage: React.FC = () => {
             ? apiUrl("/documentation/create/")
             : apiUrl("/news/create/");
 
-        const payload = isDocsMode
-            ? {
-                title: title.trim(),
-                content: content.trim(),
-                category,
-            }
-            : {
-                title: title.trim(),
-                content: content.trim(),
-            };
+        const payload = new FormData();
+
+        payload.append("title", title.trim());
+        payload.append("content", content.trim());
+
+        if (isDocsMode) {
+            payload.append("category", category);
+        } else if (file) {
+            payload.append("file", file);
+        }
 
         try {
             const response = await fetch(endpoint, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...getAuthHeaders(),
-                },
+                headers: getAuthHeaders(),
                 credentials: "include",
-                body: JSON.stringify(payload),
+                body: payload,
             });
 
             const responseText = await response.text();
@@ -169,6 +167,7 @@ const ContentEditorPage: React.FC = () => {
 
             setTitle("");
             setContent("");
+            setFile(null);
             if (isDocsMode && DOCUMENTATION_CATEGORIES.length) {
                 setCategory(DOCUMENTATION_CATEGORIES[0]);
             }
@@ -260,6 +259,19 @@ const ContentEditorPage: React.FC = () => {
                             className="form-textarea"
                         />
                     </div>
+
+                    {!isDocsMode && (
+                        <div className="form-group">
+                            <label htmlFor="file">Изображение новости</label>
+                            <input
+                                id="file"
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                                className="form-input"
+                            />
+                        </div>
+                    )}
 
                     <div className="form-actions">
                         <button

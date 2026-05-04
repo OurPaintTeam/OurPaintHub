@@ -55,6 +55,14 @@ def parse_document_text(text):
 
 def serialize_documentation(item):
     parsed = parse_document_text(item.text)
+    file_url = None
+
+    if item.file:
+        try:
+            file_url = item.file.url
+        except ValueError:
+            file_url = None
+
     return {
         "id": item.id,
         "type": item.type,
@@ -63,6 +71,9 @@ def serialize_documentation(item):
         "category": parsed["category"],
         "target_audience": item.target_audience,
         "author_id": item.admin_id,
+        "author_email": item.admin.email if item.admin_id else None,
+        "file": file_url,
+        "file_url": file_url,
         "created_at": item.created_at.isoformat(),
         "updated_at": item.updated_at.isoformat(),
     }
@@ -96,6 +107,7 @@ def create_news(request):
         type=DocumentationType.NEWS,
         admin=user,
         text=build_document_text(title, content),
+        file=request.FILES.get("file"),
     )
 
     log_action(user, "create", news)
@@ -129,6 +141,13 @@ def update_news(request, news_id):
         request.data.get("title", ""),
         request.data.get("content", "")
     )
+
+    if "file" in request.FILES:
+        news.file = request.FILES["file"]
+    elif request.data.get("clear_file") in ("1", "true", "True", True):
+        news.file.delete(save=False)
+        news.file = None
+
     news.save()
 
     log_action(user, "update", news)

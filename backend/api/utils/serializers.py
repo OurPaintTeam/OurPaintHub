@@ -1,12 +1,30 @@
-from api.models.companies import is_company_member, can_manage_company, can_view_repository, can_edit_repository, \
-    can_delete_repository
+from api.models.companies import (
+    CompanyMember,
+    can_delete_repository,
+    can_edit_repository,
+    can_manage_company,
+    can_view_repository,
+    is_company_member,
+)
+
+
+def _file_url(file_field):
+    if not file_field:
+        return None
+
+    try:
+        return file_field.url
+    except ValueError:
+        return None
+
+
+def _iso(value):
+    return value.isoformat() if value and hasattr(value, "isoformat") else value
 
 
 def serialize_user(user):
     profile = getattr(user, "profile", None)
-
-    def serialize_date(value):
-        return value.isoformat() if hasattr(value, "isoformat") else value
+    avatar_url = _file_url(getattr(profile, "avatar", None))
 
     return {
         "id": user.id,
@@ -14,60 +32,65 @@ def serialize_user(user):
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "role": user.role,
-        "is_admin": user.is_app_admin,
+        "role": getattr(user, "role", None),
+        "is_admin": getattr(user, "is_app_admin", False),
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
-        "bio": profile.bio if profile else None,
-        "date_of_birth": serialize_date(profile.date_of_birth) if profile and profile.date_of_birth else None,
-        "avatar": profile.avatar.url if profile and profile.avatar else None,
-        "date_joined": user.date_joined.isoformat() if user.date_joined else None,
-        "last_login": user.last_login.isoformat() if user.last_login else None,
-        "profile_created_at": profile.created_at.isoformat() if profile else None,
-        "profile_updated_at": profile.updated_at.isoformat() if profile else None,
+        "bio": getattr(profile, "bio", None),
+        "date_of_birth": _iso(getattr(profile, "date_of_birth", None)),
+        "avatar": avatar_url,
+        "avatar_url": avatar_url,
+        "date_joined": _iso(getattr(user, "date_joined", None)),
+        "last_login": _iso(getattr(user, "last_login", None)),
+        "profile_created_at": _iso(getattr(profile, "created_at", None)),
+        "profile_updated_at": _iso(getattr(profile, "updated_at", None)),
     }
 
+
 def serialize_repository(repository, user=None):
+    owner_user = repository.owner_user
+    owner_company = repository.owner_company
+
     return {
         "id": repository.id,
         "name": repository.name,
         "description": repository.description,
         "visibility": repository.visibility,
         "created_by_id": repository.created_by_id,
+        "created_by_username": repository.created_by.username if repository.created_by_id else None,
         "owner_user_id": repository.owner_user_id,
-        "owner_user_username": repository.owner_user.username if repository.owner_user_id else None,
+        "owner_user_username": owner_user.username if owner_user else None,
         "owner_company_id": repository.owner_company_id,
-        "owner_company_name": repository.owner_company.name if repository.owner_company_id else None,
+        "owner_company_name": owner_company.name if owner_company else None,
         "is_personal": repository.is_personal,
         "is_company_repository": repository.is_company_repository,
-        **(
-            {
-                "can_view": can_view_repository(user, repository),
-                "can_edit": can_edit_repository(user, repository),
-                "can_delete": can_delete_repository(user, repository),
-            }
-            if user
-            else {}
-        ),
+        "can_view": bool(user and can_view_repository(user, repository)),
+        "can_edit": bool(user and can_edit_repository(user, repository)),
+        "can_delete": bool(user and can_delete_repository(user, repository)),
+        "created_at": _iso(repository.created_at),
+        "updated_at": _iso(repository.updated_at),
     }
 
 
 def serialize_company(company, user=None):
-    data = {
+    member_count = CompanyMember.objects.filter(company=company).count()
+    logo_url = _file_url(company.logo)
+    cover_url = _file_url(company.cover)
+
+    return {
         "id": company.id,
         "name": company.name,
         "description": company.description,
         "owner_id": company.owner_id,
-        "owner_username": company.owner.username,
+        "owner_username": company.owner.username if company.owner_id else None,
+        "logo": logo_url,
+        "logo_url": logo_url,
+        "cover": cover_url,
+        "cover_url": cover_url,
+        "member_count": member_count,
+        "is_owner": bool(user and user.is_authenticated and company.owner_id == user.id),
+        "is_member": bool(user and is_company_member(user, company)),
+        "can_manage": bool(user and can_manage_company(user, company)),
+        "created_at": _iso(company.created_at),
+        "updated_at": _iso(company.updated_at),
     }
-
-    if user:
-        data.update(
-            {
-                "is_owner": company.owner_id == user.id,
-                "is_member": is_company_member(user, company),
-                "can_manage": can_manage_company(user, company),
-            }
-        )
-
-    return data

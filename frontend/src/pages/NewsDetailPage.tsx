@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import MarkdownText from "../components/MarkdownText";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./NewsDetailPage.scss";
 
 interface NewsItem {
@@ -11,6 +11,8 @@ interface NewsItem {
     content: string;
     author_id?: number;
     author_email?: string;
+    file_url?: string | null;
+    file?: string | null;
     created_at?: string;
     updated_at?: string;
 }
@@ -28,6 +30,7 @@ const NewsDetailPage: React.FC<NewsDetailPageProps> = ({ isAuthenticated = false
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [news, setNews] = useState<NewsItem | null>(null);
+    const [recentNews, setRecentNews] = useState<NewsItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -71,6 +74,7 @@ const NewsDetailPage: React.FC<NewsDetailPageProps> = ({ isAuthenticated = false
 
             if (newsItem) {
                 setNews(newsItem);
+                setRecentNews(newsData.filter((item) => item.id !== newsId).slice(0, 5));
             } else {
                 setError("Новость не найдена.");
             }
@@ -100,26 +104,28 @@ const NewsDetailPage: React.FC<NewsDetailPageProps> = ({ isAuthenticated = false
         navigate("/news");
     };
 
-    const formatDate = (value: string) => {
+    const formatDate = (value?: string) => {
+        if (!value) return "Дата недоступна";
+
         const date = new Date(value);
 
         if (Number.isNaN(date.getTime())) {
             return "Дата недоступна";
         }
 
-        return date.toLocaleString("ru-RU", {
+        return date.toLocaleDateString("ru-RU", {
             year: "numeric",
-            month: "2-digit",
+            month: "long",
             day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
         });
     };
+
+    const newsImage = mediaUrl(news?.file_url || news?.file);
 
     return (
         <MainLayout isAuthenticated={isAuthenticated}>
             <div className="news-detail-container">
-                <button onClick={() => navigate(-1)} className="back-btn">
+                <button onClick={() => navigate("/news")} className="back-btn" type="button">
                     &larr; Назад к новостям
                 </button>
 
@@ -135,33 +141,55 @@ const NewsDetailPage: React.FC<NewsDetailPageProps> = ({ isAuthenticated = false
                         </button>
                     </div>
                 ) : news ? (
-                    <article className="news-detail">
-                        <header className="news-header">
-                            <h1>{news.title}</h1>
-                            {isAuthenticated && isAdmin && (
-                                <div className="news-actions">
-                                    <button onClick={handleEditNews} className="edit-btn" title="Редактировать новость">
-                                        ✏️ Редактировать
-                                    </button>
-                                    <button onClick={handleDeleteNews} className="delete-btn" title="Удалить новость">
-                                        🗑️ Удалить
-                                    </button>
+                    <div
+                        className={`news-detail-layout ${newsImage ? "has-cover" : ""}`}
+                        style={newsImage ? { "--news-cover": `url("${newsImage}")` } as React.CSSProperties : undefined}
+                    >
+                        <article className={`news-detail ${newsImage ? "has-cover" : ""}`}>
+                            <div className="news-detail-head">
+                                <p className="news-detail-kicker">Development updates</p>
+                                <header className="news-header">
+                                    <h1>{news.title}</h1>
+                                    {isAuthenticated && isAdmin && (
+                                        <div className="news-actions">
+                                            <button onClick={handleEditNews} className="edit-btn" title="Редактировать новость" type="button">
+                                                Редактировать
+                                            </button>
+                                            <button onClick={handleDeleteNews} className="delete-btn" title="Удалить новость" type="button">
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    )}
+                                </header>
+
+                                <div className="news-meta">
+                                    {news.author_email && <span className="author">Автор: {news.author_email}</span>}
+                                    {news.created_at && <span className="date">Опубликовано: {formatDate(news.created_at)}</span>}
+                                    {news.updated_at && news.updated_at !== news.created_at && (
+                                        <span className="updated">Обновлено: {formatDate(news.updated_at)}</span>
+                                    )}
                                 </div>
-                            )}
-                        </header>
+                            </div>
 
-                        <div className="news-meta">
-                            {news.author_email && <span className="author">Автор: {news.author_email}</span>}
-                            {news.created_at && <span className="date">Опубликовано: {formatDate(news.created_at)}</span>}
-                            {news.updated_at && news.updated_at !== news.created_at && (
-                                <span className="updated">Обновлено: {formatDate(news.updated_at)}</span>
-                            )}
-                        </div>
+                            <div className="news-content">
+                                <MarkdownText text={news.content} />
+                            </div>
+                        </article>
 
-                        <div className="news-content">
-                            <MarkdownText text={news.content} />
-                        </div>
-                    </article>
+                        {recentNews.length > 0 && (
+                            <aside className="recent-posts">
+                                <h2>Recent posts</h2>
+                                <div className="recent-posts-list">
+                                    {recentNews.map((item) => (
+                                        <button key={item.id} onClick={() => navigate(`/news/${item.id}`)} type="button">
+                                            <span>{item.title}</span>
+                                            <time>{formatDate(item.created_at)}</time>
+                                        </button>
+                                    ))}
+                                </div>
+                            </aside>
+                        )}
+                    </div>
                 ) : null}
             </div>
         </MainLayout>
