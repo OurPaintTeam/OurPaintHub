@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faBookOpen,
     faBuilding,
+    faChevronLeft,
     faChevronRight,
     faDownload,
     faFolderTree,
@@ -44,6 +45,8 @@ const GeneralPage: React.FC = () => {
     const [downloads, setDownloads] = useState<DownloadItem[]>([]);
     const [downloadsLoading, setDownloadsLoading] = useState(true);
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const [activeBuildIndex, setActiveBuildIndex] = useState(0);
+    const buildListRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -132,6 +135,57 @@ const GeneralPage: React.FC = () => {
     const latestVersion = downloads[0]?.version ? `v${downloads[0].version}` : "alpha";
     const latestDate = downloads[0]?.updated_at || downloads[0]?.created_at;
 
+    const scrollToBuild = (index: number) => {
+        const list = buildListRef.current;
+        const card = list?.querySelector<HTMLElement>(".general-build");
+
+        if (!list || !card) return;
+
+        const nextIndex = Math.max(0, Math.min(index, downloads.length - 1));
+
+        list.scrollTo({
+            left: nextIndex * (card.offsetWidth + 12),
+            behavior: "smooth",
+        });
+
+        setActiveBuildIndex(nextIndex);
+    };
+
+    const handleBuildScroll = () => {
+        const list = buildListRef.current;
+        const card = list?.querySelector<HTMLElement>(".general-build");
+
+        if (!list || !card) return;
+
+        const nextIndex = Math.round(list.scrollLeft / (card.offsetWidth + 12));
+
+        setActiveBuildIndex(Math.max(0, Math.min(nextIndex, downloads.length - 1)));
+    };
+
+    useEffect(() => {
+        setActiveBuildIndex(0);
+        buildListRef.current?.scrollTo({ left: 0 });
+    }, [downloads.length]);
+
+    useEffect(() => {
+        const sections = document.querySelectorAll<HTMLElement>(".scroll-reveal");
+
+        if (sections.length === 0) return undefined;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("is-visible");
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.18 });
+
+        sections.forEach((section) => observer.observe(section));
+
+        return () => observer.disconnect();
+    }, [downloadsLoading, downloads.length]);
+
     if (loading) {
         return (
             <MainLayout isAuthenticated={!!user}>
@@ -185,58 +239,88 @@ const GeneralPage: React.FC = () => {
                     <InteractiveCadPreview />
                 </section>
 
-                <section className="general-version-panel">
+                <section className="general-version-panel scroll-reveal">
                     <div>
                         <p className="section-label">Текущие сборки</p>
                         <h2>Последние 3 версии</h2>
-                        <p>
-                            Эти файлы берутся из вкладки «Приложение» и доступны для скачивания прямо с главной.
-                        </p>
                     </div>
 
-                    <div className="general-build-list">
+                    {downloads.length > 1 && (
+                        <div className="general-version-controls" aria-label="РџРµСЂРµРєР»СЋС‡РµРЅРёРµ РІРµСЂСЃРёР№">
+                            <button
+                                aria-label="РџСЂРµРґС‹РґСѓС‰Р°СЏ РІРµСЂСЃРёСЏ"
+                                disabled={activeBuildIndex === 0}
+                                onClick={() => scrollToBuild(activeBuildIndex - 1)}
+                                type="button"
+                            >
+                                <FontAwesomeIcon icon={faChevronLeft} />
+                            </button>
+                            <button
+                                aria-label="РЎР»РµРґСѓСЋС‰Р°СЏ РІРµСЂСЃРёСЏ"
+                                disabled={activeBuildIndex === downloads.length - 1}
+                                onClick={() => scrollToBuild(activeBuildIndex + 1)}
+                                type="button"
+                            >
+                                <FontAwesomeIcon icon={faChevronRight} />
+                            </button>
+                        </div>
+                    )}
+
+                    <div
+                        className="general-build-list"
+                        onScroll={handleBuildScroll}
+                        ref={buildListRef}
+                    >
                         {downloadsLoading ? (
                             <div className="general-build-empty">Загрузка версий...</div>
                         ) : downloads.length === 0 ? (
                             <div className="general-build-empty">Пока нет опубликованных сборок</div>
                         ) : (
-                            downloads.map((item) => (
-                                <article className="general-build" key={item.id}>
-                                    <div>
-                                        <span className="badge">{item.platform || "all"}</span>
-                                        <h3>{item.title}</h3>
-                                        <p>{item.content}</p>
-                                        <div className="general-build-meta">
-                                            <span>{item.version ? `v${item.version}` : "version n/a"}</span>
-                                            <span>{formatFileSize(item.file_size)}</span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        className="download-action-primary"
-                                        disabled={downloadingId === item.id}
-                                        onClick={() => handleDownload(item)}
-                                        type="button"
+                            <div className="general-build-track">
+                                {downloads.map((item) => (
+                                    <article
+                                        className="general-build"
+                                        key={item.id}
                                     >
-                                        <FontAwesomeIcon icon={faDownload} />
-                                        {downloadingId === item.id ? "..." : "Скачать"}
-                                    </button>
-                                </article>
-                            ))
+                                        <div>
+                                            <span className="badge">{item.platform || "all"}</span>
+                                            <h3>{item.title}</h3>
+                                            <p>{item.content}</p>
+                                            <div className="general-build-meta">
+                                                <span>{item.version ? `v${item.version}` : "version n/a"}</span>
+                                                <span>{formatFileSize(item.file_size)}</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="download-action-primary"
+                                            disabled={downloadingId === item.id}
+                                            onClick={() => handleDownload(item)}
+                                            type="button"
+                                        >
+                                            <FontAwesomeIcon icon={faDownload} />
+                                            {downloadingId === item.id ? "..." : "Скачать"}
+                                        </button>
+                                    </article>
+                                ))}
+                            </div>
                         )}
                     </div>
+
                 </section>
 
-                <section className="general-capabilities">
+                <section className="general-capabilities scroll-reveal">
                     <div>
                         <p className="section-label">Возможности CAD</p>
                         <h2>Рабочий контур OurPaint</h2>
-                        <p>
-                            Главная собирает быстрые переходы к материалам, проектам и командам, сохраняя стиль CAD-интерфейса из приложения.
-                        </p>
                     </div>
 
                     <div className="general-cap-grid">
+                        <div className="general-cap">
+                            <FontAwesomeIcon icon={faPenRuler} />
+                            <h3>OurPaintDCM</h3>
+                            <p>2D Dimensional Constraint Manager для размерных ограничений и точной геометрии.</p>
+                        </div>
                         <div className="general-cap">
                             <FontAwesomeIcon icon={faGaugeHigh} />
                             <h3>Координатная сетка</h3>
@@ -255,7 +339,7 @@ const GeneralPage: React.FC = () => {
                     </div>
                 </section>
 
-                <section className="dashboard-grid general-navigation-grid">
+                <section className="dashboard-grid general-navigation-grid scroll-reveal">
                     <div className="dashboard-card" onClick={() => navigate("/news")}>
                         <div className="card-icon">
                             <FontAwesomeIcon icon={faNewspaper} />

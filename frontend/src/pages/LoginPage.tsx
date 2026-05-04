@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faPenRuler } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
+import opLogo from "../assets/OP_logo.svg";
 import "./LoginPage.scss";
 
 interface UserData {
@@ -67,7 +68,7 @@ const LoginPage: React.FC = () => {
         <div className="login-page">
             <div className="login-container">
                 <div className="login-header">
-                    <FontAwesomeIcon icon={faPenRuler} />
+                    <img className="auth-brand-logo" src={opLogo} alt="" />
                     <h1>OurPaintHUB</h1>
                     <p>Платформа для обмена проектами</p>
                     <h2>Вход в систему</h2>

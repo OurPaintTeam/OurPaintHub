@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faArrowRightFromBracket,
-    faPenRuler,
     faBars,
     faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
 import IconMenuButton from "../IconMenuButton/IconMenuButton";
 import { useAuth } from "../../contexts/AuthContext";
+import opLogo from "../../assets/OP_logo.svg";
 
 import "./NavigationBox.scss";
 
@@ -73,7 +73,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
                     type="button"
                 >
                     <span className="nav-logo-mark">
-                        <FontAwesomeIcon icon={faPenRuler} />
+                        <img src={opLogo} alt="" />
                     </span>
                     <span className="nav-logo-copy">
                         <span className="nav-logo-title">OurPaint</span>

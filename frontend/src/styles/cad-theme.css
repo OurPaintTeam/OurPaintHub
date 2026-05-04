@@ -103,27 +103,20 @@ select {
   width: 42px;
   height: 42px;
   overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #a92b20 0%, #c84b3f 100%);
-  color: #fff;
+  border-radius: 12px;
+  background: transparent;
   box-shadow: 0 12px 28px rgba(169, 43, 32, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .nav-logo-mark::after {
-  content: "";
-  position: absolute;
-  inset: 7px auto auto 7px;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.24);
+  content: none;
 }
 
-.nav-logo-mark svg {
-  position: relative;
-  z-index: 1;
-  width: 22px;
-  height: 22px;
+.nav-logo-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .nav-logo-copy {
@@ -960,11 +953,12 @@ select {
 }
 
 .login-header svg,
-.auth-header svg {
+.auth-header svg,
+.auth-brand-logo {
   width: 54px;
   height: 54px;
   margin-bottom: 20px;
-  padding: 13px;
+  padding: 0;
   border: 1px solid var(--paint-border);
   border-radius: 18px;
   background: #fff;
@@ -972,8 +966,15 @@ select {
   box-shadow: 0 20px 60px rgba(169, 43, 32, 0.18);
 }
 
+.auth-brand-logo {
+  display: block;
+  object-fit: contain;
+}
+
 .login-page .login-header svg,
-.auth-page .auth-header svg {
+.auth-page .auth-header svg,
+.login-page .auth-brand-logo,
+.auth-page .auth-brand-logo {
   margin-bottom: 22px !important;
 }
 
@@ -1622,11 +1623,13 @@ select {
   }
 
   .login-page .login-header svg,
-  .auth-page .auth-header svg {
+  .auth-page .auth-header svg,
+  .login-page .auth-brand-logo,
+  .auth-page .auth-brand-logo {
     width: 78px;
     height: 78px;
     margin-bottom: 14px !important;
-    padding: 16px;
+    padding: 0;
   }
 
   .login-page .login-form,
@@ -1663,5 +1666,338 @@ select {
     animation-duration: 1ms !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
+  }
+}
+
+.cad-shell {
+  overflow: hidden;
+  width: min(100%, 980px);
+  justify-self: end;
+  border: 1px solid #252833;
+  border-radius: 10px;
+  background: #9b8a9d;
+  box-shadow: 0 30px 80px rgba(22, 16, 24, 0.22);
+  letter-spacing: 0;
+}
+
+.cad-window-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  border-top: 1px solid rgba(75, 130, 140, 0.6);
+  border-bottom: 1px solid #38343e;
+  background: #45434d;
+  padding: 0 10px 0 12px;
+  color: #e8e4f5;
+}
+
+.cad-menu,
+.cad-window-actions,
+.cad-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.cad-menu {
+  gap: 18px;
+  min-width: 0;
+}
+
+.cad-menu button,
+.cad-toolbar button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cad-menu button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  color: #e4e0f4;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cad-menu button:hover {
+  color: #fff;
+}
+
+.cad-menu-chevron {
+  width: 9px;
+  height: 9px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.88;
+}
+
+.cad-window-actions {
+  gap: 14px;
+  color: #dad4e5;
+}
+
+.cad-window-actions img {
+  display: block;
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+  opacity: 0.88;
+}
+
+.cad-window-actions img:first-child {
+  width: 12px;
+  height: 12px;
+}
+
+.cad-window-actions img:last-child {
+  width: 16px;
+  height: 16px;
+}
+
+.cad-window-tile {
+  width: 15px;
+  height: 12px;
+  border-radius: 4px 4px 2px 2px;
+  background: #a99aab;
+  box-shadow: inset 0 -4px 0 rgba(32, 25, 34, 0.28);
+}
+
+.cad-toolbar {
+  height: 28px;
+  gap: 7px;
+  background: #9f8ea0;
+  padding: 0 10px;
+  color: #fff;
+}
+
+.cad-toolbar button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 14px;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.cad-toolbar button:hover,
+.cad-toolbar button.is-active {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.cad-toolbar button:active {
+  transform: translateY(1px);
+}
+
+.cad-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.cad-tool-img {
+  display: block;
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.cad-workspace {
+  padding: 0 12px;
+  background: #9b8a9d;
+}
+
+.cad-grid {
+  position: relative;
+  aspect-ratio: 2.12 / 1;
+  width: 100%;
+  height: auto;
+  min-height: 360px;
+  max-height: 506px;
+  overflow: hidden;
+  border: 1px solid #f2f0f1;
+  background-color: #fbfbfb;
+  background-image:
+    linear-gradient(0deg, rgba(155, 157, 160, 0.24) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(155, 157, 160, 0.24) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(98, 100, 104, 0.42) 1.2px, transparent 1.2px),
+    linear-gradient(90deg, rgba(98, 100, 104, 0.42) 1.2px, transparent 1.2px);
+  background-position: 50% 50%;
+  background-size:
+    100% 4.54545%,
+    2.12766% 100%,
+    100% 22.72727%,
+    10.6383% 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.cad-grid.cad-tool-select {
+  cursor: default;
+}
+
+.cad-axis-x,
+.cad-axis-y {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: #f1888c;
+}
+
+.cad-axis-x {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.cad-axis-y {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.cad-label {
+  position: absolute;
+  z-index: 8;
+  color: #343337;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cad-x-label {
+  transform: translate(-50%, 5px);
+}
+
+.cad-origin-label {
+  transform: translate(calc(-100% - 5px), 5px);
+}
+
+.cad-y-label {
+  transform: translate(-22px, -50%);
+}
+
+.cad-shapes {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.cad-shape-line,
+.cad-shape-circle,
+.cad-shape-point {
+  vector-effect: non-scaling-stroke;
+}
+
+.cad-shape-line {
+  stroke: #5c7ddf;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.cad-shape-circle {
+  fill: transparent;
+  stroke: #5c7ddf;
+  stroke-width: 2;
+}
+
+.cad-shape-point {
+  fill: #5c7ddf;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.cad-shape-preview {
+  opacity: 0.66;
+  stroke-dasharray: 7 5;
+}
+
+.cad-shape-anchor {
+  fill: #f1888c;
+}
+
+.cad-command-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  margin: 12px 0 0;
+  border: 2px solid #111;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: #3a3a39;
+  padding: 0 13px 0 17px;
+  color: #cfc9d8;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cad-command-bar svg {
+  width: 22px;
+  height: 22px;
+  color: #cfc9e4;
+  transform: rotate(43deg);
+}
+
+@media (max-width: 900px) {
+  .cad-shell {
+    justify-self: stretch;
+  }
+
+  .cad-window-bar {
+    height: auto;
+    min-height: 52px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .cad-menu {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .cad-window-actions {
+    gap: 12px;
+  }
+
+  .cad-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 48px;
+    padding: 8px 12px;
+  }
+
+  .cad-grid {
+    min-height: 220px;
+  }
+
+  .cad-label {
+    font-size: 16px;
+  }
+
+  .cad-x-label {
+    display: block;
   }
 }

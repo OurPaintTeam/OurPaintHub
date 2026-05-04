@@ -5,10 +5,10 @@ import {
     faUser,
     faEnvelope,
     faLock,
-    faPenRuler,
     faCalendar,
 } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "../config/api";
+import opLogo from "../assets/OP_logo.svg";
 import "./RegistrationPage.scss";
 
 interface UserData {
@@ -92,7 +92,7 @@ const RegistrationPage: React.FC = () => {
         <div className="auth-page">
             <div className="auth-container">
                 <div className="auth-header">
-                    <FontAwesomeIcon icon={faPenRuler} />
+                    <img className="auth-brand-logo" src={opLogo} alt="" />
                     <h1>OurPaintHUB</h1>
                     <p>Платформа для обмена проектами</p>
                 </div>

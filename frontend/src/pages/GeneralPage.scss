@@ -88,6 +88,32 @@
   font-size: 13px;
 }
 
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(26px) scale(0.985);
+  transition:
+    opacity 600ms ease,
+    transform 650ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.general-version-panel.scroll-reveal {
+  transition-delay: 80ms;
+}
+
+.general-capabilities.scroll-reveal {
+  transition-delay: 120ms;
+}
+
+.general-navigation-grid.scroll-reveal {
+  transition-delay: 150ms;
+}
+
 .general-version-panel,
 .general-capabilities {
   display: grid;
@@ -96,6 +122,54 @@
   align-items: start;
   border-top: 1px solid rgba(217, 222, 231, 0.9);
   padding-top: 30px;
+}
+
+.general-version-panel {
+  position: relative;
+  grid-template-columns: 1fr;
+}
+
+.general-version-panel > div:first-child {
+  max-width: 620px;
+}
+
+.general-version-controls {
+  position: absolute;
+  top: 32px;
+  right: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.general-version-controls button {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(217, 222, 231, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--paint-text);
+  box-shadow: 0 10px 28px rgba(44, 39, 48, 0.08);
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.general-version-controls button:hover:not(:disabled) {
+  border-color: rgba(169, 43, 32, 0.28);
+  background: var(--paint-accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.general-version-controls button:disabled {
+  cursor: default;
+  opacity: 0.42;
 }
 
 .general-version-panel h2,
@@ -109,14 +183,34 @@
 }
 
 .general-build-list {
-  display: grid;
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding: 1px;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 1px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.general-build-list::-webkit-scrollbar {
+  display: none;
+}
+
+.general-build-track {
+  display: flex;
   gap: 12px;
+  width: max-content;
 }
 
 .general-build,
 .general-build-empty {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  width: min(560px, calc(100vw - 64px));
+  scroll-snap-align: start;
   gap: 18px;
   align-items: center;
   border: 1px solid #f0eceb;
@@ -124,6 +218,16 @@
   background: rgba(255, 255, 255, 0.86);
   padding: 18px;
   box-shadow: var(--paint-shadow);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.general-build:hover {
+  border-color: rgba(169, 43, 32, 0.2);
+  box-shadow: var(--paint-shadow-hover);
+  transform: translateY(-2px);
 }
 
 .general-build-empty {
@@ -164,9 +268,21 @@
   min-width: 120px;
 }
 
+@keyframes general-item-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .general-cap-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -179,6 +295,31 @@
   background: rgba(255, 255, 255, 0.82);
   padding: 18px;
   box-shadow: var(--paint-shadow);
+}
+
+.general-cap,
+.general-navigation-grid .dashboard-card {
+  opacity: 0;
+  transform: translateY(18px) scale(0.97);
+}
+
+.scroll-reveal.is-visible .general-cap,
+.general-navigation-grid.scroll-reveal.is-visible .dashboard-card {
+  animation: general-item-rise 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.scroll-reveal.is-visible .general-cap:nth-child(2),
+.general-navigation-grid.scroll-reveal.is-visible .dashboard-card:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.scroll-reveal.is-visible .general-cap:nth-child(3),
+.general-navigation-grid.scroll-reveal.is-visible .dashboard-card:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.scroll-reveal.is-visible .general-cap:nth-child(4) {
+  animation-delay: 230ms;
 }
 
 .general-cap > svg {
@@ -238,8 +379,18 @@
     width: 100%;
   }
 
+  .general-version-controls {
+    position: static;
+    margin-top: -8px;
+    justify-content: flex-end;
+  }
+
   .general-build {
     grid-template-columns: 1fr;
+  }
+
+  .general-build-list {
+    padding-bottom: 1px;
   }
 
   .general-build .download-action-primary {
@@ -248,5 +399,24 @@
 
   .general-cap-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .general-cap,
+  .general-navigation-grid .dashboard-card {
+    opacity: 1;
+    transform: none;
+  }
+
+  .scroll-reveal.is-visible .general-cap,
+  .general-navigation-grid.scroll-reveal.is-visible .dashboard-card {
+    animation: none;
   }
 }
