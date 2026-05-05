@@ -166,3 +166,53 @@
     width: 100%;
   }
 }
+
+
+.edit-version-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 42px;
+  padding: 0 14px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(169, 43, 32, 0.18);
+
+  background: var(--paint-muted);
+  color: var(--paint-accent);
+
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+
+  cursor: pointer;
+
+  transition:
+          transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+          box-shadow 220ms ease,
+          background 220ms ease,
+          border-color 220ms ease,
+          color 220ms ease;
+
+  box-shadow: var(--paint-shadow);
+
+  &:hover {
+    transform: translateY(-2px);
+    background: var(--paint-accent-soft);
+    border-color: rgba(169, 43, 32, 0.28);
+    box-shadow: var(--paint-shadow-hover);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: var(--paint-shadow);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}

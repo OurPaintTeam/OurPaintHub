@@ -42,6 +42,13 @@ interface FileWithPreview {
     size: string;
 }
 
+interface Invite {
+    id: number;
+    invited_user: string;
+    status: string;
+    created_at: string;
+}
+
 const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -56,6 +63,7 @@ const CompanyPage: React.FC = () => {
     const [company, setCompany] = useState<Company | null>(null);
     const [members, setMembers] = useState<User[]>([]);
     const [repos, setRepos] = useState<Repository[]>([]);
+    const [invites, setInvites] = useState<Invite[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editing, setEditing] = useState(false);
@@ -95,16 +103,21 @@ const CompanyPage: React.FC = () => {
             setCompanyDescription(companyData.description || "");
 
             if (companyData.is_member) {
-                const [membersData, reposData] = await Promise.all([
+                const [membersData, reposData, invitesData] = await Promise.all([
                     apiFetch<User[]>(`/companies/${id}/members/`, { auth: true }),
                     apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true }),
+                    companyData.can_manage
+                        ? apiFetch<Invite[]>(`/companies/${id}/invites/`, { auth: true })
+                        : Promise.resolve([]),
                 ]);
                 setMembers(membersData || []);
                 setRepos(reposData || []);
+                setInvites(invitesData || []);
             } else {
                 const reposData = await apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true });
                 setRepos(reposData || []);
                 setMembers([]);
+                setInvites([]);
             }
         } catch (error) {
             setMessage(error instanceof Error ? error.message : "Ошибка загрузки");
@@ -180,10 +193,30 @@ const CompanyPage: React.FC = () => {
             setMessage("Приглашение отправлено");
             setSearchQuery("");
             setSearchResults([]);
+            await load(); // Перезагружаем данные, чтобы обновить список приглашений
         } catch (e) {
             setMessage(e instanceof Error ? e.message : "Ошибка приглашения");
         } finally {
             setInviteLoading(false);
+        }
+    };
+
+    const cancelInvite = async (inviteId: number) => {
+        setSaving(true);
+        setMessage("");
+
+        try {
+            await apiFetch(`/companies/invites/${inviteId}/cancel/`, {
+                method: "POST",
+                auth: true,
+            });
+
+            setMessage("Приглашение отменено");
+            await load(); // Перезагружаем данные, чтобы обновить список приглашений
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка отмены приглашения");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -215,7 +248,6 @@ const CompanyPage: React.FC = () => {
         }
     };
 
-    // Обработка выбора файлов для репозитория
     const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files || []);
         const newFiles: FileWithPreview[] = files.map((file) => ({
@@ -307,8 +339,6 @@ const CompanyPage: React.FC = () => {
         );
     }
 
-
-
     const leaveCompany = async () => {
         if (!company) return;
 
@@ -397,33 +427,6 @@ const CompanyPage: React.FC = () => {
                     <section className="section card">
                         <h2>Участники</h2>
 
-                        {canManage && (
-                            <div className="invite-box">
-                                <input
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Поиск пользователя (username или email)"
-                                />
-
-                                {searchResults.length > 0 && (
-                                    <div className="invite-results">
-                                        {searchResults.map((user) => (
-                                            <div key={user.id} className="invite-row">
-                                                <span>{user.username || user.email}</span>
-                                                <button
-                                                    onClick={() => inviteUser(user)}
-                                                    disabled={inviteLoading}
-                                                    className="invite-btn"
-                                                >
-                                                    Пригласить
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         <div className="members-list">
                             {members.map((member) => (
                                 <div key={member.id} className="member-row">
@@ -439,6 +442,67 @@ const CompanyPage: React.FC = () => {
                                     )}
                                 </div>
                             ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Секция приглашенных - только для владельцев/менеджеров */}
+                {canManage && (
+                    <section className="section card" style={{ marginTop: 20 }}>
+                        <h2>Приглашенные</h2>
+
+                        {/* ПОИСК ПОЛЬЗОВАТЕЛЕЙ ДЛЯ ПРИГЛАШЕНИЯ */}
+                        <div className="invite-box">
+                            <input
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Поиск пользователя (username или email)"
+                            />
+
+                            {searchResults.length > 0 && (
+                                <div className="invite-results">
+                                    {searchResults.map((user) => (
+                                        <div key={user.id} className="invite-row">
+                                            <span>{user.username || user.email}</span>
+                                            <button
+                                                onClick={() => inviteUser(user)}
+                                                disabled={inviteLoading}
+                                                className="invite-btn"
+                                            >
+                                                Пригласить
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* СПИСОК ПРИГЛАШЕНИЙ */}
+                        <div className="invites-list">
+                            {invites.length === 0 ? (
+                                <div className="empty-state">
+                                    Нет приглашенных
+                                </div>
+                            ) : (
+                                invites.map((inv) => (
+                                    <div key={inv.id} className="invite-row">
+                                        <div>
+                                            <b>{inv.invited_user}</b>
+                                            <div style={{ fontSize: 12, opacity: 0.7 }}>
+                                                {inv.status}
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="danger-btn"
+                                            onClick={() => cancelInvite(inv.id)}
+                                            disabled={saving}
+                                        >
+                                            Отменить
+                                        </button>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </section>
                 )}
