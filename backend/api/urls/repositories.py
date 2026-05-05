@@ -1,6 +1,6 @@
 from django.urls import path
 
-from api.views.repositories import get_repositories
+from api.views.repositories import get_repositories, download_repository_file
 
 from api.views.commits import create_commit
 from api.views.repositories import revert_repository_to_commit, get_repository_commits, delete_repository_file, \
@@ -22,7 +22,10 @@ urlpatterns = [
 
     path("<int:repository_id>/download/", download_repository),
 
+    path("<int:repository_id>/files/<int:file_id>/download/",download_repository_file),
+
     path("<int:repository_id>/files/", get_repository_files),
+
     path("<int:repository_id>/files/delete/", delete_repository_file),
 
     path("<int:repository_id>/commits/", get_repository_commits),

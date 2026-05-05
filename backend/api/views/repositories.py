@@ -443,6 +443,41 @@ def download_repository(request, repository_id):
     return response
 
 
+@api_view(["GET"])
+def download_repository_file(request, repository_id, file_id):
+    user, error = get_user_from_request_data(request)
+    if error:
+        return error
+
+    try:
+        repository = Repository.objects.get(id=repository_id)
+    except Repository.DoesNotExist:
+        return Response({"error": "repository_not_found"}, status=404)
+
+    if not can_view_repository(user, repository):
+        return Response({"error": "forbidden"}, status=403)
+
+    try:
+        commit_file = CommitFile.objects.select_related("blob", "commit").get(
+            id=file_id,
+            commit__repository=repository
+        )
+    except CommitFile.DoesNotExist:
+        return Response({"error": "file_not_found"}, status=404)
+
+    if not commit_file.blob:
+        return Response({"error": "empty_file"}, status=400)
+
+    file_handle = commit_file.blob.blob.open("rb")
+    file_data = file_handle.read()
+    file_handle.close()
+
+    response = HttpResponse(file_data, content_type="application/octet-stream")
+    response["Content-Disposition"] = f'attachment; filename="{commit_file.path.split("/")[-1]}"'
+
+    return response
+
+
 @api_view(["POST"])
 def revert_repository_to_commit(request, repository_id, commit_id):
     user, error = get_user_from_request_data(request)
