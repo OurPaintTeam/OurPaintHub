@@ -197,6 +197,32 @@ def remove_company_member(request, user, company_id):
     return Response({"error": "Нет прав"}, status=403)
 
 
+@api_view(["DELETE"])
+@with_user
+def leave_company(request, user, company_id):
+    try:
+        company = Company.objects.get(id=company_id)
+    except Company.DoesNotExist:
+        return Response({"error": "not_found"}, status=404)
+
+    if company.owner_id == user.id:
+        return Response(
+            {"error": "Владелец не может выйти из компании"},
+            status=400
+        )
+
+    member_qs = CompanyMember.objects.filter(company=company, user=user)
+
+    if not member_qs.exists():
+        return Response({"error": "Вы не участник компании"}, status=400)
+
+    member_qs.delete()
+
+    log_action(user, "leave_company", company)
+
+    return Response({"message": "Вы вышли из компании"})
+
+
 # =========================================================
 # REPOSITORIES
 # =========================================================
