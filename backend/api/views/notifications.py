@@ -7,6 +7,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
+from api.choices import CompanyInviteStatus
+from api.models import CompanyInvite
 from api.models.notifications import Notification, NotificationStatus
 
 from django.contrib.auth import get_user_model
@@ -176,18 +178,30 @@ def mark_notification_read(request, notification_id):
 
 @api_view(["DELETE"])
 def delete_notification(request, notification_id):
-    """
-    Физически удалить уведомление из БД.
-    """
-
     user, error = get_user_from_request_data(request)
     if error:
         return error
 
     try:
-        notification = Notification.objects.get(id=notification_id, recipient=user)
+        notification = Notification.objects.get(
+            id=notification_id,
+            recipient=user
+        )
     except Notification.DoesNotExist:
-        return Response({"error": "Уведомление не найдено"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "not_found"}, status=404)
+
+    invite_id = notification.metadata.get("invite_id")
+
+    if invite_id:
+        try:
+            invite = CompanyInvite.objects.get(id=invite_id)
+
+            if invite.status == CompanyInviteStatus.PENDING:
+                invite.cancel(user)
+
+        except CompanyInvite.DoesNotExist:
+            pass
 
     notification.delete()
-    return Response({"message": "Уведомление удалено"}, status=status.HTTP_200_OK)
+
+    return Response({"message": "deleted"})

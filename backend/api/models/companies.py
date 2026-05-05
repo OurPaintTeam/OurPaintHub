@@ -149,14 +149,15 @@ class CompanyInvite(TimeStampedModel):
         ]
 
     def clean(self):
-        if self.company.owner_id == self.invited_user_id:
-            raise ValidationError("Owner cannot be invited.")
+        if self._state.adding:
+            if self.company.owner_id == self.invited_user_id:
+                raise ValidationError("Owner cannot be invited.")
 
-        if CompanyMember.objects.filter(
-                company=self.company,
-                user=self.invited_user
-        ).exists():
-            raise ValidationError("User is already a member.")
+            if CompanyMember.objects.filter(
+                    company=self.company,
+                    user=self.invited_user
+            ).exists():
+                raise ValidationError("User is already a member.")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -172,13 +173,23 @@ class CompanyInvite(TimeStampedModel):
         if invite.status != CompanyInviteStatus.PENDING:
             raise ValidationError("Invite is no longer active.")
 
-        CompanyMember.objects.get_or_create(
-            company=invite.company,
-            user=invite.invited_user
-        )
+        # если уже участник — просто завершаем invite
+        if not CompanyMember.objects.filter(
+                company=invite.company,
+                user=invite.invited_user
+        ).exists():
+            CompanyMember.objects.create(
+                company=invite.company,
+                user=invite.invited_user
+            )
 
         invite.status = CompanyInviteStatus.ACCEPTED
         invite.save(update_fields=["status", "updated_at"])
+
+        Notification.objects.filter(
+            recipient=invite.invited_user,
+            metadata__invite_id=invite.id
+        ).delete()
 
         if invite.invited_by:
             Notification.objects.create(
@@ -186,6 +197,7 @@ class CompanyInvite(TimeStampedModel):
                 actor=invite.invited_user,
                 title="Invitation accepted",
                 text=f"{invite.invited_user.username} joined {invite.company.name}.",
+                metadata={"company_id": invite.company_id},
             )
 
     @transaction.atomic
@@ -201,6 +213,12 @@ class CompanyInvite(TimeStampedModel):
         invite.status = CompanyInviteStatus.REJECTED
         invite.save(update_fields=["status", "updated_at"])
 
+
+        Notification.objects.filter(
+            recipient=invite.invited_user,
+            metadata__invite_id=invite.id
+        ).delete()
+
         if invite.invited_by:
             Notification.objects.create(
                 recipient=invite.invited_by,
@@ -211,39 +229,28 @@ class CompanyInvite(TimeStampedModel):
             )
 
     @transaction.atomic
-    def accept(self, user):
+    def cancel(self, user):
         invite = CompanyInvite.objects.select_for_update().get(pk=self.pk)
 
-        if invite.invited_user_id != user.id:
-            raise ValidationError("You cannot accept this invite.")
+        if invite.invited_by_id != user.id:
+            raise ValidationError("You cannot cancel this invite.")
 
         if invite.status != CompanyInviteStatus.PENDING:
             raise ValidationError("Invite is no longer active.")
 
-        CompanyMember.objects.get_or_create(
-            company=invite.company,
-            user=invite.invited_user
-        )
-
-        invite.status = CompanyInviteStatus.ACCEPTED
+        invite.status = CompanyInviteStatus.CANCELLED
         invite.save(update_fields=["status", "updated_at"])
 
-        # уведомление пригласившему
-        if invite.invited_by:
-            Notification.objects.create(
-                recipient=invite.invited_by,
-                actor=invite.invited_user,
-                title="Invitation accepted",
-                text=f"{invite.invited_user.username} joined {invite.company.name}.",
-                metadata={"company_id": invite.company_id},
-            )
+        Notification.objects.filter(
+            recipient=invite.invited_user,
+            metadata__invite_id=invite.id
+        ).delete()
 
-        # уведомление пользователю
         Notification.objects.create(
             recipient=invite.invited_user,
-            actor=invite.invited_by,
-            title="You joined a company",
-            text=f"You have been added to {invite.company.name}.",
+            actor=user,
+            title="Invitation cancelled",
+            text=f"Invitation to {invite.company.name} was cancelled.",
             metadata={"company_id": invite.company_id},
         )
 
@@ -262,6 +269,7 @@ class CompanyInvite(TimeStampedModel):
             title="Company invitation",
             text=f"You were invited to join {company.name}.",
             metadata={
+                "type": "company_invite",
                 "company_id": company.id,
                 "invite_id": invite.id,
             },

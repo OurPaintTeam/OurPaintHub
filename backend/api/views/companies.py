@@ -33,80 +33,6 @@ def company_name_taken(name, exclude_company_id=None):
     return queryset.exists()
 
 
-@api_view(["POST"])
-@with_user
-def create_company_invite(request, user, company_id):
-
-    try:
-        company = Company.objects.get(id=company_id)
-    except Company.DoesNotExist:
-        return Response({"error": "company_not_found"}, status=404)
-
-    if not can_manage_company(user, company):
-        return Response({"error": "forbidden"}, status=403)
-
-    username = request.data.get("username")
-    email = request.data.get("email")
-
-    if not username and not email:
-        return Response({"error": "username or email required"}, status=400)
-
-    User = get_user_model()
-
-    invited_user = None
-
-    if username:
-        invited_user = User.objects.filter(username=username).first()
-
-    if email and not invited_user:
-        invited_user = User.objects.filter(email=email).first()
-
-    if not invited_user:
-        return Response({"error": "user_not_found"}, status=404)
-
-    # уже участник
-    if CompanyMember.objects.filter(company=company, user=invited_user).exists():
-        return Response({"error": "already_member"}, status=400)
-
-    existing = CompanyInvite.objects.filter(
-        company=company,
-        invited_user=invited_user,
-        status="pending"
-    ).first()
-
-    if existing:
-        return Response({
-            "error": "invite_already_sent",
-            "invite_id": existing.id
-        }, status=400)
-
-    try:
-        invite = CompanyInvite.create_invite(
-            company=company,
-            invited_user=invited_user,
-            invited_by=user,
-        )
-
-        Notification.objects.create(
-            recipient=invited_user,
-            actor=user,
-            title="Company invitation",
-            text=f"You were invited to join {company.name}.",
-            metadata={
-                "type": "company_invite",
-                "invite_id": invite.id,
-                "company_id": company.id,
-            },
-        )
-
-    except ValidationError as e:
-        return Response({"error": str(e)}, status=400)
-
-    return Response({
-        "id": invite.id,
-        "status": invite.status,
-    }, status=201)
-
 
 @api_view(["GET"])
 @with_user
@@ -249,19 +175,26 @@ def remove_company_member(request, user, company_id):
         company = Company.objects.get(id=company_id)
         member = User.objects.get(id=member_id)
     except:
-        return Response({"error": "not found"}, status=404)
-
-    if not can_manage_company(user, company):
-        return Response({"error": "Нет прав"}, status=403)
+        return Response({"error": "not_found"}, status=404)
 
     if company.owner_id == member.id:
         return Response({"error": "Нельзя удалить owner"}, status=400)
 
-    CompanyMember.objects.filter(company=company, user=member).delete()
+    if user.id == member.id:
+        CompanyMember.objects.filter(company=company, user=member).delete()
 
-    log_action(user, "remove_member", company, {"member_id": member.id})
+        log_action(user, "leave_company", company)
 
-    return Response({"message": "removed"})
+        return Response({"message": "Вы вышли из компании"})
+
+    if can_manage_company(user, company):
+        CompanyMember.objects.filter(company=company, user=member).delete()
+
+        log_action(user, "remove_member", company, {"member_id": member.id})
+
+        return Response({"message": "Участник удалён"})
+
+    return Response({"error": "Нет прав"}, status=403)
 
 
 # =========================================================
@@ -289,11 +222,8 @@ def get_company_repositories(request, user, company_id):
 
 
 @api_view(["POST"])
-def create_company_invite(request, company_id):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
+@with_user
+def create_company_invite(request, user, company_id):
     try:
         company = Company.objects.get(id=company_id)
     except Company.DoesNotExist:
@@ -319,6 +249,21 @@ def create_company_invite(request, company_id):
     if not invited_user:
         return Response({"error": "user_not_found"}, status=404)
 
+    if CompanyMember.objects.filter(company=company, user=invited_user).exists():
+        return Response({"error": "already_member"}, status=400)
+
+    existing = CompanyInvite.objects.filter(
+        company=company,
+        invited_user=invited_user,
+        status=CompanyInviteStatus.PENDING
+    ).first()
+
+    if existing:
+        return Response({
+            "error": "invite_already_sent",
+            "invite_id": existing.id
+        }, status=400)
+
     try:
         invite = CompanyInvite.create_invite(
             company=company,
@@ -331,6 +276,7 @@ def create_company_invite(request, company_id):
     return Response({
         "id": invite.id,
         "status": invite.status,
+        "message": "Приглашение отправлено"
     }, status=201)
 
 
@@ -389,13 +335,35 @@ def accept_invite(request, invite_id):
 
     try:
         invite = CompanyInvite.objects.get(id=invite_id)
-        invite.accept(user)
     except CompanyInvite.DoesNotExist:
-        return Response({"error": "not_found"}, status=404)
+        return Response({"error": "Приглашение не найдено"}, status=404)
+
+    # Если приглашение отменено - просто удаляем его
+    if invite.status == CompanyInviteStatus.CANCELLED:
+        invite.delete()
+        return Response({
+            "error": "invite_cancelled",
+            "message": "Это приглашение было отменено. Пожалуйста, запросите новое приглашение."
+        }, status=400)
+
+    if invite.status != CompanyInviteStatus.PENDING:
+        status_messages = {
+            CompanyInviteStatus.ACCEPTED: "Это приглашение уже было принято",
+            CompanyInviteStatus.REJECTED: "Это приглашение было отклонено",
+        }
+        message = status_messages.get(invite.status, f"Приглашение имеет статус: {invite.status}")
+        return Response({"error": message}, status=400)
+
+    try:
+        invite.accept(user)
     except ValidationError as e:
         return Response({"error": str(e)}, status=400)
 
-    return Response({"message": "accepted"})
+    return Response({
+        "message": "Вы присоединились к компании",
+        "company_id": invite.company.id,
+        "company_name": invite.company.name
+    })
 
 
 
@@ -424,10 +392,12 @@ def cancel_invite(request, invite_id):
 
     try:
         invite = CompanyInvite.objects.get(id=invite_id)
-        invite.cancel(user)
     except CompanyInvite.DoesNotExist:
-        return Response({"error": "not_found"}, status=404)
+        return Response({"error": "Приглашение не найдено"}, status=404)
+
+    try:
+        invite.cancel(user)
     except ValidationError as e:
         return Response({"error": str(e)}, status=400)
 
-    return Response({"message": "cancelled"})
+    return Response({"message": "Приглашение отменено"})
