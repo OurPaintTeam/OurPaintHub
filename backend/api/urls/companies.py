@@ -2,8 +2,8 @@ from django.urls import path
 
 from api.views.companies import get_companies, create_company, update_company, delete_company, \
     get_company_members, \
-    remove_company_member, get_company_repositories, get_incoming_invites, get_sent_invites, \
-    accept_invite, reject_invite, cancel_invite, create_company_invite, get_company, leave_company
+    remove_company_member, get_company_repositories, get_incoming_invites, \
+    accept_invite, reject_invite, cancel_invite, create_company_invite, get_company, leave_company, get_company_invites
 
 urlpatterns = [
     path("list/", get_companies),
@@ -28,7 +28,7 @@ urlpatterns = [
     path("invites/incoming/", get_incoming_invites),
 
     # исходящие приглашения пользователя
-    path("invites/sent/", get_sent_invites),
+    path("<int:company_id>/invites/", get_company_invites),
 
     # принять приглашение
     path("invites/<int:invite_id>/accept/", accept_invite),

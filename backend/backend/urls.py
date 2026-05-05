@@ -26,18 +26,6 @@ urlpatterns = [
     path("api/notifications/", include("api.urls.notifications")),
     path("api/content/", include("api.urls.content")),
     path("api/faq/", include("api.urls.faq")),
-    path("api/news/", news_view),
-    path("api/news/create/", create_news),
-    path("api/news/<int:news_id>/", update_news),
-    path("api/news/<int:news_id>/delete/", delete_news),
-    path("api/documentation/", documentation_view),
-    path("api/documentation/create/", create_documentation),
-    path("api/documentation/<int:doc_id>/", update_documentation),
-    path("api/documentation/<int:doc_id>/delete/", delete_documentation),
-    path("api/download/", download_view),
-    path("api/download/create/", create_version),
-    path("api/download/<int:version_id>/", download_file),
-    path("api/download/<int:version_id>/delete/", delete_version),
 ]
 
 if settings.DEBUG:

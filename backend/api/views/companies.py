@@ -330,28 +330,6 @@ def get_incoming_invites(request):
     ])
 
 
-@api_view(["GET"])
-def get_sent_invites(request):
-    user, error = get_user_from_request_data(request)
-    if error:
-        return error
-
-    invites = CompanyInvite.objects.filter(
-        invited_by=user
-    ).select_related("company", "invited_user")
-
-    return Response([
-        {
-            "id": i.id,
-            "company": i.company.name,
-            "invited_user": i.invited_user.username,
-            "status": i.status,
-            "created_at": i.created_at,
-        }
-        for i in invites
-    ])
-
-
 
 @api_view(["POST"])
 def accept_invite(request, invite_id):
@@ -427,3 +405,27 @@ def cancel_invite(request, invite_id):
         return Response({"error": str(e)}, status=400)
 
     return Response({"message": "Приглашение отменено"})
+
+
+@api_view(["GET"])
+@with_user
+def get_company_invites(request, user, company_id):
+    company = Company.objects.get(id=company_id)
+
+    if not can_manage_company(user, company):
+        return Response({"error": "forbidden"}, status=403)
+
+    invites = CompanyInvite.objects.filter(
+        company=company,
+        status=CompanyInviteStatus.PENDING
+    ).select_related("invited_user")
+
+    return Response([
+        {
+            "id": i.id,
+            "invited_user": i.invited_user.username,
+            "status": i.status,
+            "created_at": i.created_at,
+        }
+        for i in invites
+    ])

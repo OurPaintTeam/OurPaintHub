@@ -296,7 +296,7 @@ def create_version(request):
     return Response(serialize_app_version(version), status=201)
 
 
-@api_view(["PUT", "DELETE"])
+@api_view(["PUT"])
 def update_version(request, version_id):
     user, error = get_user_from_request_data(request)
     if error:
@@ -309,11 +309,6 @@ def update_version(request, version_id):
         version = AppVersion.objects.get(id=version_id)
     except AppVersion.DoesNotExist:
         return Response({"error": "not_found"}, status=404)
-
-    if request.method == "DELETE":
-        log_action(user, "delete", version)
-        version.delete()
-        return Response(status=204)
 
     for field in ["title", "content", "version", "platform"]:
         if field in request.data:
