@@ -1,15 +1,17 @@
 from django.urls import path
 
-from api.views.companies import get_companies, create_company, get_or_update_company, delete_company, \
+from api.views.companies import get_companies, create_company, update_company, delete_company, \
     get_company_members, \
     remove_company_member, get_company_repositories, get_incoming_invites, get_sent_invites, \
-    accept_invite, reject_invite, cancel_invite, create_company_invite
+    accept_invite, reject_invite, cancel_invite, create_company_invite , get_company
 
 urlpatterns = [
     path("list/", get_companies),
     path("create/", create_company),
 
-    path("<int:company_id>/", get_or_update_company),
+    path("update/<int:company_id>/", update_company),
+
+    path("<int:company_id>/", get_company),
 
     path("<int:company_id>/delete/", delete_company),
 

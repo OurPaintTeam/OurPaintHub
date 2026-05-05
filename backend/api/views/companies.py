@@ -136,9 +136,6 @@ def get_company(request, user, company_id):
     except Company.DoesNotExist:
         return Response({"error": "Компания не найдена"}, status=404)
 
-    if not is_company_member(user, company):
-        return Response({"error": "Недостаточно прав"}, status=403)
-
     return Response(serialize_company(company, user))
 
 
@@ -173,25 +170,19 @@ def create_company(request, user):
     )
 
 
-@api_view(["GET", "PUT"])
+@api_view(["PUT"])
 @with_user
-def get_or_update_company(request, user, company_id):
+def update_company(request, user, company_id):
     try:
-        company = Company.objects.get(id=company_id)
+        company = Company.objects.select_related("owner").get(id=company_id)
     except Company.DoesNotExist:
         return Response({"error": "Компания не найдена"}, status=404)
 
-    if request.method == "GET":
-        if not is_company_member(user, company):
-            return Response({"error": "Недостаточно прав"}, status=403)
-
-        return Response(serialize_company(company, user))
-
+    # Только управляющие могут обновлять
     if not can_manage_company(user, company):
-        return Response({"error": "Нет прав"}, status=403)
+        return Response({"error": "Нет прав на редактирование"}, status=403)
 
-    name = (request.data.get("name", company.name) or "").strip()
-
+    name = (request.data.get("name") or "").strip()
     if not name:
         return Response({"error": "Название обязательно"}, status=400)
 
@@ -199,7 +190,7 @@ def get_or_update_company(request, user, company_id):
         return Response({"error": "Компания с таким названием уже существует"}, status=400)
 
     company.name = name
-    company.description = (request.data.get("description", company.description) or "").strip()
+    company.description = (request.data.get("description") or "").strip()
 
     try:
         company.save()
@@ -285,10 +276,14 @@ def get_company_repositories(request, user, company_id):
     except Company.DoesNotExist:
         return Response({"error": "Компания не найдена"}, status=404)
 
-    if not is_company_member(user, company):
-        return Response({"error": "Нет прав"}, status=403)
+    is_member = is_company_member(user, company)
 
-    repos = Repository.objects.filter(owner_company=company).order_by("name")
+    repos = Repository.objects.filter(owner_company=company)
+
+    if not is_member:
+        repos = repos.filter(visibility="public")
+
+    repos = repos.order_by("name")
 
     return Response([serialize_repository(r, user) for r in repos])
 

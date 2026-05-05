@@ -73,11 +73,10 @@ def serialize_repository(repository, user=None):
 
 
 def serialize_company(company, user=None):
-    member_count = CompanyMember.objects.filter(company=company).count()
     logo_url = _file_url(company.logo)
     cover_url = _file_url(company.cover)
 
-    return {
+    base_data = {
         "id": company.id,
         "name": company.name,
         "description": company.description,
@@ -87,10 +86,22 @@ def serialize_company(company, user=None):
         "logo_url": logo_url,
         "cover": cover_url,
         "cover_url": cover_url,
-        "member_count": member_count,
-        "is_owner": bool(user and user.is_authenticated and company.owner_id == user.id),
-        "is_member": bool(user and is_company_member(user, company)),
-        "can_manage": bool(user and can_manage_company(user, company)),
+        "member_count": CompanyMember.objects.filter(company=company).count(),
         "created_at": _iso(company.created_at),
         "updated_at": _iso(company.updated_at),
+    }
+
+    if not user or not user.is_authenticated or not is_company_member(user, company):
+        return {
+            **base_data,
+            "is_member": False,
+            "can_manage": False,
+            "is_owner": False,
+        }
+
+    return {
+        **base_data,
+        "is_owner": company.owner_id == user.id,
+        "is_member": True,
+        "can_manage": can_manage_company(user, company),
     }
