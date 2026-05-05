@@ -176,40 +176,75 @@ const RepositoryPage: React.FC = () => {
         }
     };
 
-    const downloadRepositoryZip = () => {
+    const downloadRepositoryZip = async () => {
         if (!repo) return;
 
-        const token = getAccessToken();
+        try {
+            const response = await fetch(
+                apiUrl(`/repositories/${repo.id}/download/`),
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${getAccessToken()}`,
+                    },
+                }
+            );
 
-        if (!token) {
-            navigate("/login");
-            return;
+            if (!response.ok) {
+                throw new Error("Ошибка скачивания");
+            }
+
+            const blob = await response.blob();
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+
+            a.href = url;
+            a.download = `${repo.name}.zip`;
+
+            document.body.appendChild(a);
+            a.click();
+
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
         }
-
-        window.open(
-            apiUrl(
-                `/repositories/${repo.id}/download/?access_token=${encodeURIComponent(
-                    token
-                )}`
-            ),
-            "_blank"
-        );
     };
 
-    const downloadFile = (file: RepoFile) => {
-        const token = getAccessToken();
+    const downloadFile = async (file: RepoFile) => {
+        if (!repo) return;
+        try {
+            const response = await fetch(
+                apiUrl(`/repositories/${repo.id}/files/${file.commit_file_id}/download/`),
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${getAccessToken()}`,
+                    },
+                }
+            );
 
-        if (!token || !file.download_url) {
-            navigate("/login");
-            return;
+            if (!response.ok) {
+                throw new Error("Ошибка скачивания файла");
+            }
+
+            const blob = await response.blob();
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+
+            a.href = url;
+            a.download = file.name;
+
+            document.body.appendChild(a);
+            a.click();
+
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
         }
-
-        window.open(
-            `${apiUrl(
-                file.download_url.replace("/api", "")
-            )}?access_token=${encodeURIComponent(token)}`,
-            "_blank"
-        );
     };
 
     const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
