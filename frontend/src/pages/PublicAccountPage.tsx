@@ -19,7 +19,6 @@ interface UserProfile {
     email: string;
     first_name: string;
     last_name: string;
-    role: string;
     bio?: string | null;
     date_of_birth?: string | null;
     avatar?: string | null;
@@ -199,10 +198,6 @@ const PublicAccountPage: React.FC = () => {
                                 <div className="profile-info-row">
                                     <span>Фамилия</span>
                                     <strong>{profile.last_name || "Не указано"}</strong>
-                                </div>
-                                <div className="profile-info-row">
-                                    <span>Роль</span>
-                                    <strong>{profile.role || "user"}</strong>
                                 </div>
                                 <div className="profile-info-row">
                                     <span>Дата рождения</span>

@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useEffect, useState } from "react";
+import React, { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import { apiFetch, apiUrl, getAccessToken } from "../config/api";
@@ -41,6 +41,13 @@ interface RepositoryDetail {
     commits: Commit[];
 }
 
+interface FileWithPreview {
+    id: string;
+    file: File;
+    name: string;
+    size: string;
+}
+
 const formatDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "Дата недоступна";
@@ -52,6 +59,14 @@ const formatDate = (value: string) => {
         hour: "2-digit",
         minute: "2-digit",
     });
+};
+
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
 const RepositoryPage: React.FC = () => {
@@ -71,17 +86,16 @@ const RepositoryPage: React.FC = () => {
         useState<"private" | "public">("private");
 
     const [commitMessage, setCommitMessage] = useState("");
-    const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-    const [uploadPaths, setUploadPaths] = useState("");
+    const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
 
     const [editingFile, setEditingFile] = useState<RepoFile | null>(null);
     const [filePath, setFilePath] = useState("");
-    const [replacementFile, setReplacementFile] =
-        useState<File | null>(null);
+    const [replacementFile, setReplacementFile] = useState<File | null>(null);
 
     const [message, setMessage] = useState("");
-    const [viewingCommit, setViewingCommit] =
-        useState<Commit | null>(null);
+    const [viewingCommit, setViewingCommit] = useState<Commit | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!id) {
@@ -198,10 +212,31 @@ const RepositoryPage: React.FC = () => {
         );
     };
 
-    const handleUploadFilesChange = (
-        event: ChangeEvent<HTMLInputElement>
-    ) => {
-        setUploadFiles(Array.from(event.target.files || []));
+    const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        const newFiles: FileWithPreview[] = files.map((file) => ({
+            id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+            file: file,
+            name: file.name,
+            size: formatFileSize(file.size),
+        }));
+
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
+    const removeFile = (fileId: string) => {
+        setSelectedFiles((prev) => prev.filter((f) => f.id !== fileId));
+    };
+
+    const clearAllFiles = () => {
+        setSelectedFiles([]);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     const createCommit = async () => {
@@ -210,27 +245,21 @@ const RepositoryPage: React.FC = () => {
             return;
         }
 
+        if (selectedFiles.length === 0) {
+            setMessage("Выберите хотя бы один файл");
+            return;
+        }
+
         setSaving(true);
         setMessage("");
 
         try {
-            const paths = uploadPaths
-                .split("\n")
-                .map((item) => item.trim())
-                .filter(Boolean);
-
             const formData = new FormData();
-
             formData.append("message", commitMessage.trim());
 
-            uploadFiles.forEach((file, index) => {
-                formData.append("files", file);
-                formData.append(
-                    "paths",
-                    paths[index] ||
-                    file.webkitRelativePath ||
-                    file.name
-                );
+            selectedFiles.forEach((fileWrapper) => {
+                formData.append("files", fileWrapper.file);
+                formData.append("paths", fileWrapper.file.webkitRelativePath || fileWrapper.file.name);
             });
 
             await apiFetch(
@@ -243,8 +272,7 @@ const RepositoryPage: React.FC = () => {
             );
 
             setCommitMessage("");
-            setUploadFiles([]);
-            setUploadPaths("");
+            setSelectedFiles([]);
             setMessage("Коммит создан");
 
             await load();
@@ -357,6 +385,48 @@ const RepositoryPage: React.FC = () => {
         }
     };
 
+    const deleteRepository = async () => {
+        if (!repo) return;
+
+        const confirmMessage = repo.owner_company_id
+            ? `Вы уверены, что хотите удалить репозиторий "${repo.name}" из компании? Это действие необратимо.`
+            : `Вы уверены, что хотите удалить репозиторий "${repo.name}"? Это действие необратимо.`;
+
+        if (!window.confirm(confirmMessage)) return;
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            await apiFetch(
+                `/repositories/${repo.id}/delete/`,
+                {
+                    method: "DELETE",
+                    auth: true,
+                }
+            );
+
+            setMessage("Репозиторий удалён");
+
+            // Перенаправление после удаления
+            setTimeout(() => {
+                if (repo.owner_company_id) {
+                    navigate(`/companies/${repo.owner_company_id}`);
+                } else {
+                    navigate("/repositories/my");
+                }
+            }, 1500);
+        } catch (error) {
+            setMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Ошибка удаления репозитория"
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) {
         return (
             <MainLayout isAuthenticated={true}>
@@ -380,15 +450,20 @@ const RepositoryPage: React.FC = () => {
             <div className="repo-page page">
                 <button
                     onClick={() => navigate(-1)}
-                    className="back-btn"
+                    className="link-btn"
                 >
-                    &larr; Назад
+                    ← Назад
                 </button>
 
                 <div className="repo-hero">
                     <div>
                         <h1>{repo.name}</h1>
                         <p>{repo.description || "Без описания"}</p>
+                        {repo.owner_company_name && (
+                            <p className="repo-owner">
+                                Компания: {repo.owner_company_name}
+                            </p>
+                        )}
                     </div>
 
                     <div className="repo-actions">
@@ -398,11 +473,23 @@ const RepositoryPage: React.FC = () => {
                         >
                             Скачать ZIP
                         </button>
+
+                        {repo.can_delete && (
+                            <button
+                                onClick={deleteRepository}
+                                className="danger-btn"
+                                disabled={saving}
+                            >
+                                {saving ? "Удаление..." : "Удалить репозиторий"}
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 {message && (
-                    <p className="message success">{message}</p>
+                    <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
+                        {message}
+                    </p>
                 )}
 
                 {repo.can_edit && !viewingCommit && (
@@ -411,57 +498,72 @@ const RepositoryPage: React.FC = () => {
 
                         <input
                             value={commitMessage}
-                            onChange={(e) =>
-                                setCommitMessage(
-                                    e.target.value
-                                )
-                            }
+                            onChange={(e) => setCommitMessage(e.target.value)}
                             placeholder="Сообщение коммита"
                         />
 
-                        <input
-                            type="file"
-                            multiple
-                            onChange={
-                                handleUploadFilesChange
-                            }
-                        />
+                        <div className="file-upload-section">
+                            <label className="file-upload-label">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    onChange={handleFilesChange}
+                                    className="file-input"
+                                />
+                                <span className="secondary-btn">Выбрать файлы</span>
+                            </label>
 
-                        <textarea
-                            value={uploadPaths}
-                            onChange={(e) =>
-                                setUploadPaths(
-                                    e.target.value
-                                )
-                            }
-                            placeholder="Пути файлов"
-                        />
+                            {selectedFiles.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={clearAllFiles}
+                                    className="secondary-btn"
+                                >
+                                    Очистить ({selectedFiles.length})
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedFiles.length > 0 && (
+                            <div className="files-list">
+                                {selectedFiles.map((fileWrapper) => (
+                                    <div key={fileWrapper.id} className="file-item">
+                                        <div className="file-info">
+                                            <span className="file-name">{fileWrapper.name}</span>
+                                            <span className="file-size">{fileWrapper.size}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFile(fileWrapper.id)}
+                                            className="danger-btn"
+                                        >
+                                            Удалить
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         <button
                             onClick={createCommit}
+                            disabled={saving || !commitMessage.trim() || selectedFiles.length === 0}
                             className="card-btn"
                         >
-                            Создать коммит
+                            {saving ? "Создание..." : "Создать коммит"}
                         </button>
                     </section>
                 )}
 
                 {viewingCommit && (
                     <div className="card">
-                        <strong>
-                            Просмотр коммита:
-                        </strong>{" "}
-                        {viewingCommit.commit_hash.slice(
-                            0,
-                            12
-                        )}
+                        <strong>Просмотр коммита:</strong>{" "}
+                        {viewingCommit.commit_hash.slice(0, 12)}
 
                         <button
                             onClick={backToHead}
                             className="secondary-btn"
-                            style={{
-                                marginLeft: 12,
-                            }}
+                            style={{ marginLeft: 12 }}
                         >
                             Вернуться к HEAD
                         </button>
@@ -473,55 +575,37 @@ const RepositoryPage: React.FC = () => {
 
                     <div className="repo-list">
                         {files.map((file) => (
-                            <div
-                                key={file.commit_file_id}
-                                className="card file-card"
-                            >
+                            <div key={file.commit_file_id} className="card file-card">
                                 <div>
-                                    <strong>
-                                        {file.name}
-                                    </strong>
+                                    <strong>{file.name}</strong>
                                     <p>{file.path}</p>
                                 </div>
 
                                 <div className="repo-actions">
                                     <button
-                                        onClick={() =>
-                                            downloadFile(
-                                                file
-                                            )
-                                        }
+                                        onClick={() => downloadFile(file)}
                                         className="secondary-btn"
                                     >
                                         Скачать
                                     </button>
 
-                                    {repo.can_edit &&
-                                        !viewingCommit && (
-                                            <>
-                                                <button
-                                                    onClick={() =>
-                                                        openFileEditor(
-                                                            file
-                                                        )
-                                                    }
-                                                    className="secondary-btn"
-                                                >
-                                                    Изменить
-                                                </button>
+                                    {repo.can_edit && !viewingCommit && (
+                                        <>
+                                            <button
+                                                onClick={() => openFileEditor(file)}
+                                                className="secondary-btn"
+                                            >
+                                                Изменить
+                                            </button>
 
-                                                <button
-                                                    onClick={() =>
-                                                        deleteFile(
-                                                            file
-                                                        )
-                                                    }
-                                                    className="danger-btn"
-                                                >
-                                                    Удалить
-                                                </button>
-                                            </>
-                                        )}
+                                            <button
+                                                onClick={() => deleteFile(file)}
+                                                className="danger-btn"
+                                            >
+                                                Удалить
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -533,37 +617,21 @@ const RepositoryPage: React.FC = () => {
 
                     <div className="repo-list">
                         {commits.map((commit) => (
-                            <div
-                                key={commit.id}
-                                className="card commit-card"
-                            >
-                                <strong>
-                                    {commit.message}
-                                </strong>
+                            <div key={commit.id} className="card commit-card">
+                                <strong>{commit.message}</strong>
 
                                 <p>
                                     {commit.created_by_username
                                         ? `${commit.created_by_username} · `
                                         : ""}
-                                    {formatDate(
-                                        commit.created_at
-                                    )}
+                                    {formatDate(commit.created_at)}
                                 </p>
 
-                                <code>
-                                    {commit.commit_hash.slice(
-                                        0,
-                                        12
-                                    )}
-                                </code>
+                                <code>{commit.commit_hash.slice(0, 12)}</code>
 
                                 <div className="repo-actions">
                                     <button
-                                        onClick={() =>
-                                            goToCommit(
-                                                commit
-                                            )
-                                        }
+                                        onClick={() => goToCommit(commit)}
                                         className="secondary-btn"
                                     >
                                         Просмотреть
@@ -571,11 +639,7 @@ const RepositoryPage: React.FC = () => {
 
                                     {repo.can_edit && (
                                         <button
-                                            onClick={() =>
-                                                revertToCommit(
-                                                    commit
-                                                )
-                                            }
+                                            onClick={() => revertToCommit(commit)}
                                             className="danger-btn"
                                         >
                                             Откатить
@@ -588,58 +652,27 @@ const RepositoryPage: React.FC = () => {
                 </section>
 
                 {editingFile && (
-                    <div
-                        className="modal-overlay"
-                        onClick={() =>
-                            setEditingFile(null)
-                        }
-                    >
-                        <div
-                            className="modal"
-                            onClick={(e) =>
-                                e.stopPropagation()
-                            }
-                        >
+                    <div className="modal-overlay" onClick={() => setEditingFile(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
                             <h2>Изменить файл</h2>
 
                             <input
                                 value={filePath}
-                                onChange={(e) =>
-                                    setFilePath(
-                                        e.target.value
-                                    )
-                                }
+                                onChange={(e) => setFilePath(e.target.value)}
                                 placeholder="Путь файла"
                             />
 
                             <input
                                 type="file"
-                                onChange={(e) =>
-                                    setReplacementFile(
-                                        e.target.files?.[0] ||
-                                        null
-                                    )
-                                }
+                                onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
                             />
 
                             <div className="modal-actions">
-                                <button
-                                    onClick={
-                                        saveFileChange
-                                    }
-                                    className="card-btn"
-                                >
+                                <button onClick={saveFileChange} className="card-btn">
                                     Сохранить
                                 </button>
 
-                                <button
-                                    onClick={() =>
-                                        setEditingFile(
-                                            null
-                                        )
-                                    }
-                                    className="secondary-btn"
-                                >
+                                <button onClick={() => setEditingFile(null)} className="secondary-btn">
                                     Отмена
                                 </button>
                             </div>

@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, {useEffect, useMemo, useState} from "react";
+import {useNavigate} from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch, mediaUrl } from "../config/api";
+import {apiFetch, mediaUrl} from "../config/api";
 import "./AccountPage.scss";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
 import {
     faBuilding,
     faCalendarDays,
@@ -124,13 +124,12 @@ const AccountPage: React.FC = () => {
         if (!account) return [];
 
         return [
-            { label: "Username", value: account.username },
-            { label: "Email", value: account.email },
-            { label: "Имя", value: account.first_name || "Не указано" },
-            { label: "Фамилия", value: account.last_name || "Не указано" },
-            { label: "Роль", value: account.role || "user" },
-            { label: "Дата рождения", value: formatDate(account.date_of_birth) },
-            { label: "Регистрация", value: formatDate(account.date_joined, true) },
+            {label: "Username", value: account.username},
+            {label: "Email", value: account.email},
+            {label: "Имя", value: account.first_name || "Не указано"},
+            {label: "Фамилия", value: account.last_name || "Не указано"},
+            {label: "Дата рождения", value: formatDate(account.date_of_birth)},
+            {label: "Регистрация", value: formatDate(account.date_joined, true)},
         ];
     }, [account]);
 
@@ -157,7 +156,8 @@ const AccountPage: React.FC = () => {
                     <div className="profile-layout">
                         <aside className="profile-sidebar">
                             <div className="profile-avatar profile-avatar-large">
-                                {avatarSrc ? <img src={avatarSrc} alt={account.username} /> : <FontAwesomeIcon icon={faUserCircle} />}
+                                {avatarSrc ? <img src={avatarSrc} alt={account.username}/> :
+                                    <FontAwesomeIcon icon={faUserCircle}/>}
                             </div>
 
                             <div className="profile-identity">
@@ -168,27 +168,29 @@ const AccountPage: React.FC = () => {
                             {account.bio && <p className="profile-bio">{account.bio}</p>}
 
                             <button className="settings-btn" onClick={() => navigate("/settings")} type="button">
-                                <FontAwesomeIcon icon={faGear} />
+                                <FontAwesomeIcon icon={faGear}/>
                                 Настройки профиля
                             </button>
 
                             <div className="profile-meta-list">
                                 <span>
-                                    <FontAwesomeIcon icon={faEnvelope} />
+                                    <FontAwesomeIcon icon={faEnvelope}/>
                                     {account.email}
                                 </span>
+                                {account.role === 'admin' && (
+                                    <span>
+                                        <FontAwesomeIcon icon={faIdBadge}/>
+                                        {account.role || "user"}
+                                    </span>
+                                )}
                                 <span>
-                                    <FontAwesomeIcon icon={faIdBadge} />
-                                    {account.role || "user"}
-                                </span>
-                                <span>
-                                    <FontAwesomeIcon icon={faCalendarDays} />
+                                    <FontAwesomeIcon icon={faCalendarDays}/>
                                     Регистрация: {formatDate(account.date_joined)}
                                 </span>
                             </div>
 
                             <button className="delete-btn profile-danger" onClick={handleDeleteAccount} type="button">
-                                <FontAwesomeIcon icon={faTrash} />
+                                <FontAwesomeIcon icon={faTrash}/>
                                 Удалить аккаунт
                             </button>
                         </aside>
@@ -237,7 +239,8 @@ const AccountPage: React.FC = () => {
                                         <span className="section-label">Repositories</span>
                                         <h2>Ваши репозитории</h2>
                                     </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/repositories/my")} type="button">
+                                    <button className="secondary-btn" onClick={() => navigate("/repositories/my")}
+                                            type="button">
                                         Все проекты
                                     </button>
                                 </div>
@@ -252,7 +255,7 @@ const AccountPage: React.FC = () => {
                                                 key={repo.id}
                                                 onClick={() => navigate(`/repositories/${repo.id}`)}
                                             >
-                                                <FontAwesomeIcon icon={faFolderTree} />
+                                                <FontAwesomeIcon icon={faFolderTree}/>
                                                 <div>
                                                     <h3>{repo.name}</h3>
                                                     <p>{repo.description || "Без описания"}</p>
@@ -269,7 +272,8 @@ const AccountPage: React.FC = () => {
                                         <span className="section-label">Companies</span>
                                         <h2>Компании</h2>
                                     </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/companies")} type="button">
+                                    <button className="secondary-btn" onClick={() => navigate("/companies")}
+                                            type="button">
                                         Открыть команды
                                     </button>
                                 </div>
@@ -284,7 +288,7 @@ const AccountPage: React.FC = () => {
                                                 key={company.id}
                                                 onClick={() => navigate(`/companies/${company.id}`)}
                                             >
-                                                <FontAwesomeIcon icon={faBuilding} />
+                                                <FontAwesomeIcon icon={faBuilding}/>
                                                 <div>
                                                     <h3>{company.name}</h3>
                                                     <p>{company.owner_id === account.id ? "Владелец" : "Участник"}</p>

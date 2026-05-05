@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useEffect, useState } from "react";
+import React, { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import { apiFetch } from "../config/api";
@@ -18,6 +18,9 @@ interface Company {
     owner_id: number;
     owner_username?: string;
     can_manage?: boolean;
+    is_member?: boolean;
+    is_owner?: boolean;
+    member_count?: number;
 }
 
 interface Repository {
@@ -31,6 +34,21 @@ interface CreateRepositoryResponse {
     message?: string;
     repository: Repository;
 }
+
+interface FileWithPreview {
+    id: string;
+    file: File;
+    name: string;
+    size: string;
+}
+
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
 
 const CompanyPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -47,11 +65,16 @@ const CompanyPage: React.FC = () => {
     const [repoName, setRepoName] = useState("");
     const [repoDescription, setRepoDescription] = useState("");
     const [repoVisibility, setRepoVisibility] = useState<"private" | "public">("private");
-    const [repoFiles, setRepoFiles] = useState<File[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
     const [message, setMessage] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [inviteLoading, setInviteLoading] = useState(false);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const isMember = company?.is_member === true;
+    const canManage = company?.can_manage === true;
 
     useEffect(() => {
         if (!id) {
@@ -66,17 +89,25 @@ const CompanyPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const [companyData, membersData, reposData] = await Promise.all([
-                apiFetch<Company>(`/companies/${id}/`, { auth: true }),
-                apiFetch<User[]>(`/companies/${id}/members/`, { auth: true }),
-                apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true }),
-            ]);
-
+            const companyData = await apiFetch<Company>(`/companies/${id}/`, { auth: true });
             setCompany(companyData);
-            setMembers(membersData || []);
-            setRepos(reposData || []);
             setCompanyName(companyData.name);
             setCompanyDescription(companyData.description || "");
+
+            if (companyData.is_member) {
+                const [membersData, reposData] = await Promise.all([
+                    apiFetch<User[]>(`/companies/${id}/members/`, { auth: true }),
+                    apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true }),
+                ]);
+                setMembers(membersData || []);
+                setRepos(reposData || []);
+            } else {
+                const reposData = await apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true });
+                setRepos(reposData || []);
+                setMembers([]);
+            }
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка загрузки");
         } finally {
             setLoading(false);
         }
@@ -88,7 +119,7 @@ const CompanyPage: React.FC = () => {
         setSaving(true);
         setMessage("");
         try {
-            await apiFetch(`/companies/${company.id}/`, {
+            await apiFetch(`/companies/update/${company.id}/`, {
                 method: "PUT",
                 auth: true,
                 body: JSON.stringify({
@@ -124,7 +155,6 @@ const CompanyPage: React.FC = () => {
             const data = await apiFetch<User[]>(`/users/search/?q=${q}`, {
                 auth: true,
             });
-
             setSearchResults(data || []);
         } catch (e) {
             setSearchResults([]);
@@ -161,7 +191,6 @@ const CompanyPage: React.FC = () => {
         const timer = setTimeout(() => {
             searchUsers(searchQuery);
         }, 300);
-
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
@@ -186,8 +215,32 @@ const CompanyPage: React.FC = () => {
         }
     };
 
-    const handleRepoFiles = (event: ChangeEvent<HTMLInputElement>) => {
-        setRepoFiles(Array.from(event.target.files || []));
+    // Обработка выбора файлов для репозитория
+    const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        const newFiles: FileWithPreview[] = files.map((file) => ({
+            id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+            file: file,
+            name: file.name,
+            size: formatFileSize(file.size),
+        }));
+
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
+    const removeFile = (fileId: string) => {
+        setSelectedFiles((prev) => prev.filter((f) => f.id !== fileId));
+    };
+
+    const clearAllFiles = () => {
+        setSelectedFiles([]);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     const createCompanyRepository = async () => {
@@ -196,8 +249,14 @@ const CompanyPage: React.FC = () => {
             return;
         }
 
+        if (selectedFiles.length === 0) {
+            setMessage("Выберите хотя бы один файл для первого коммита");
+            return;
+        }
+
         setSaving(true);
         setMessage("");
+
         try {
             const formData = new FormData();
             formData.append("company_id", String(company.id));
@@ -205,9 +264,10 @@ const CompanyPage: React.FC = () => {
             formData.append("description", repoDescription.trim());
             formData.append("visibility", repoVisibility);
             formData.append("message", "Первый коммит");
-            repoFiles.forEach((file) => {
-                formData.append("files", file);
-                formData.append("paths", file.webkitRelativePath || file.name);
+
+            selectedFiles.forEach((fileWrapper) => {
+                formData.append("files", fileWrapper.file);
+                formData.append("paths", fileWrapper.file.webkitRelativePath || fileWrapper.file.name);
             });
 
             const data = await apiFetch<CreateRepositoryResponse>("/repositories/create/", {
@@ -220,7 +280,7 @@ const CompanyPage: React.FC = () => {
             setRepoName("");
             setRepoDescription("");
             setRepoVisibility("private");
-            setRepoFiles([]);
+            setSelectedFiles([]);
             setShowRepoForm(false);
             setMessage(data.message || "Репозиторий создан");
             await load();
@@ -255,7 +315,7 @@ const CompanyPage: React.FC = () => {
                 </button>
 
                 <div className="company-detail card">
-                    {editing ? (
+                    {editing && isMember ? (
                         <>
                             <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
                             <textarea value={companyDescription} onChange={(event) => setCompanyDescription(event.target.value)} />
@@ -273,34 +333,33 @@ const CompanyPage: React.FC = () => {
                             <h1>{company.name}</h1>
                             <p>{company.description || "Без описания"}</p>
                             <p>Владелец: {company.owner_username || company.owner_id}</p>
-                            {company.can_manage && (
-                                <div className="invite-box">
-                                    <input
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Поиск пользователя (username или email)"
-                                    />
+                            <p>Участников: {company.member_count || 0}</p>
 
-                                    {searchResults.length > 0 && (
-                                        <div className="invite-results">
-                                            {searchResults.map((user) => (
-                                                <div key={user.id} className="invite-row">
-                        <span>
-                            {user.username || user.email}
-                        </span>
+                            {isMember && canManage && (
+                                <>
+                                    <button onClick={() => setEditing(true)} className="secondary-btn" style={{ marginTop: "1rem" }}>
+                                        Редактировать компанию
+                                    </button>
+                                    <button onClick={deleteCompany} className="danger-btn" style={{ marginTop: "0.5rem" }}>
+                                        Удалить компанию
+                                    </button>
+                                </>
+                            )}
 
-                                                    <button
-                                                        onClick={() => inviteUser(user)}
-                                                        disabled={inviteLoading}
-                                                        className="invite-btn"
-                                                    >
-                                                        Пригласить
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                            {!isMember && (
+                                <button
+                                    onClick={() => navigate(`/companies/${id}/join`)}
+                                    className="card-btn"
+                                    style={{ marginTop: "1rem" }}
+                                >
+                                    Вступить в компанию
+                                </button>
+                            )}
+
+                            {isMember && (
+                                <span className="badge member-badge" style={{ marginTop: "1rem", display: "inline-block" }}>
+                                    Вы участник
+                                </span>
                             )}
                         </>
                     )}
@@ -308,71 +367,81 @@ const CompanyPage: React.FC = () => {
 
                 {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
 
-                <section className="section card">
-                    <h2>Участники</h2>
+                {/* Секция участников - только для членов компании */}
+                {isMember && (
+                    <section className="section card">
+                        <h2>Участники</h2>
 
-                    {company.can_manage && (
-                        <div className="invite-box">
-                            <input
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Поиск пользователя (username или email)"
-                            />
+                        {canManage && (
+                            <div className="invite-box">
+                                <input
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Поиск пользователя (username или email)"
+                                />
 
-                            {searchResults.length > 0 && (
-                                <div className="invite-results">
-                                    {searchResults.map((user) => (
-                                        <div key={user.id} className="invite-row">
-                                            <span>{user.username || user.email}</span>
-
-                                            <button
-                                                onClick={() => inviteUser(user)}
-                                                disabled={inviteLoading}
-                                                className="invite-btn"
-                                            >
-                                                Пригласить
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    <div className="members-list">
-                        {members.map((member) => (
-                            <div key={member.id} className="member-row">
-                                <span>{member.username || member.email}</span>
-
-                                {company.can_manage && member.id !== company.owner_id && (
-                                    <button
-                                        onClick={() => removeMember(member.id)}
-                                        disabled={saving}
-                                        className="link-btn danger"
-                                    >
-                                        Удалить
-                                    </button>
+                                {searchResults.length > 0 && (
+                                    <div className="invite-results">
+                                        {searchResults.map((user) => (
+                                            <div key={user.id} className="invite-row">
+                                                <span>{user.username || user.email}</span>
+                                                <button
+                                                    onClick={() => inviteUser(user)}
+                                                    disabled={inviteLoading}
+                                                    className="invite-btn"
+                                                >
+                                                    Пригласить
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
-                        ))}
-                    </div>
-                </section>
+                        )}
 
+                        <div className="members-list">
+                            {members.map((member) => (
+                                <div key={member.id} className="member-row">
+                                    <span>{member.username || member.email}</span>
+                                    {canManage && member.id !== company.owner_id && (
+                                        <button
+                                            onClick={() => removeMember(member.id)}
+                                            disabled={saving}
+                                            className="link-btn danger"
+                                        >
+                                            Удалить
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Секция репозиториев */}
                 <section className="section">
                     <div className="section-header">
                         <h2>Репозитории компании</h2>
-                        <button onClick={() => setShowRepoForm((value) => !value)} className="card-btn">
-                            {showRepoForm ? "Скрыть форму" : "Создать репозиторий"}
-                        </button>
+                        {isMember && (
+                            <button onClick={() => setShowRepoForm((value) => !value)} className="card-btn">
+                                {showRepoForm ? "Скрыть форму" : "Создать репозиторий"}
+                            </button>
+                        )}
                     </div>
 
-                    {showRepoForm && (
+                    {/* Форма создания репозитория */}
+                    {isMember && showRepoForm && (
                         <div className="repo-create card">
-                            <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="Название" />
+                            <input
+                                value={repoName}
+                                onChange={(event) => setRepoName(event.target.value)}
+                                placeholder="Название репозитория"
+                            />
                             <textarea
                                 value={repoDescription}
                                 onChange={(event) => setRepoDescription(event.target.value)}
-                                placeholder="Описание"
+                                placeholder="Описание (необязательно)"
+                                rows={3}
                             />
                             <select
                                 value={repoVisibility}
@@ -381,10 +450,56 @@ const CompanyPage: React.FC = () => {
                                 <option value="private">Приватный</option>
                                 <option value="public">Публичный</option>
                             </select>
-                            <input type="file" multiple onChange={handleRepoFiles} />
-                            {repoFiles.length > 0 && <p>Файлов для первого коммита: {repoFiles.length}</p>}
-                            <button onClick={createCompanyRepository} disabled={saving || !repoName.trim()} className="card-btn">
-                                Создать
+
+                            <div className="file-upload-section">
+                                <label className="file-upload-label">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        onChange={handleFilesChange}
+                                        className="file-input"
+                                    />
+                                    <span className="secondary-btn">Выбрать файлы</span>
+                                </label>
+
+                                {selectedFiles.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={clearAllFiles}
+                                        className="secondary-btn"
+                                    >
+                                        Очистить ({selectedFiles.length})
+                                    </button>
+                                )}
+                            </div>
+
+                            {selectedFiles.length > 0 && (
+                                <div className="files-list">
+                                    {selectedFiles.map((fileWrapper) => (
+                                        <div key={fileWrapper.id} className="file-item">
+                                            <div className="file-info">
+                                                <span className="file-name">{fileWrapper.name}</span>
+                                                <span className="file-size">{fileWrapper.size}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFile(fileWrapper.id)}
+                                                className="danger-btn"
+                                            >
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={createCompanyRepository}
+                                disabled={saving || !repoName.trim() || selectedFiles.length === 0}
+                                className="card-btn"
+                            >
+                                {saving ? "Создание..." : "Создать репозиторий"}
                             </button>
                         </div>
                     )}
@@ -397,7 +512,9 @@ const CompanyPage: React.FC = () => {
                                 <div key={repo.id} className="repo-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
                                     <h3>{repo.name}</h3>
                                     <p>{repo.description || "Без описания"}</p>
-                                    <span className={`badge ${repo.visibility}`}>{repo.visibility === "public" ? "Публичный" : "Приватный"}</span>
+                                    <span className={`badge ${repo.visibility}`}>
+                                        {repo.visibility === "public" ? "Публичный" : "Приватный"}
+                                    </span>
                                 </div>
                             ))}
                         </div>

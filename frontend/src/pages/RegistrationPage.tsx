@@ -8,6 +8,7 @@ import {
     faCalendar,
 } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "../config/api";
+// @ts-ignore
 import opLogo from "../assets/OP_logo.svg";
 import "./RegistrationPage.scss";
 
@@ -15,9 +16,6 @@ interface UserData {
     id: number;
     username: string;
     email: string;
-    first_name?: string;
-    last_name?: string;
-    date_of_birth?: string | null;
 }
 
 interface RegistrationResponse {
@@ -28,10 +26,7 @@ interface RegistrationResponse {
 const RegistrationPage: React.FC = () => {
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
-    const [dateOfBirth, setDateOfBirth] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [message, setMessage] = useState("");
@@ -67,10 +62,7 @@ const RegistrationPage: React.FC = () => {
                 body: JSON.stringify({
                     username,
                     email,
-                    password,
-                    first_name: firstName,
-                    last_name: lastName,
-                    date_of_birth: dateOfBirth || null,
+                    password
                 }),
             });
 
@@ -111,26 +103,6 @@ const RegistrationPage: React.FC = () => {
                             />
                         </div>
                         <div className="input-group">
-                            <FontAwesomeIcon icon={faUser} />
-                            <input
-                                type="text"
-                                placeholder="Имя"
-                                autoComplete="given-name"
-                                value={firstName}
-                                onChange={(event) => setFirstName(event.target.value)}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <FontAwesomeIcon icon={faUser} />
-                            <input
-                                type="text"
-                                placeholder="Фамилия"
-                                autoComplete="family-name"
-                                value={lastName}
-                                onChange={(event) => setLastName(event.target.value)}
-                            />
-                        </div>
-                        <div className="input-group">
                             <FontAwesomeIcon icon={faEnvelope} />
                             <input
                                 type="email"
@@ -139,16 +111,6 @@ const RegistrationPage: React.FC = () => {
                                 autoComplete="email"
                                 value={email}
                                 onChange={(event) => setEmail(event.target.value)}
-                            />
-                        </div>
-                        <div className="input-group">
-                            <FontAwesomeIcon icon={faCalendar} />
-                            <input
-                                type="date"
-                                placeholder="Дата рождения"
-                                autoComplete="bday"
-                                value={dateOfBirth}
-                                onChange={(event) => setDateOfBirth(event.target.value)}
                             />
                         </div>
                         <div className="input-group">
