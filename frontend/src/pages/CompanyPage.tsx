@@ -307,6 +307,31 @@ const CompanyPage: React.FC = () => {
         );
     }
 
+
+
+    const leaveCompany = async () => {
+        if (!company) return;
+
+        if (!window.confirm("Выйти из компании?")) return;
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            await apiFetch(`/companies/${company.id}/leave/`, {
+                method: "DELETE",
+                auth: true,
+            });
+
+            setMessage("Вы вышли из компании");
+            navigate("/companies");
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка выхода");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <MainLayout isAuthenticated={true}>
             <div className="companies-page page">
@@ -346,20 +371,20 @@ const CompanyPage: React.FC = () => {
                                 </>
                             )}
 
-                            {!isMember && (
-                                <button
-                                    onClick={() => navigate(`/companies/${id}/join`)}
-                                    className="card-btn"
-                                    style={{ marginTop: "1rem" }}
-                                >
-                                    Вступить в компанию
-                                </button>
-                            )}
+                            {isMember && !canManage && (
+                                <div style={{ marginTop: "1rem" }}>
+                                    <span className="badge member-badge">
+                                       Вы участник
+                                    </span>
 
-                            {isMember && (
-                                <span className="badge member-badge" style={{ marginTop: "1rem", display: "inline-block" }}>
-                                    Вы участник
-                                </span>
+                                    <button
+                                        onClick={leaveCompany}
+                                        className="danger-btn"
+                                        style={{ marginLeft: "1rem" }}
+                                    >
+                                        Выйти из компании
+                                    </button>
+                                </div>
                             )}
                         </>
                     )}
