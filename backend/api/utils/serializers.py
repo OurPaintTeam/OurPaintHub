@@ -39,7 +39,6 @@ def serialize_user(user):
         "bio": getattr(profile, "bio", None),
         "date_of_birth": _iso(getattr(profile, "date_of_birth", None)),
         "avatar": avatar_url,
-        "avatar_url": avatar_url,
         "date_joined": _iso(getattr(user, "date_joined", None)),
         "last_login": _iso(getattr(user, "last_login", None)),
         "profile_created_at": _iso(getattr(profile, "created_at", None)),
@@ -51,18 +50,34 @@ def serialize_repository(repository, user=None):
     owner_user = repository.owner_user
     owner_company = repository.owner_company
 
+    # Получаем аватар пользователя (владельца)
+    user_avatar = None
+    if owner_user:
+        profile = getattr(owner_user, "profile", None)
+        user_avatar = _file_url(getattr(profile, "avatar", None))
+
+    # Получаем логотип компании
+    company_logo = None
+    if owner_company:
+        company_logo = _file_url(owner_company.logo)
+
+    # Получаем логотип репозитория
+    repo_logo = _file_url(repository.logo)
+
     return {
         "id": repository.id,
         "name": repository.name,
         "description": repository.description,
         "visibility": repository.visibility,
         "created_by_id": repository.created_by_id,
-        "logo": repository.logo.url if repository.logo else None,
+        "logo_repo": repo_logo,  # логотип репозитория
         "created_by_username": repository.created_by.username if repository.created_by_id else None,
         "owner_user_id": repository.owner_user_id,
         "owner_user_username": owner_user.username if owner_user else None,
         "owner_company_id": repository.owner_company_id,
         "owner_company_name": owner_company.name if owner_company else None,
+        "avatar": user_avatar,  # аватар пользователя (владельца)
+        "logo_company": company_logo,  # логотип компании
         "is_personal": repository.is_personal,
         "is_company_repository": repository.is_company_repository,
         "can_view": bool(user and can_view_repository(user, repository)),

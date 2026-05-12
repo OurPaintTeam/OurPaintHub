@@ -23,6 +23,17 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+def _file_url(file_field):
+    if not file_field:
+        return None
+    try:
+        return file_field.url
+    except ValueError:
+        return None
+
+def _iso(value):
+    return value.isoformat() if value and hasattr(value, "isoformat") else value
+
 def company_name_taken(name, exclude_company_id=None):
     queryset = Company.objects.filter(name__iexact=name)
 
@@ -113,6 +124,9 @@ def update_company(request, user, company_id):
 
     if company_name_taken(name, exclude_company_id=company.id):
         return Response({"error": "Компания с таким названием уже существует"}, status=400)
+
+    if "logo" in request.FILES:
+        company.logo = request.FILES["logo"]
 
     company.name = name
     company.description = (request.data.get("description") or "").strip()
@@ -419,12 +433,27 @@ def get_company_invites(request, user, company_id):
         status=CompanyInviteStatus.PENDING
     ).select_related("invited_user")
 
-    return Response([
-        {
-            "id": i.id,
-            "invited_user": i.invited_user.username,
-            "status": i.status,
-            "created_at": i.created_at,
-        }
-        for i in invites
-    ])
+    result = []
+    for invite in invites:
+        # Получаем аватар приглашенного пользователя
+        invited_user = invite.invited_user
+        invited_user_avatar = None
+
+        if invited_user:
+            profile = getattr(invited_user, "profile", None)
+            if profile and profile.avatar:
+                try:
+                    invited_user_avatar = profile.avatar.url
+                except (ValueError, AttributeError):
+                    invited_user_avatar = None
+
+        result.append({
+            "id": invite.id,
+            "invited_user": invited_user.username if invited_user else str(invited_user),
+            "invited_user_id": invited_user.id if invited_user else None,
+            "invited_user_avatar": invited_user_avatar,
+            "status": invite.status,
+            "created_at": _iso(invite.created_at) if hasattr(invite, 'created_at') else None,
+        })
+
+    return Response(result)
