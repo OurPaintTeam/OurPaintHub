@@ -131,6 +131,12 @@ def update_company(request, user, company_id):
     company.name = name
     company.description = (request.data.get("description") or "").strip()
 
+    remove_logo = request.POST.get("remove_logo") or request.data.get("remove_logo")
+    if remove_logo == "true":
+        if company.logo:
+            company.logo.delete(save=False)
+        company.logo = None
+
     try:
         company.save()
     except IntegrityError:

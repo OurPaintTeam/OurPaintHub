@@ -205,6 +205,8 @@ def update_repository(request, repository_id):
     if not can_edit_repository(user, repository):
         return Response({"error": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
+    remove_logo = request.data.get("remove_logo")
+
     if "name" in request.data:
         repository.name = request.data.get("name")
     if "description" in request.data:
@@ -216,6 +218,10 @@ def update_repository(request, repository_id):
         repository.visibility = visibility
     if "logo" in request.FILES:
         repository.logo = request.FILES.get("logo")
+    if remove_logo == "true":
+        if repository.logo:
+            repository.logo.delete(save=False)
+        repository.logo = None
 
     repository.save()
     log_action(user, "change", repository)
