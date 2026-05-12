@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./RepositoriesPage.scss";
 
 interface Repository {
@@ -99,6 +99,11 @@ const RepositoriesMyPage: React.FC = () => {
             return;
         }
 
+        if (selectedFiles.length === 0) {
+            setMessage("Выберите хотя бы один файл для первого коммита");
+            return;
+        }
+
         setCreating(true);
         setMessage("");
 
@@ -132,6 +137,11 @@ const RepositoriesMyPage: React.FC = () => {
         }
     };
 
+    // Функция для получения корректного URL логотипа репозитория
+    const getRepoLogoUrl = (logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    };
+
     return (
         <MainLayout isAuthenticated={true}>
             <div className="repos-page page">
@@ -144,12 +154,15 @@ const RepositoriesMyPage: React.FC = () => {
                     <p>Создание сразу с файлами сделает первый коммит.</p>
                 </div>
 
-                <div className="repo-create">
+                <div className="repo-create card">
+                    <h2>Создать новый репозиторий</h2>
+
                     <input
                         type="text"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                         placeholder="Название репозитория"
+                        autoFocus
                     />
 
                     <textarea
@@ -212,7 +225,7 @@ const RepositoriesMyPage: React.FC = () => {
 
                     <button
                         onClick={createRepo}
-                        disabled={creating || !name.trim()}
+                        disabled={creating || !name.trim() || selectedFiles.length === 0}
                         className="card-btn"
                     >
                         {creating ? "Создание..." : "Создать репозиторий"}
@@ -232,34 +245,37 @@ const RepositoriesMyPage: React.FC = () => {
                         Личных репозиториев пока нет
                     </div>
                 ) : (
-                    <div className="repos-grid">
-                        {repos.map((repo) => (
-                            <div
-                                key={repo.id}
-                                className="repo-card"
-                                onClick={() => navigate(`/repositories/${repo.id}`)}
-                            >
-                                <div className="repo-card-header">
-                                {repo.logo ? (
-                                    <img
-                                        src={repo.logo}
-                                        alt={repo.name}
-                                        className="repo-logo"
-                                    />
-                                ) : (
-                                    <div className="repo-logo-placeholder">
-                                        {repo.name.slice(0, 2).toUpperCase()}
+                    <>
+                        <h2>Мои репозитории</h2>
+                        <div className="repos-grid">
+                            {repos.map((repo) => (
+                                <div
+                                    key={repo.id}
+                                    className="repo-card"
+                                    onClick={() => navigate(`/repositories/${repo.id}`)}
+                                >
+                                    <div className="repo-card-header">
+                                        {repo.logo ? (
+                                            <img
+                                                src={getRepoLogoUrl(repo.logo)}
+                                                alt={repo.name}
+                                                className="repo-logo"
+                                            />
+                                        ) : (
+                                            <div className="repo-logo-placeholder">
+                                                {repo.name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                <h3>{repo.name}</h3>
+                                    <h3>{repo.name}</h3>
+                                    <p>{repo.description || "Без описания"}</p>
+                                    <span className={`badge ${repo.visibility}`}>
+                                        {repo.visibility === "public" ? "Публичный" : "Приватный"}
+                                    </span>
                                 </div>
-                                <p>{repo.description || "Без описания"}</p>
-                                <span className={`badge ${repo.visibility}`}>
-                                    {repo.visibility === "public" ? "Публичный" : "Приватный"}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
         </MainLayout>

@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch, apiUrl, getAccessToken } from "../config/api";
+import { apiFetch, apiUrl, getAccessToken, mediaUrl } from "../config/api";
 import "./RepositoriesPage.scss";
 
 interface Repository {
@@ -33,6 +33,7 @@ interface Commit {
     message: string;
     commit_hash: string;
     created_by_username?: string;
+    created_by_id?: number;  // Добавляем ID автора коммита
     created_at: string;
 }
 
@@ -99,6 +100,12 @@ const RepositoryPage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [repoLogo, setRepoLogo] = useState<File | null>(null);
+
+    // Функция для получения корректного URL логотипа репозитория
+    const getRepoLogoUrl = (logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    };
+
     const saveRepository = async () => {
         if (!repo) return;
 
@@ -494,7 +501,6 @@ const RepositoryPage: React.FC = () => {
 
             setMessage("Репозиторий удалён");
 
-            // Перенаправление после удаления
             setTimeout(() => {
                 if (repo.owner_company_id) {
                     navigate(`/companies/${repo.owner_company_id}`);
@@ -543,26 +549,26 @@ const RepositoryPage: React.FC = () => {
 
                 <div className="repo-hero">
                     <div className="repo-header">
-                    {repo.logo ? (
-                        <img
-                            src={repo.logo}
-                            alt={repo.name}
-                            className="repo-logo"
-                        />
-                    ) : (
-                        <div className="repo-logo-placeholder">
-                            {repo.name.slice(0, 2).toUpperCase()}
-                        </div>
-                    )}
-                    <div>
-                        <h1>{repo.name}</h1>
-                        <p>{repo.description || "Без описания"}</p>
-                        {repo.owner_company_name && (
-                            <p className="repo-owner">
-                                Компания: {repo.owner_company_name}
-                            </p>
+                        {repo.logo ? (
+                            <img
+                                src={getRepoLogoUrl(repo.logo)}
+                                alt={repo.name}
+                                className="repo-logo"
+                            />
+                        ) : (
+                            <div className="repo-logo-placeholder">
+                                {repo.name.slice(0, 2).toUpperCase()}
+                            </div>
                         )}
-                    </div>
+                        <div>
+                            <h1>{repo.name}</h1>
+                            <p>{repo.description || "Без описания"}</p>
+                            {repo.owner_company_name && (
+                                <p className="repo-owner">
+                                    Компания: {repo.owner_company_name}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     <div className="repo-actions">
@@ -687,6 +693,11 @@ const RepositoryPage: React.FC = () => {
                                 <div>
                                     <strong>{file.name}</strong>
                                     <p>{file.path}</p>
+                                    {file.size && (
+                                        <p className="file-size-info">
+                                            Размер: {formatFileSize(file.size)}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="repo-actions">
@@ -729,22 +740,27 @@ const RepositoryPage: React.FC = () => {
                                 <strong>{commit.message}</strong>
 
                                 <p>
-                                    {commit.created_by_username
-                                        ? `${commit.created_by_username} · `
-                                        : ""}
+                                    {commit.created_by_username && (
+                                        <button
+                                            className="commit-author-link"
+                                            onClick={() => navigate(`/profile/${commit.created_by_id}/`)}
+                                        >
+                                            {commit.created_by_username}
+                                        </button>
+                                    )}
+                                    {commit.created_by_username && " · "}
                                     {formatDate(commit.created_at)}
                                 </p>
 
-                                <code>{commit.commit_hash.slice(0, 12)}</code>
+                                {/* Хэш как кликабельная кнопка вместо отдельной кнопки "Просмотреть" */}
+                                <button
+                                    className="commit-hash-link"
+                                    onClick={() => goToCommit(commit)}
+                                >
+                                    {commit.commit_hash.slice(0, 12)}
+                                </button>
 
                                 <div className="repo-actions">
-                                    <button
-                                        onClick={() => goToCommit(commit)}
-                                        className="secondary-btn"
-                                    >
-                                        Просмотреть
-                                    </button>
-
                                     {repo.can_edit && (
                                         <button
                                             onClick={() => revertToCommit(commit)}
@@ -790,17 +806,27 @@ const RepositoryPage: React.FC = () => {
                                     )
                                 }
                             >
-                                <option value="private">Private</option>
-                                <option value="public">Public</option>
+                                <option value="private">Приватный</option>
+                                <option value="public">Публичный</option>
                             </select>
 
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) =>
-                                    setRepoLogo(e.target.files?.[0] || null)
-                                }
-                            />
+                            <label className="file-upload-label">
+                                <span className="secondary-btn">Выбрать логотип</span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                        setRepoLogo(e.target.files?.[0] || null)
+                                    }
+                                    style={{ display: "none" }}
+                                />
+                            </label>
+
+                            {repoLogo && (
+                                <p className="file-name">
+                                    Выбран файл: {repoLogo.name}
+                                </p>
+                            )}
 
                             <div className="modal-actions">
                                 <button
@@ -833,13 +859,23 @@ const RepositoryPage: React.FC = () => {
                                 placeholder="Путь файла"
                             />
 
-                            <input
-                                type="file"
-                                onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
-                            />
+                            <label className="file-upload-label">
+                                <span className="secondary-btn">Выбрать новый файл</span>
+                                <input
+                                    type="file"
+                                    onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
+                                    style={{ display: "none" }}
+                                />
+                            </label>
+
+                            {replacementFile && (
+                                <p className="file-name">
+                                    Выбран файл: {replacementFile.name}
+                                </p>
+                            )}
 
                             <div className="modal-actions">
-                                <button onClick={saveFileChange} className="card-btn">
+                                <button onClick={saveFileChange} className="card-btn" disabled={!replacementFile}>
                                     Сохранить
                                 </button>
 

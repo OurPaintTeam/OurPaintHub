@@ -1,9 +1,9 @@
-import React, {useEffect, useMemo, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import {apiFetch, mediaUrl} from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./AccountPage.scss";
-import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faBuilding,
     faCalendarDays,
@@ -38,12 +38,15 @@ interface Repository {
     id: number;
     name: string;
     description?: string;
+    logo_repo?: string | null;  // логотип репозитория
 }
 
 interface Company {
     id: number;
     name: string;
     owner_id: number;
+    logo?: string | null;  // логотип компании
+    description?: string;
 }
 
 const AccountPage: React.FC = () => {
@@ -53,6 +56,7 @@ const AccountPage: React.FC = () => {
     const [companiesOwned, setCompaniesOwned] = useState<Company[]>([]);
     const [companiesMember, setCompaniesMember] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState(false);
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -95,7 +99,23 @@ const AccountPage: React.FC = () => {
     };
 
     const handleDeleteAccount = async () => {
-        alert("Endpoint удаления аккаунта `/user/delete/` сейчас не описан в backend urls.py.");
+        if (!deleteConfirm) {
+            setDeleteConfirm(true);
+            setTimeout(() => setDeleteConfirm(false), 5000);
+            return;
+        }
+
+        try {
+            await apiFetch("/user/delete/", {
+                method: "DELETE",
+                auth: true,
+            });
+            localStorage.clear();
+            navigate("/login");
+        } catch (error) {
+            console.error("DELETE ACCOUNT ERROR", error);
+            alert("Ошибка при удалении аккаунта");
+        }
     };
 
     const formatDate = (value?: string | null, withTime = false) => {
@@ -116,7 +136,20 @@ const AccountPage: React.FC = () => {
             : date.toLocaleDateString("ru-RU");
     };
 
-    const avatarSrc = mediaUrl(account?.avatar);
+    // Функции для получения URL изображений
+    const getAvatarUrl = useCallback((avatar: string | null | undefined): string | null => {
+        return mediaUrl(avatar);
+    }, []);
+
+    const getRepoLogoUrl = useCallback((logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    }, []);
+
+    const getCompanyLogoUrl = useCallback((logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    }, []);
+
+    const avatarSrc = getAvatarUrl(account?.avatar);
     const fullName = [account?.first_name, account?.last_name].filter(Boolean).join(" ");
     const companies = [...companiesOwned, ...companiesMember];
 
@@ -124,19 +157,20 @@ const AccountPage: React.FC = () => {
         if (!account) return [];
 
         return [
-            {label: "Username", value: account.username},
-            {label: "Email", value: account.email},
-            {label: "Имя", value: account.first_name || "Не указано"},
-            {label: "Фамилия", value: account.last_name || "Не указано"},
-            {label: "Дата рождения", value: formatDate(account.date_of_birth)},
-            {label: "Регистрация", value: formatDate(account.date_joined, true)},
+            { label: "Username", value: account.username },
+            { label: "Email", value: account.email },
+            { label: "Имя", value: account.first_name || "Не указано" },
+            { label: "Фамилия", value: account.last_name || "Не указано" },
+            { label: "Дата рождения", value: formatDate(account.date_of_birth) },
+            { label: "Регистрация", value: formatDate(account.date_joined, true) },
+            { label: "Последний вход", value: formatDate(account.last_login, true) },
         ];
     }, [account]);
 
     if (loading) {
         return (
             <MainLayout isAuthenticated={true}>
-                <p>Загрузка...</p>
+                <div className="loading-state">Загрузка профиля...</div>
             </MainLayout>
         );
     }
@@ -156,8 +190,10 @@ const AccountPage: React.FC = () => {
                     <div className="profile-layout">
                         <aside className="profile-sidebar">
                             <div className="profile-avatar profile-avatar-large">
-                                {avatarSrc ? <img src={avatarSrc} alt={account.username}/> :
-                                    <FontAwesomeIcon icon={faUserCircle}/>}
+                                {avatarSrc ?
+                                    <img src={avatarSrc} alt={account.username} /> :
+                                    <FontAwesomeIcon icon={faUserCircle} />
+                                }
                             </div>
 
                             <div className="profile-identity">
@@ -168,30 +204,34 @@ const AccountPage: React.FC = () => {
                             {account.bio && <p className="profile-bio">{account.bio}</p>}
 
                             <button className="settings-btn" onClick={() => navigate("/settings")} type="button">
-                                <FontAwesomeIcon icon={faGear}/>
+                                <FontAwesomeIcon icon={faGear} />
                                 Настройки профиля
                             </button>
 
                             <div className="profile-meta-list">
                                 <span>
-                                    <FontAwesomeIcon icon={faEnvelope}/>
+                                    <FontAwesomeIcon icon={faEnvelope} />
                                     {account.email}
                                 </span>
                                 {account.role === 'admin' && (
                                     <span>
-                                        <FontAwesomeIcon icon={faIdBadge}/>
+                                        <FontAwesomeIcon icon={faIdBadge} />
                                         {account.role || "user"}
                                     </span>
                                 )}
                                 <span>
-                                    <FontAwesomeIcon icon={faCalendarDays}/>
+                                    <FontAwesomeIcon icon={faCalendarDays} />
                                     Регистрация: {formatDate(account.date_joined)}
                                 </span>
                             </div>
 
-                            <button className="delete-btn profile-danger" onClick={handleDeleteAccount} type="button">
-                                <FontAwesomeIcon icon={faTrash}/>
-                                Удалить аккаунт
+                            <button
+                                className={`delete-btn profile-danger ${deleteConfirm ? 'confirm' : ''}`}
+                                onClick={handleDeleteAccount}
+                                type="button"
+                            >
+                                <FontAwesomeIcon icon={faTrash} />
+                                {deleteConfirm ? "Подтвердите удаление" : "Удалить аккаунт"}
                             </button>
                         </aside>
 
@@ -239,8 +279,7 @@ const AccountPage: React.FC = () => {
                                         <span className="section-label">Repositories</span>
                                         <h2>Ваши репозитории</h2>
                                     </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/repositories/my")}
-                                            type="button">
+                                    <button className="secondary-btn" onClick={() => navigate("/repositories/my")} type="button">
                                         Все проекты
                                     </button>
                                 </div>
@@ -255,7 +294,15 @@ const AccountPage: React.FC = () => {
                                                 key={repo.id}
                                                 onClick={() => navigate(`/repositories/${repo.id}`)}
                                             >
-                                                <FontAwesomeIcon icon={faFolderTree}/>
+                                                {getRepoLogoUrl(repo.logo_repo) ? (
+                                                    <img
+                                                        src={getRepoLogoUrl(repo.logo_repo)!}
+                                                        alt={repo.name}
+                                                        className="list-card-icon-img"
+                                                    />
+                                                ) : (
+                                                    <FontAwesomeIcon icon={faFolderTree} />
+                                                )}
                                                 <div>
                                                     <h3>{repo.name}</h3>
                                                     <p>{repo.description || "Без описания"}</p>
@@ -272,8 +319,7 @@ const AccountPage: React.FC = () => {
                                         <span className="section-label">Companies</span>
                                         <h2>Компании</h2>
                                     </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/companies")}
-                                            type="button">
+                                    <button className="secondary-btn" onClick={() => navigate("/companies")} type="button">
                                         Открыть команды
                                     </button>
                                 </div>
@@ -288,10 +334,19 @@ const AccountPage: React.FC = () => {
                                                 key={company.id}
                                                 onClick={() => navigate(`/companies/${company.id}`)}
                                             >
-                                                <FontAwesomeIcon icon={faBuilding}/>
+                                                {getCompanyLogoUrl(company.logo) ? (
+                                                    <img
+                                                        src={getCompanyLogoUrl(company.logo)!}
+                                                        alt={company.name}
+                                                        className="list-card-icon-img"
+                                                    />
+                                                ) : (
+                                                    <FontAwesomeIcon icon={faBuilding} />
+                                                )}
                                                 <div>
                                                     <h3>{company.name}</h3>
                                                     <p>{company.owner_id === account.id ? "Владелец" : "Участник"}</p>
+                                                    {company.description && <small>{company.description}</small>}
                                                 </div>
                                             </article>
                                         ))

@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch } from "../config/api";
+import { apiFetch, mediaUrl } from "../config/api";
 import "./CompaniesPage.scss";
 import "./RepositoriesPage.scss";
 
@@ -9,6 +9,7 @@ interface User {
     id: number;
     username?: string;
     email: string;
+    avatar?: string | null;
 }
 
 interface Company {
@@ -17,11 +18,11 @@ interface Company {
     description?: string;
     owner_id: number;
     owner_username?: string;
+    owner_avatar?: string | null;
     can_manage?: boolean;
     is_member?: boolean;
     is_owner?: boolean;
     member_count?: number;
-
     logo?: string | null;
 }
 
@@ -48,6 +49,8 @@ interface FileWithPreview {
 interface Invite {
     id: number;
     invited_user: string;
+    invited_user_id?: number;
+    invited_user_avatar?: string | null;
     status: string;
     created_at: string;
 }
@@ -83,6 +86,7 @@ const CompanyPage: React.FC = () => {
     const [inviteLoading, setInviteLoading] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -213,7 +217,7 @@ const CompanyPage: React.FC = () => {
             setMessage("Приглашение отправлено");
             setSearchQuery("");
             setSearchResults([]);
-            await load(); // Перезагружаем данные, чтобы обновить список приглашений
+            await load();
         } catch (e) {
             setMessage(e instanceof Error ? e.message : "Ошибка приглашения");
         } finally {
@@ -232,7 +236,7 @@ const CompanyPage: React.FC = () => {
             });
 
             setMessage("Приглашение отменено");
-            await load(); // Перезагружаем данные, чтобы обновить список приглашений
+            await load();
         } catch (error) {
             setMessage(error instanceof Error ? error.message : "Ошибка отмены приглашения");
         } finally {
@@ -382,6 +386,13 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Правильное использование mediaUrl для разных типов изображений
+    const companyLogo = mediaUrl(company?.logo);
+    const ownerAvatar = mediaUrl(company?.owner_avatar);
+    const repoLogo = (logo: string | null | undefined) => mediaUrl(logo);
+    const userAvatar = (avatar: string | null | undefined) => mediaUrl(avatar);
+    const invitedUserAvatar = (avatar: string | null | undefined) => mediaUrl(avatar);
+
     return (
         <MainLayout isAuthenticated={true}>
             <div className="companies-page page">
@@ -391,11 +402,9 @@ const CompanyPage: React.FC = () => {
 
                 <div className="company-detail card">
                     <div className="company-header">
-
-
                         <div className="company-info">
-                            {company.logo ? (
-                                <img src={company.logo} className="company-logo" />
+                            {companyLogo ? (
+                                <img src={companyLogo} className="company-logo" alt={company.name} />
                             ) : (
                                 <div className="company-logo-placeholder">
                                     {company.name.slice(0, 2).toUpperCase()}
@@ -428,9 +437,15 @@ const CompanyPage: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <h1>{company.name}</h1>
-                            <p>{company.description || "Без описания"}</p>
-                            <p>Владелец: {company.owner_username || company.owner_id}</p>
+                            {/* Владелец - кликабельный */}
+                            <div className="owner-info-row clickable" onClick={() => navigate(`/profile/${company.owner_id}/`)}>
+                                {ownerAvatar ? (
+                                    <img src={ownerAvatar} alt="Owner" className="owner-avatar-small" />
+                                ) : (
+                                    <div className="owner-avatar-placeholder-small">👑</div>
+                                )}
+                                <p>Владелец: {company.owner_username || company.owner_id}</p>
+                            </div>
                             <p>Участников: {company.member_count || 0}</p>
 
                             {isMember && canManage && (
@@ -465,7 +480,7 @@ const CompanyPage: React.FC = () => {
 
                 {message && <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>{message}</p>}
 
-                {/* Секция участников - только для членов компании */}
+                {/* Секция участников - с аватарками и кликабельными именами */}
                 {isMember && (
                     <section className="section card">
                         <h2>Участники</h2>
@@ -473,7 +488,26 @@ const CompanyPage: React.FC = () => {
                         <div className="members-list">
                             {members.map((member) => (
                                 <div key={member.id} className="member-row">
-                                    <span>{member.username || member.email}</span>
+                                    <div
+                                        className="member-info clickable"
+                                        onClick={() => navigate(`/profile/${member.id}/`)}
+                                    >
+                                        {member.avatar ? (
+                                            <img
+                                                src={userAvatar(member.avatar)}
+                                                alt={member.username || member.email}
+                                                className="member-avatar"
+                                            />
+                                        ) : (
+                                            <div className="member-avatar-placeholder">
+                                                {member.username ? member.username.slice(0, 2).toUpperCase() : "??"}
+                                            </div>
+                                        )}
+                                        <span>{member.username || member.email}</span>
+                                        {member.id === company.owner_id && (
+                                            <span className="owner-badge">Владелец</span>
+                                        )}
+                                    </div>
                                     {canManage && member.id !== company.owner_id && (
                                         <button
                                             onClick={() => removeMember(member.id)}
@@ -489,12 +523,12 @@ const CompanyPage: React.FC = () => {
                     </section>
                 )}
 
-                {/* Секция приглашенных - только для владельцев/менеджеров */}
+                {/* Секция приглашенных - с аватарками и кликабельными именами */}
                 {canManage && (
                     <section className="section card" style={{ marginTop: 20 }}>
                         <h2>Приглашенные</h2>
 
-                        {/* ПОИСК ПОЛЬЗОВАТЕЛЕЙ ДЛЯ ПРИГЛАШЕНИЯ */}
+                        {/* ПОИСК ПОЛЬЗОВАТЕЛЕЙ ДЛЯ ПРИГЛАШЕНИЯ - с аватарками и кликабельными именами */}
                         <div className="invite-box">
                             <input
                                 value={searchQuery}
@@ -506,7 +540,23 @@ const CompanyPage: React.FC = () => {
                                 <div className="invite-results">
                                     {searchResults.map((user) => (
                                         <div key={user.id} className="invite-row">
-                                            <span>{user.username || user.email}</span>
+                                            <div
+                                                className="user-info clickable"
+                                                onClick={() => navigate(`/profile/${user.id}/`)}
+                                            >
+                                                {user.avatar ? (
+                                                    <img
+                                                        src={userAvatar(user.avatar)}
+                                                        alt={user.username || user.email}
+                                                        className="user-avatar-small"
+                                                    />
+                                                ) : (
+                                                    <div className="user-avatar-placeholder-small">
+                                                        {user.username ? user.username.slice(0, 2).toUpperCase() : "??"}
+                                                    </div>
+                                                )}
+                                                <span>{user.username || user.email}</span>
+                                            </div>
                                             <button
                                                 onClick={() => inviteUser(user)}
                                                 disabled={inviteLoading}
@@ -520,7 +570,7 @@ const CompanyPage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* СПИСОК ПРИГЛАШЕНИЙ */}
+                        {/* СПИСОК ПРИГЛАШЕНИЙ - с аватарками и кликабельными именами */}
                         <div className="invites-list">
                             {invites.length === 0 ? (
                                 <div className="empty-state">
@@ -529,10 +579,26 @@ const CompanyPage: React.FC = () => {
                             ) : (
                                 invites.map((inv) => (
                                     <div key={inv.id} className="invite-row">
-                                        <div>
-                                            <b>{inv.invited_user}</b>
-                                            <div style={{ fontSize: 12, opacity: 0.7 }}>
-                                                {inv.status}
+                                        <div
+                                            className="user-info clickable"
+                                            onClick={() => navigate(`/profile/${inv.invited_user_id}/`)}
+                                        >
+                                            {inv.invited_user_avatar ? (
+                                                <img
+                                                    src={invitedUserAvatar(inv.invited_user_avatar)}
+                                                    alt={inv.invited_user}
+                                                    className="user-avatar-small"
+                                                />
+                                            ) : (
+                                                <div className="user-avatar-placeholder-small">
+                                                    {inv.invited_user.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <b>{inv.invited_user}</b>
+                                                <div style={{ fontSize: 12, opacity: 0.7 }}>
+                                                    {inv.status === "pending" ? "Ожидает" : inv.status}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -645,7 +711,7 @@ const CompanyPage: React.FC = () => {
                                     <div className="repo-card-header">
                                         {repo.logo ? (
                                             <img
-                                                src={repo.logo}
+                                                src={repoLogo(repo.logo)}
                                                 alt={repo.name}
                                                 className="repo-logo"
                                             />

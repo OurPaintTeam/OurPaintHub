@@ -33,12 +33,15 @@ interface Repository {
     name: string;
     description?: string;
     visibility: "private" | "public";
+    logo_repo?: string | null;  // логотип репозитория
 }
 
 interface Company {
     id: number;
     name: string;
     description?: string;
+    logo?: string | null;  // логотип компании
+    owner_id?: number;
 }
 
 interface PublicProfileResponse {
@@ -76,12 +79,27 @@ const PublicAccountPage: React.FC = () => {
             setProfile(data.user);
             setRepositories(data.repositories || []);
             setCompanies(data.companies || []);
+        } catch (error) {
+            console.error("Error loading profile:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    const avatarSrc = mediaUrl(profile?.avatar);
+    // Функции для получения URL изображений
+    const getAvatarUrl = (avatar: string | null | undefined): string | null => {
+        return mediaUrl(avatar);
+    };
+
+    const getRepoLogoUrl = (logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    };
+
+    const getCompanyLogoUrl = (logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    };
+
+    const avatarSrc = getAvatarUrl(profile?.avatar);
     const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ");
 
     const formatDate = (value?: string | null, withTime = false) => {
@@ -105,7 +123,7 @@ const PublicAccountPage: React.FC = () => {
     if (loading) {
         return (
             <MainLayout isAuthenticated={true}>
-                <p>Загрузка...</p>
+                <div className="loading-state">Загрузка профиля...</div>
             </MainLayout>
         );
     }
@@ -130,13 +148,17 @@ const PublicAccountPage: React.FC = () => {
                     <div>
                         <span className="section-label">Public profile</span>
                         <h1>Публичный профиль</h1>
+                        <p>Информация о пользователе, его репозитории и компании</p>
                     </div>
                 </div>
 
                 <div className="profile-layout">
                     <aside className="profile-sidebar">
                         <div className="profile-avatar profile-avatar-large">
-                            {avatarSrc ? <img src={avatarSrc} alt={profile.username} /> : <FontAwesomeIcon icon={faUserCircle} />}
+                            {avatarSrc ?
+                                <img src={avatarSrc} alt={profile.username} /> :
+                                <FontAwesomeIcon icon={faUserCircle} />
+                            }
                         </div>
 
                         <div className="profile-identity">
@@ -227,11 +249,26 @@ const PublicAccountPage: React.FC = () => {
                                     <p className="empty-state">Публичных репозиториев нет</p>
                                 ) : (
                                     repositories.map((repo) => (
-                                        <article key={repo.id} className="profile-list-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
-                                            <FontAwesomeIcon icon={faFolderTree} />
+                                        <article
+                                            key={repo.id}
+                                            className="profile-list-card"
+                                            onClick={() => navigate(`/repositories/${repo.id}`)}
+                                        >
+                                            {getRepoLogoUrl(repo.logo_repo) ? (
+                                                <img
+                                                    src={getRepoLogoUrl(repo.logo_repo)!}
+                                                    alt={repo.name}
+                                                    className="list-card-icon-img"
+                                                />
+                                            ) : (
+                                                <FontAwesomeIcon icon={faFolderTree} />
+                                            )}
                                             <div>
                                                 <h3>{repo.name}</h3>
                                                 <p>{repo.description || "Без описания"}</p>
+                                                <span className={`visibility-badge ${repo.visibility}`}>
+                                                    {repo.visibility === "public" ? "Публичный" : "Приватный"}
+                                                </span>
                                             </div>
                                         </article>
                                     ))
@@ -252,8 +289,20 @@ const PublicAccountPage: React.FC = () => {
                                     <p className="empty-state">Компаний нет</p>
                                 ) : (
                                     companies.map((company) => (
-                                        <article key={company.id} className="profile-list-card" onClick={() => navigate(`/companies/${company.id}`)}>
-                                            <FontAwesomeIcon icon={faBuilding} />
+                                        <article
+                                            key={company.id}
+                                            className="profile-list-card"
+                                            onClick={() => navigate(`/companies/${company.id}`)}
+                                        >
+                                            {getCompanyLogoUrl(company.logo) ? (
+                                                <img
+                                                    src={getCompanyLogoUrl(company.logo)!}
+                                                    alt={company.name}
+                                                    className="list-card-icon-img"
+                                                />
+                                            ) : (
+                                                <FontAwesomeIcon icon={faBuilding} />
+                                            )}
                                             <div>
                                                 <h3>{company.name}</h3>
                                                 <p>{company.description || "Без описания"}</p>

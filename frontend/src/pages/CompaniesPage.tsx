@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch, getAccessToken } from "../config/api";
+import { apiFetch, getAccessToken, mediaUrl } from "../config/api";
 import "./CompaniesPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBuilding, faPlus } from "@fortawesome/free-solid-svg-icons";
@@ -95,6 +95,11 @@ const CompaniesPage: React.FC = () => {
         }
     };
 
+    // Функция для получения корректного URL логотипа компании
+    const getCompanyLogoUrl = (logo: string | null | undefined): string | null => {
+        return mediaUrl(logo);
+    };
+
     if (!isAuthenticated) return null;
 
     return (
@@ -126,9 +131,13 @@ const CompaniesPage: React.FC = () => {
                                 onClick={() => navigate(`/companies/${company.id}`)}
                             >
                                 {company.logo ? (
-                                    <img src={company.logo} alt={company.name} className="company-logo" />
+                                    <img
+                                        src={getCompanyLogoUrl(company.logo)}
+                                        alt={company.name}
+                                        className="company-logo"
+                                    />
                                 ) : (
-                                    <FontAwesomeIcon icon={faBuilding} />
+                                    <FontAwesomeIcon icon={faBuilding} className="company-icon" />
                                 )}
 
                                 <h3>{company.name}</h3>
@@ -149,11 +158,17 @@ const CompaniesPage: React.FC = () => {
                     <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                         <div className="modal" onClick={(event) => event.stopPropagation()}>
                             <h2>Создать компанию</h2>
-                            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Название компании" />
+                            <input
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="Название компании"
+                                autoFocus
+                            />
                             <textarea
                                 value={description}
                                 onChange={(event) => setDescription(event.target.value)}
-                                placeholder="Описание"
+                                placeholder="Описание (необязательно)"
+                                rows={3}
                             />
                             <div className="modal-actions">
                                 <button onClick={createCompany} disabled={creating || !name.trim()} className="card-btn">
