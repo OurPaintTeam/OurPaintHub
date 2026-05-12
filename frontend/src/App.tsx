@@ -3,31 +3,31 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { ToastProvider } from "./contexts/ToastContext";
 import { useAuth } from "./contexts/AuthContext";
 
-import NewsPage from "./pages/NewsPage";
-import DocumentationPage from "./pages/DocumentationPage";
-import DownloadPage from "./pages/DownloadPage";
-import AccountPage from "./pages/AccountPage";
-import LoginPage from "./pages/LoginPage";
-import RegistrationPage from "./pages/RegistrationPage";
-import QAPage from "./pages/QAPage";
-import SettingsPage from "./pages/SettingsPage";
-import PublicAccountPage from "./pages/PublicAccountPage";
-import ContentEditorPage from "./pages/ContentEditorPage";
-import EditNewsPage from "./pages/EditNewsPage";
-import NewsDetailPage from "./pages/NewsDetailPage";
-import DocumentationDetailPage from "./pages/DocumentationDetailPage";
-import EditDocumentationPage from "./pages/EditDocumentationPage";
-import AddVersionPage from "./pages/AddVersionPage";
-import GeneralPage from "./pages/GeneralPage";
+import NewsPage from "./pages/Content/NewsPage";
+import DocumentationPage from "./pages/Content/DocumentationPage";
+import DownloadPage from "./pages/Content/DownloadPage";
+import AccountPage from "./pages/Users/AccountPage";
+import LoginPage from "./pages/Users/LoginPage";
+import RegistrationPage from "./pages/Users/RegistrationPage";
+import QAPage from "./pages/Content/QAPage";
+import SettingsPage from "./pages/Users/SettingsPage";
+import PublicAccountPage from "./pages/Users/PublicAccountPage";
+import ContentEditorPage from "./pages/Content/ContentEditorPage";
+import EditNewsPage from "./pages/Content/EditNewsPage";
+import NewsDetailPage from "./pages/Content/NewsDetailPage";
+import DocumentationDetailPage from "./pages/Content/DocumentationDetailPage";
+import EditDocumentationPage from "./pages/Content/EditDocumentationPage";
+import AddVersionPage from "./pages/Content/AddVersionPage";
+import GeneralPage from "./pages/Content/GeneralPage";
 import ErrorPage from "./pages/ErrorPage";
-import RepositoriesPage from "./pages/RepositoriesPage";
-import CompaniesPage from "./pages/CompaniesPage";
-import RepositoriesMyPage from "./pages/RepositoriesMyPage";
-import RepositoryPage from "./pages/RepositoryPage";
+import RepositoriesPage from "./pages/Repositories/RepositoriesPage";
+import CompaniesPage from "./pages/Companies/CompaniesPage";
+import MyRepositoriesPage from "./pages/Repositories/MyRepositoriesPage";
+import RepositoryPage from "./pages/Repositories/RepositoryPage";
 
 import "./styles/toast.scss";
-import PublicRepositoriesPage from "./pages/PublicRepositoriesPage";
-import CompanyPage from "./pages/CompanyPage";
+import PublicRepositoriesPage from "./pages/Repositories/PublicRepositoriesPage";
+import CompanyPage from "./pages/Companies/CompanyPage";
 import NotificationPage from "./pages/NotificationPage";
 
 
@@ -77,7 +77,7 @@ function App() {
                     <Route path="/notification" element={requireAuth(<NotificationPage />)} />
 
                     <Route path="/repositories" element={requireAuth(<RepositoriesPage />)} />
-                    <Route path="/repositories/my" element={requireAuth(<RepositoriesMyPage />)} />
+                    <Route path="/repositories/my" element={requireAuth(<MyRepositoriesPage />)} />
                     <Route path="/repositories/public" element={requireAuth(<PublicRepositoriesPage />)} />
                     <Route path="/repositories/:id" element={requireAuth(<RepositoryPage />)} />
 

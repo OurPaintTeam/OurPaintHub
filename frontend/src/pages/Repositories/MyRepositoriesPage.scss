@@ -1,0 +1,243 @@
+// MyRepositoriesPage.scss - стили для страницы моих репозиториев
+
+.my-repos-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeInUp 0.5s ease-out;
+
+  .page-header {
+    margin-bottom: 2rem;
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--dark);
+    margin-bottom: 1.5rem;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 20px;
+      background: var(--primary-gradient);
+      border-radius: 2px;
+      margin-right: 0.75rem;
+      vertical-align: middle;
+    }
+  }
+
+  .repos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  // Общие стили для карточек
+  .repo-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid #e5e7eb;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--primary-gradient);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+
+      &::before {
+        transform: scaleX(1);
+      }
+    }
+
+    .repo-card-header {
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: center;
+      min-height: 80px;
+
+      .repo-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 0.75rem;
+        object-fit: cover;
+      }
+
+      .repo-logo-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 0.75rem;
+        background: var(--primary-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+      }
+    }
+
+    h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+      text-align: center;
+    }
+
+    p {
+      font-size: 0.875rem;
+      color: var(--gray);
+      margin-bottom: 1rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-align: center;
+      width: fit-content;
+      margin: 0 auto;
+
+      &.public {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      &.private {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+    }
+  }
+
+  // Стили для карточки создания (с большим красным плюсом)
+  .create-card {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border: 2px dashed #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 320px;
+
+    &::before {
+      display: none;
+    }
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fff0f0 0%, #fef2f2 100%);
+    }
+
+    .create-card-content {
+      text-align: center;
+      width: 100%;
+
+      .plus-icon-large {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1rem;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      h3 {
+        color: #dc2626;
+        margin-bottom: 0.5rem;
+        font-size: 1.25rem;
+      }
+
+      p {
+        color: #9ca3af;
+        font-size: 0.875rem;
+        margin-bottom: 0;
+      }
+    }
+
+    &:hover .plus-icon-large {
+      transform: scale(1.1) rotate(90deg);
+      box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+    }
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .my-repos-page {
+    padding: 1rem;
+
+    .repos-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .create-card {
+      min-height: 260px;
+
+      .create-card-content .plus-icon-large {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+      }
+    }
+  }
+}
+
+// Анимации
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

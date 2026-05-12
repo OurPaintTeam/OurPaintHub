@@ -1,0 +1,94 @@
+// Если у вас есть общий файл стилей для модалок, добавьте туда:
+
+.file-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  .secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #e5e7eb;
+      transform: translateY(-1px);
+    }
+  }
+}
+
+.files-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+
+  .files-list-header {
+    padding: 0.5rem 0.75rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .file-info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+
+      .file-name {
+        font-size: 0.875rem;
+        color: #1f2937;
+        font-family: monospace;
+      }
+
+      .file-size {
+        font-size: 0.75rem;
+        color: #6b7280;
+      }
+    }
+
+    .remove-file-btn {
+      width: 28px;
+      height: 28px;
+      background: #fee2e2;
+      border: none;
+      border-radius: 0.375rem;
+      color: #dc2626;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #fecaca;
+        transform: scale(1.05);
+      }
+    }
+  }
+}
