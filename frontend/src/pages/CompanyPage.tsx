@@ -21,6 +21,8 @@ interface Company {
     is_member?: boolean;
     is_owner?: boolean;
     member_count?: number;
+
+    logo?: string | null;
 }
 
 interface Repository {
@@ -28,6 +30,7 @@ interface Repository {
     name: string;
     description?: string;
     visibility: "private" | "public";
+    logo?: string | null;
 }
 
 interface CreateRepositoryResponse {
@@ -78,6 +81,15 @@ const CompanyPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [inviteLoading, setInviteLoading] = useState(false);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setLogoFile(file);
+        setLogoPreview(URL.createObjectURL(file));
+    };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,18 +143,26 @@ const CompanyPage: React.FC = () => {
 
         setSaving(true);
         setMessage("");
+
         try {
+            const formData = new FormData();
+            formData.append("name", companyName.trim());
+            formData.append("description", companyDescription.trim());
+
+            if (logoFile) {
+                formData.append("logo", logoFile);
+            }
+
             await apiFetch(`/companies/update/${company.id}/`, {
                 method: "PUT",
                 auth: true,
-                body: JSON.stringify({
-                    name: companyName.trim(),
-                    description: companyDescription.trim(),
-                }),
-                redirectOnError: false,
+                body: formData,
             });
 
             setEditing(false);
+            setLogoFile(null);
+            setLogoPreview(null);
+
             setMessage("Компания обновлена");
             await load();
         } catch (error) {
@@ -370,8 +390,31 @@ const CompanyPage: React.FC = () => {
                 </button>
 
                 <div className="company-detail card">
+                    <div className="company-header">
+
+
+                        <div className="company-info">
+                            {company.logo ? (
+                                <img src={company.logo} className="company-logo" />
+                            ) : (
+                                <div className="company-logo-placeholder">
+                                    {company.name.slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
+
+                            <div>
+                                <h1>{company.name}</h1>
+                                <p>{company.description || "Без описания"}</p>
+                            </div>
+                        </div>
+                    </div>
+
                     {editing && isMember ? (
                         <>
+                            <input type="file" accept="image/*" onChange={handleLogoChange} />
+                            {logoPreview && (
+                                <img src={logoPreview} alt="preview" className="logo-preview" />
+                            )}
                             <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
                             <textarea value={companyDescription} onChange={(event) => setCompanyDescription(event.target.value)} />
                             <div className="form-actions">
@@ -599,6 +642,19 @@ const CompanyPage: React.FC = () => {
                         <div className="repos-grid">
                             {repos.map((repo) => (
                                 <div key={repo.id} className="repo-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
+                                    <div className="repo-card-header">
+                                        {repo.logo ? (
+                                            <img
+                                                src={repo.logo}
+                                                alt={repo.name}
+                                                className="repo-logo"
+                                            />
+                                        ) : (
+                                            <div className="repo-logo-placeholder">
+                                                {repo.name.slice(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
                                     <h3>{repo.name}</h3>
                                     <p>{repo.description || "Без описания"}</p>
                                     <span className={`badge ${repo.visibility}`}>

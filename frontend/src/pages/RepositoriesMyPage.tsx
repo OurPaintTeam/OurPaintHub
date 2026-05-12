@@ -10,6 +10,7 @@ interface Repository {
     description?: string;
     visibility: "private" | "public";
     can_edit?: boolean;
+    logo?: string | null;
 }
 
 interface CreateRepositoryResponse {
@@ -238,7 +239,20 @@ const RepositoriesMyPage: React.FC = () => {
                                 className="repo-card"
                                 onClick={() => navigate(`/repositories/${repo.id}`)}
                             >
+                                <div className="repo-card-header">
+                                {repo.logo ? (
+                                    <img
+                                        src={repo.logo}
+                                        alt={repo.name}
+                                        className="repo-logo"
+                                    />
+                                ) : (
+                                    <div className="repo-logo-placeholder">
+                                        {repo.name.slice(0, 2).toUpperCase()}
+                                    </div>
+                                )}
                                 <h3>{repo.name}</h3>
+                                </div>
                                 <p>{repo.description || "Без описания"}</p>
                                 <span className={`badge ${repo.visibility}`}>
                                     {repo.visibility === "public" ? "Публичный" : "Приватный"}

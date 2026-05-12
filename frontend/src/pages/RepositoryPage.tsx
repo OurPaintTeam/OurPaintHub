@@ -15,6 +15,7 @@ interface Repository {
     owner_company_name?: string | null;
     can_edit?: boolean;
     can_delete?: boolean;
+    logo?: string | null;
 }
 
 interface RepoFile {
@@ -96,6 +97,56 @@ const RepositoryPage: React.FC = () => {
     const [viewingCommit, setViewingCommit] = useState<Commit | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [repoLogo, setRepoLogo] = useState<File | null>(null);
+    const saveRepository = async () => {
+        if (!repo) return;
+
+        if (!repoName.trim()) {
+            setMessage("Название репозитория обязательно");
+            return;
+        }
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            const formData = new FormData();
+
+            formData.append("name", repoName.trim());
+            formData.append("description", repoDescription);
+            formData.append("visibility", repoVisibility);
+
+            if (repoLogo) {
+                formData.append("logo", repoLogo);
+            }
+
+            const updated = await apiFetch<{ repository: Repository }>(
+                `/repositories/${repo.id}/update/`,
+                {
+                    method: "PUT",
+                    auth: true,
+                    body: formData,
+                }
+            );
+
+            setRepo(updated.repository);
+            setEditingRepo(false);
+            setRepoLogo(null);
+
+            setMessage("Репозиторий обновлён");
+
+            await load();
+        } catch (error) {
+            setMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Ошибка обновления репозитория"
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
 
     useEffect(() => {
         if (!id) {
@@ -491,6 +542,18 @@ const RepositoryPage: React.FC = () => {
                 </button>
 
                 <div className="repo-hero">
+                    <div className="repo-header">
+                    {repo.logo ? (
+                        <img
+                            src={repo.logo}
+                            alt={repo.name}
+                            className="repo-logo"
+                        />
+                    ) : (
+                        <div className="repo-logo-placeholder">
+                            {repo.name.slice(0, 2).toUpperCase()}
+                        </div>
+                    )}
                     <div>
                         <h1>{repo.name}</h1>
                         <p>{repo.description || "Без описания"}</p>
@@ -499,6 +562,7 @@ const RepositoryPage: React.FC = () => {
                                 Компания: {repo.owner_company_name}
                             </p>
                         )}
+                    </div>
                     </div>
 
                     <div className="repo-actions">
@@ -516,6 +580,15 @@ const RepositoryPage: React.FC = () => {
                                 disabled={saving}
                             >
                                 {saving ? "Удаление..." : "Удалить репозиторий"}
+                            </button>
+                        )}
+                        {repo.can_edit && (
+                            <button
+                                onClick={() => setEditingRepo(true)}
+                                className="card-btn edit-btn"
+                            >
+                                <span className="icon">✏️</span>
+                                Редактировать
                             </button>
                         )}
                     </div>
@@ -685,6 +758,69 @@ const RepositoryPage: React.FC = () => {
                         ))}
                     </div>
                 </section>
+
+                {editingRepo && (
+                    <div
+                        className="modal-overlay"
+                        onClick={() => setEditingRepo(false)}
+                    >
+                        <div
+                            className="modal"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h2>Редактировать репозиторий</h2>
+
+                            <input
+                                value={repoName}
+                                onChange={(e) => setRepoName(e.target.value)}
+                                placeholder="Название"
+                            />
+
+                            <textarea
+                                value={repoDescription}
+                                onChange={(e) => setRepoDescription(e.target.value)}
+                                placeholder="Описание"
+                            />
+
+                            <select
+                                value={repoVisibility}
+                                onChange={(e) =>
+                                    setRepoVisibility(
+                                        e.target.value as "private" | "public"
+                                    )
+                                }
+                            >
+                                <option value="private">Private</option>
+                                <option value="public">Public</option>
+                            </select>
+
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                    setRepoLogo(e.target.files?.[0] || null)
+                                }
+                            />
+
+                            <div className="modal-actions">
+                                <button
+                                    onClick={saveRepository}
+                                    className="card-btn"
+                                    disabled={saving}
+                                >
+                                    {saving ? "Сохранение..." : "Сохранить"}
+                                </button>
+
+                                <button
+                                    onClick={() => setEditingRepo(false)}
+                                    className="secondary-btn"
+                                >
+                                    Отмена
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {editingFile && (
                     <div className="modal-overlay" onClick={() => setEditingFile(null)}>

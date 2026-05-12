@@ -12,6 +12,7 @@ interface Repository {
     owner_user_username?: string | null;
     owner_company_id?: number | null;
     owner_company_name?: string | null;
+    logo?: string | null;
 }
 
 const PublicRepositoriesPage: React.FC = () => {
@@ -53,6 +54,19 @@ const PublicRepositoriesPage: React.FC = () => {
                     <div className="repos-grid">
                         {repos.map((repo) => (
                             <div key={repo.id} className="repo-card" onClick={() => navigate(`/repositories/${repo.id}`)}>
+                                <div className="repo-card-header">
+                                {repo.logo ? (
+                                    <img
+                                        src={repo.logo}
+                                        alt={repo.name}
+                                        className="repo-logo"
+                                    />
+                                ) : (
+                                    <div className="repo-logo-placeholder">
+                                        {repo.name.slice(0, 2).toUpperCase()}
+                                    </div>
+                                )}
+                                    </div>
                                 <h3>{repo.name}</h3>
                                 <p>{repo.description || "Без описания"}</p>
                                 {repo.owner_company_id ? (

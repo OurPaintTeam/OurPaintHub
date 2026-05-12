@@ -16,6 +16,7 @@ interface Company {
     name: string;
     description?: string;
     owner_id: number;
+    logo?: string | null;
 }
 
 interface CreateCompanyResponse {
@@ -119,10 +120,21 @@ const CompaniesPage: React.FC = () => {
                         <div className="empty-state">У вас пока нет компаний</div>
                     ) : (
                         companies.map((company) => (
-                            <div key={company.id} className="company-card" onClick={() => navigate(`/companies/${company.id}`)}>
-                                <FontAwesomeIcon icon={faBuilding} />
+                            <div
+                                key={company.id}
+                                className="company-card"
+                                onClick={() => navigate(`/companies/${company.id}`)}
+                            >
+                                {company.logo ? (
+                                    <img src={company.logo} alt={company.name} className="company-logo" />
+                                ) : (
+                                    <FontAwesomeIcon icon={faBuilding} />
+                                )}
+
                                 <h3>{company.name}</h3>
+
                                 {company.description && <p>{company.description}</p>}
+
                                 {company.owner_id === user?.id ? (
                                     <span className="badge owner">Владелец</span>
                                 ) : (
