@@ -7,6 +7,9 @@ from api.choices import RepositoryVisibility
 from api.models.base import TimeStampedModel
 from api.models.companies import Company
 
+def validate_logo(image):
+    if image and image.size > 2 * 1024 * 1024:
+        raise ValidationError("Logo too large (max 2MB)")
 
 # REPOSITORY
 class Repository(TimeStampedModel):
@@ -62,6 +65,13 @@ class Repository(TimeStampedModel):
         choices=RepositoryVisibility.choices,
         default=RepositoryVisibility.PRIVATE,
         db_index=True,
+    )
+
+    logo = models.ImageField(
+        upload_to="repositories/logos/",
+        null=True,
+        blank=True,
+        validators=[validate_logo]
     )
 
     class Meta:

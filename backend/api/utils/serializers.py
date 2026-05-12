@@ -57,6 +57,7 @@ def serialize_repository(repository, user=None):
         "description": repository.description,
         "visibility": repository.visibility,
         "created_by_id": repository.created_by_id,
+        "logo": repository.logo.url if repository.logo else None,
         "created_by_username": repository.created_by.username if repository.created_by_id else None,
         "owner_user_id": repository.owner_user_id,
         "owner_user_username": owner_user.username if owner_user else None,

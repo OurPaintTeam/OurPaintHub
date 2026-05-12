@@ -111,6 +111,7 @@ def create_repository(request):
     description = (request.data.get("description") or "").strip()
     visibility = request.data.get("visibility") or RepositoryVisibility.PRIVATE
     owner_company_id = request.data.get("company_id")
+    logo = request.FILES.get("logo")
 
     if not name:
         return Response({"error": "Название репозитория обязательно"}, status=status.HTTP_400_BAD_REQUEST)
@@ -133,6 +134,7 @@ def create_repository(request):
             name=name,
             description=description,
             visibility=visibility,
+            logo=logo,
         )
     else:
         repository = Repository.objects.create(
@@ -141,6 +143,7 @@ def create_repository(request):
             name=name,
             description=description,
             visibility=visibility,
+            logo=logo,
         )
 
     changed_files = []
@@ -211,6 +214,8 @@ def update_repository(request, repository_id):
         if visibility not in RepositoryVisibility.values:
             return Response({"error": "Некорректная видимость репозитория"}, status=status.HTTP_400_BAD_REQUEST)
         repository.visibility = visibility
+    if "logo" in request.FILES:
+        repository.logo = request.FILES.get("logo")
 
     repository.save()
     log_action(user, "change", repository)
