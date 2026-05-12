@@ -45,12 +45,7 @@ class Company(TimeStampedModel):
         validators=[validate_5mb]
     )
 
-    cover = models.ImageField(
-        upload_to="companies/covers/",
-        null=True,
-        blank=True,
-        validators=[validate_5mb]
-    )
+
 
     class Meta:
         constraints = [

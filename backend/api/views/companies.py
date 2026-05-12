@@ -7,7 +7,6 @@ from django.db.models import Q
 from django.contrib.auth import get_user_model
 
 from api.choices import CompanyInviteStatus
-from api.models import Notification
 from api.models.companies import Company, CompanyMember, CompanyInvite
 from api.models.repositories import Repository
 from api.models.companies import (
