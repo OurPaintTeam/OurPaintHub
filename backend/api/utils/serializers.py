@@ -75,7 +75,6 @@ def serialize_repository(repository, user=None):
 
 def serialize_company(company, user=None):
     logo_url = _file_url(company.logo)
-    cover_url = _file_url(company.cover)
 
     base_data = {
         "id": company.id,
