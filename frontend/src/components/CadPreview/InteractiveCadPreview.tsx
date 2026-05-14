@@ -343,7 +343,6 @@ const InteractiveCadPreview: React.FC = () => {
                     </button>
                 ))}
 
-                <span className="cad-toolbar-divider" />
                 <button type="button" title="Dimension">
                     <img alt="" className="cad-tool-img" src={iconPath("sizeTool.svg")} />
                 </button>
