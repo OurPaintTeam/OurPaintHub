@@ -72,3 +72,21 @@
     background: #fecaca;
   }
 }
+
+.company-link {
+  background: none;
+  border: none;
+  color: red;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #e6f7ff;
+    color: darkred;
+    text-decoration: underline;
+  }
+}
