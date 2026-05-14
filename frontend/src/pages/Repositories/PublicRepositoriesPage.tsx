@@ -57,9 +57,6 @@ const PublicRepositoriesPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="repos-page page">
-                <button onClick={() => navigate("/repositories")} className="back-btn link-btn">
-                    ← Репозитории
-                </button>
 
                 <div className="page-header">
                     <h1>Публичные репозитории</h1>

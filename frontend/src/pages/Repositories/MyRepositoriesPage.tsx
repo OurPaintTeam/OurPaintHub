@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import { apiFetch } from "../../config/api";
 import CreateRepositoryModal from "../../components/repositories/CreateRepositoryModal";
-import RepositoryGrid from "../../components/repositories/RepositoryGrid";
 import Message from "../../components/common/Message";
 import "./MyRepositoriesPage.scss";
 import { Repository } from "../../types/repository";
@@ -160,9 +159,6 @@ const MyRepositoriesPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="my-repos-page">
-                <button onClick={() => navigate("/repositories")} className="link-btn">
-                    ← Репозитории
-                </button>
 
                 <div className="page-header">
                     <h1>Мои репозитории</h1>

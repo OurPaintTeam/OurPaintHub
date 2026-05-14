@@ -11,32 +11,29 @@
     h1 {
       font-size: 2rem;
       font-weight: 700;
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      color: #ef4444;
       margin-bottom: 0.5rem;
     }
 
     p {
-      color: var(--gray);
+      color: #6b7280;
       font-size: 0.875rem;
     }
   }
 
   .message {
     padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     margin-bottom: 1.5rem;
 
     &.success {
-      background: #d1fae5;
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
       color: #065f46;
       border-left: 4px solid #10b981;
     }
 
     &.error {
-      background: #fee2e2;
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
       color: #991b1b;
       border-left: 4px solid #ef4444;
     }
@@ -49,12 +46,13 @@
   }
 
   .company-card {
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
     border-radius: 1rem;
     padding: 1.5rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(239, 68, 68, 0.15);
     text-align: center;
     position: relative;
     overflow: hidden;
@@ -66,14 +64,15 @@
       left: 0;
       right: 0;
       height: 3px;
-      background: var(--primary-gradient);
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
       transform: scaleX(0);
       transition: transform 0.3s ease;
     }
 
     &:hover {
       transform: translateY(-4px);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.25);
 
       &::before {
         transform: scaleX(1);
@@ -90,19 +89,21 @@
         height: 80px;
         border-radius: 1rem;
         object-fit: cover;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
       }
 
       .company-logo-placeholder {
         width: 80px;
         height: 80px;
         border-radius: 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 2.5rem;
         color: white;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
       }
     }
 
@@ -110,12 +111,12 @@
       font-size: 1.125rem;
       font-weight: 600;
       margin-bottom: 0.5rem;
-      color: var(--dark);
+      color: #374151;
     }
 
     .company-description {
       font-size: 0.875rem;
-      color: var(--gray);
+      color: #6b7280;
       margin-bottom: 1rem;
       line-height: 1.4;
       display: -webkit-box;
@@ -130,11 +131,11 @@
       align-items: center;
       margin-top: 1rem;
       padding-top: 1rem;
-      border-top: 1px solid #e5e7eb;
+      border-top: 1px solid rgba(239, 68, 68, 0.1);
 
       .member-count {
         font-size: 0.75rem;
-        color: var(--gray);
+        color: #6b7280;
         display: flex;
         align-items: center;
         gap: 0.25rem;
@@ -142,21 +143,22 @@
 
       .badge {
         padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
+        border-radius: 0.5rem;
         font-size: 0.7rem;
-        font-weight: 500;
+        font-weight: 600;
         display: inline-flex;
         align-items: center;
         gap: 0.25rem;
 
         &.owner {
-          background: #dbeafe;
-          color: #1e40af;
+          background: #fee2e2;
+          color: #ef4444;
         }
 
         &.member {
-          background: #f3e8ff;
-          color: #6b21a5;
+          background: #fff5f5;
+          color: #f97316;
+          border: 1px solid #fecaca;
         }
       }
     }
@@ -164,28 +166,36 @@
 
   // Карточка создания
   .create-card {
-    background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-    border: 2px dashed #cbd5e1;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border: 2px dashed #fecaca;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 280px;
+    cursor: pointer;
 
     &::before {
       display: none;
     }
 
+    &:hover {
+      border-color: #ef4444;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.15);
+    }
+
     .create-icon {
       width: 64px;
       height: 64px;
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 1rem;
       transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 
       svg {
         font-size: 1.5rem;
@@ -194,20 +204,17 @@
     }
 
     h3 {
-      color: #059669;
+      color: #ef4444;
     }
 
     p {
       font-size: 0.75rem;
-      color: #6b7280;
+      color: #9ca3af;
     }
 
-    &:hover {
-      border-color: #10b981;
-
-      .create-icon {
-        transform: scale(1.1) rotate(90deg);
-      }
+    &:hover .create-icon {
+      transform: scale(1.1) rotate(90deg);
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3);
     }
   }
 
@@ -219,8 +226,8 @@
     .spinner {
       width: 40px;
       height: 40px;
-      border: 3px solid #e5e7eb;
-      border-top-color: var(--primary);
+      border: 3px solid #fee2e2;
+      border-top-color: #ef4444;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 1rem;
@@ -231,30 +238,34 @@
   .empty-state {
     text-align: center;
     padding: 3rem;
-    background: #f9fafb;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
     border-radius: 1rem;
+    border: 1px solid rgba(239, 68, 68, 0.15);
 
     .empty-icon {
       font-size: 3rem;
-      color: #cbd5e1;
+      color: #fecaca;
       margin-bottom: 1rem;
     }
 
     p {
-      color: var(--gray);
+      color: #6b7280;
       margin-bottom: 1rem;
     }
 
     .create-first-btn {
-      background: var(--primary-gradient);
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
       color: white;
       border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 0.75rem;
       cursor: pointer;
+      transition: all 0.3s ease;
 
       &:hover {
         transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
       }
     }
   }

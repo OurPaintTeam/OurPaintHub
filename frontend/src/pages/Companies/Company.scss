@@ -1,68 +1,276 @@
+// companies-page.scss - стили для страницы компаний в бело-красно-персиковой гамме
+
 .companies-page {
-  padding-left: 12rem;
-  padding-right: 12rem;
+  padding: 2rem 12rem;
+  min-height: 100vh;
+  animation: fadeInUp 0.5s ease-out;
+
+  @media (max-width: 1200px) {
+    padding: 2rem 6rem;
+  }
+
+  @media (max-width: 900px) {
+    padding: 1rem;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #ef4444;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+  }
+
+  .section {
+    margin-top: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #ef4444;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+
+      &::before {
+        content: "";
+        width: 4px;
+        height: 22px;
+        background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+        border-radius: 2px;
+      }
+    }
+  }
 }
 
 .companies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
 }
 
-.company-card,
-.company-detail,
-.companies-page .card,
-.modal {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
-}
-
 .company-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.15);
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.25);
+
+    &::before {
+      transform: scaleX(1);
+    }
+  }
+
+  .company-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 1rem;
+    object-fit: cover;
+    margin-bottom: 1rem;
+    border: 2px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .company-logo-placeholder {
+    width: 64px;
+    height: 64px;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #ef4444;
+    margin-bottom: 0.5rem;
+  }
+
+  .company-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .company-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(239, 68, 68, 0.1);
+
+    .member-count {
+      font-size: 0.75rem;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .badge {
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+
+      &.owner {
+        background: #fee2e2;
+        color: #ef4444;
+      }
+
+      &.member {
+        background: #fff5f5;
+        color: #f97316;
+        border: 1px solid #fecaca;
+      }
+    }
+  }
 }
 
-.company-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-}
-
-.companies-page .section {
-  margin-top: 2rem;
-}
-
+// Детальная страница компании
 .company-detail {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 2rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(239, 68, 68, 0.15);
   margin: 1rem 0 2rem;
+
+  .company-header {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+
+  .company-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .company-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 1.25rem;
+    object-fit: cover;
+    border: 2px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .company-logo-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 1.25rem;
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .company-details {
+    flex: 1;
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #ef4444;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: #6b7280;
+      margin-bottom: 0.5rem;
+    }
+  }
 }
 
-.company-actions,
-.inline-form,
-.member-row,
-.section-header,
-.form-actions,
-.modal-actions {
+// Владелец компании
+.owner-info-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.companies-page input,
-.companies-page textarea,
-.companies-page select {
-  padding: 0.65rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-}
-
-.inline-form {
-  justify-content: flex-start;
+  gap: 0.75rem;
   margin: 1rem 0;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 0.75rem;
+
+  .owner-avatar-small {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #ef4444;
+  }
+
+  .owner-avatar-placeholder-small {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  strong {
+    color: #ef4444;
+  }
 }
 
+// Список участников
 .members-list {
   display: flex;
   flex-direction: column;
@@ -70,264 +278,27 @@
 }
 
 .member-row {
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.badge.owner {
-  color: #065f46;
-  background: #d1fae5;
-}
-
-.badge.member {
-  color: #1d4ed8;
-  background: #dbeafe;
-}
-
-.empty-state {
-  text-align: center;
-  background: white;
-  padding: 3rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal {
-  width: min(480px, calc(100vw - 2rem));
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.card-btn,
-.secondary-btn,
-.danger-btn,
-.link-btn {
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.2s;
-}
-
-.card-btn {
-  background: #7c3aed;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-}
-
-.secondary-btn {
-  background: #f3f4f6;
-  color: #374151;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-}
-
-.danger-btn {
-  background: #dc2626;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-}
-
-.link-btn {
-  background: transparent;
-  color: #7c3aed;
-  padding: 0;
-}
-
-.link-btn.danger {
-  color: #dc2626;
-}
-
-.message {
-  margin: 1rem 0;
-  font-weight: 600;
-}
-
-.message.error {
-  color: #dc2626;
-}
-
-.message.success {
-  color: #059669;
-}
-
-@media (max-width: 900px) {
-  .companies-page {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  .company-actions,
-  .inline-form,
-  .member-row,
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-
-.invite-box {
-  position: relative;
-  max-width: 400px;
-}
-
-.invite-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-
-  margin-top: 5px;
-  z-index: 20;
-}
-
-.invite-row {
-  display: flex;
   justify-content: space-between;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.invite-row:hover {
-  background: #f5f5f5;
-}
-
-.invite-btn {
-  border-radius: 20px;
-  padding: 4px 10px;
-  background: #eee;
-  border: 1px solid #ccc;
-  cursor: pointer;
-}
-
-.invite-btn:hover {
-  background: #ddd;
-}
-
-// Стили для бейджа участника
-.member-badge {
-  display: inline-block;
-  padding: 0.375rem 0.75rem;
-  background: #d1fae5;
-  color: #065f46;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-// Стили для уведомления о приватных репозиториях
-.private-repos-note {
-  margin-top: 1rem;
+  gap: 1rem;
   padding: 0.75rem;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  color: #92400e;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #fee2e2;
+  transition: all 0.2s ease;
 
-  p {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+  &:hover {
+    border-color: #fecaca;
+    transform: translateX(4px);
   }
-
-  .link-btn {
-    color: #92400e;
-    text-decoration: underline;
-
-    &:hover {
-      color: #78350f;
-    }
-  }
-}
-
-// Стили для компании
-.company-detail {
-  .secondary-btn, .danger-btn, .card-btn {
-    margin-right: 0.5rem;
-  }
-}
-
-.company-header {
-  position: relative;
-  margin-bottom: 20px;
-}
-
-.company-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: -30px;
-  padding-left: 12px;
-}
-
-.company-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  object-fit: cover;
-  border: 2px solid #222;
-  background: #111;
-}
-
-.company-logo-placeholder {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  background: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-.logo-preview {
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
-  object-fit: cover;
-  margin-top: 10px;
-}
-
-// Аватарки для участников
-.member-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #eee;
 
   .member-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75rem;
+    flex: 1;
+    cursor: pointer;
 
     .member-avatar {
       width: 40px;
@@ -340,94 +311,426 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
       color: white;
-      font-weight: bold;
-      font-size: 14px;
+    }
+
+    .member-name {
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .member-email {
+      font-size: 0.75rem;
+      color: #9ca3af;
     }
 
     .owner-badge {
-      background: #ff9800;
-      color: white;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 12px;
+      font-size: 0.7rem;
+      padding: 0.125rem 0.5rem;
+      background: #fee2e2;
+      color: #ef4444;
+      border-radius: 0.5rem;
+      font-weight: 600;
     }
   }
-}
 
-// Аватар владельца компании
-.owner-info-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 10px 0;
-
-  .owner-avatar-small {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .owner-avatar-placeholder-small {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #4caf50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
+  .danger-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
   }
 }
 
-// Аватарки при поиске
-.user-info {
+// Действия с компанией
+.company-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(239, 68, 68, 0.1);
+}
+
+// Формы
+.inline-form {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 1rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
 
-  .user-avatar-small {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
+  input, textarea, select {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+// Поля ввода
+input, textarea, select {
+  padding: 0.65rem 1rem;
+  border: 1px solid #fee2e2;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: white;
+
+  &:focus {
+    outline: none;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  }
+}
+
+// Кнопки
+.card-btn, .secondary-btn, .danger-btn, .link-btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+}
+
+.secondary-btn {
+  background: white;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+
+  &:hover:not(:disabled) {
+    background: #fff5f5;
+    border-color: #ef4444;
+    transform: translateY(-2px);
+  }
+}
+
+.danger-btn {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  }
+}
+
+.link-btn {
+  background: transparent;
+  color: #ef4444;
+  padding: 0;
+
+  &:hover {
+    color: #dc2626;
+    text-decoration: underline;
   }
 
-  .user-avatar-placeholder-small {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #2196f3;
+  &.danger {
+    color: #dc2626;
+  }
+}
+
+// Бейджи
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+
+  &.owner {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+
+  &.member {
+    background: #fff5f5;
+    color: #f97316;
+    border: 1px solid #fecaca;
+  }
+}
+
+.member-badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  background: #fee2e2;
+  color: #ef4444;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+// Сообщения
+.message {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+
+  &.success {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #065f46;
+    border-left: 4px solid #10b981;
+  }
+
+  &.error {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #991b1b;
+    border-left: 4px solid #ef4444;
+  }
+}
+
+// Пустое состояние
+.empty-state {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 3rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+
+  .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  p {
+    color: #6b7280;
+    margin-bottom: 1rem;
+  }
+}
+
+// Приватные репозитории уведомление
+.private-repos-note {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  color: #ef4444;
+
+  p {
+    margin: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 12px;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
+}
+
+// Модальные окна
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem;
+  border-radius: 1.25rem;
+  width: min(500px, calc(100vw - 2rem));
+  max-height: 85vh;
+  overflow-y: auto;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  animation: scaleIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(239, 68, 68, 0.05);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    border-radius: 3px;
+  }
+
+  h2, h3 {
+    color: #ef4444;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .invite-search-section {
+    margin-bottom: 1.5rem;
+
+    input {
+      width: 100%;
+      margin-bottom: 0.75rem;
+    }
+  }
+
+  .invites-list-section {
+    margin-bottom: 1.5rem;
+  }
+}
+
+// Приглашения
+.invite-box {
+  position: relative;
+  max-width: 100%;
+}
+
+.invite-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #fee2e2;
+  border-radius: 0.75rem;
+  margin-top: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .invite-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #eee;
+  padding: 0.75rem;
+  border-bottom: 1px solid #fee2e2;
+
+  &:hover {
+    background: #fff5f5;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    cursor: pointer;
+
+    .user-avatar-small {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .user-avatar-placeholder-small {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: white;
+    }
+  }
+
+  .invite-btn {
+    padding: 0.375rem 0.75rem;
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+  }
 }
 
-.invite-results {
-  margin-top: 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  max-height: 300px;
-  overflow-y: auto;
+// Логотип репозитория
+.repo-logo,
+.repo-logo-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
 }
 
+.repo-logo {
+  object-fit: cover;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.repo-logo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  color: white;
+  font-weight: 700;
+}
+
+// Превью логотипа
+.logo-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 0.75rem;
+  object-fit: cover;
+  margin-top: 0.5rem;
+  border: 2px solid rgba(239, 68, 68, 0.2);
+}
+
+// Утилиты
 .clickable {
   cursor: pointer;
   transition: opacity 0.2s;
@@ -437,150 +740,69 @@
   }
 }
 
-.member-info {
-  &.clickable {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+// Анимации
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.user-info {
-  &.clickable {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
-// Дополнительные стили для модалок
-.modal {
-  .member-row, .invite-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    border-bottom: 1px solid #e5e7eb;
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .member-info, .user-info {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex: 1;
-      cursor: pointer;
-
-      .member-avatar, .user-avatar-small {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        object-fit: cover;
-      }
-
-      .member-avatar-placeholder, .user-avatar-placeholder-small {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: var(--primary-gradient);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        color: white;
-      }
-
-      .member-details {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-
-        .member-name {
-          font-weight: 500;
-        }
-
-        .owner-badge {
-          font-size: 0.7rem;
-          padding: 0.125rem 0.375rem;
-          background: #dbeafe;
-          color: #1e40af;
-          border-radius: 0.25rem;
-        }
-      }
-    }
-
-    .invite-status {
-      font-size: 0.7rem;
-      opacity: 0.7;
-    }
-
-    .danger-btn, .invite-btn {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.75rem;
-    }
-
-    .invite-btn {
-      background: var(--primary-gradient);
-      color: white;
-      border: none;
-      border-radius: 0.375rem;
-      cursor: pointer;
-
-      &:hover {
-        transform: translateY(-1px);
-      }
-    }
+// Адаптивность
+@media (max-width: 768px) {
+  .companies-page {
+    padding: 1rem;
   }
 
-  .invite-search-section, .invites-list-section {
-    margin-bottom: 1.5rem;
+  .company-detail {
+    padding: 1rem;
+  }
 
-    h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.75rem;
-      color: var(--dark);
-    }
+  .company-info {
+    flex-direction: column;
+    text-align: center;
+  }
 
-    input {
-      width: 100%;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.5rem;
-      margin-bottom: 0.75rem;
-    }
+  .member-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inline-form {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .company-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
+    flex-direction: column;
   }
-}
 
-.repo-logo,
-.repo-logo-placeholder {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.repo-logo {
-  object-fit: cover;
-}
-
-.repo-logo-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e5e7eb;
-  color: #111827;
-  font-weight: 700;
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

@@ -331,7 +331,6 @@ const RepositoryPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="repo-page page">
-                <button onClick={() => navigate(-1)} className="link-btn">← Назад</button>
 
                 <RepositoryHeader
                     repo={repo}
@@ -344,17 +343,26 @@ const RepositoryPage: React.FC = () => {
                 <Message message={message} type={message.includes("Ошибка") ? "error" : "success"} />
 
                 {viewingCommit && (
-                    <div className="card">
-                        <strong>Просмотр коммита:</strong> {viewingCommit.commit_hash.slice(0, 12)}
-                        <button onClick={backToHead} className="secondary-btn" style={{ marginLeft: 12 }}>
+                    <div className="commit-view-card">
+                        <div className="commit-view-info">
+                            <strong>📌 Просмотр коммита:</strong>
+                            <code>{viewingCommit.commit_hash.slice(0, 12)}</code>
+                            <span>{viewingCommit.message}</span>
+                        </div>
+                        <button onClick={backToHead} className="back-btn">
                             Вернуться к HEAD
                         </button>
                     </div>
                 )}
 
-                <section className="section repo-content-grid">
+                <section className="repo-content-grid">
                     <div className="repo-column">
-                        <h2>Файлы</h2>
+                        <div className="repo-column-header">
+                            <h2>Файлы</h2>
+                            {repo.can_edit && !viewingCommit && (
+                                <button className="add-btn" onClick={() => setCreatingCommit(true)}></button>
+                            )}
+                        </div>
                         <FileList
                             files={files}
                             canEdit={!!repo.can_edit}
@@ -369,7 +377,7 @@ const RepositoryPage: React.FC = () => {
                         <div className="repo-column-header">
                             <h2>Коммиты</h2>
                             {repo.can_edit && !viewingCommit && (
-                                <button className="add-btn" onClick={() => setCreatingCommit(true)}>+</button>
+                                <button className="add-btn" onClick={() => setCreatingCommit(true)}></button>
                             )}
                         </div>
                         <CommitList

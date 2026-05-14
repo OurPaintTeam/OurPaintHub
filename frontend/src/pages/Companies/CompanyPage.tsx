@@ -382,9 +382,6 @@ const CompanyPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="companies-page page">
-                <button onClick={() => navigate("/companies")} className="back-btn">
-                    ← Компании
-                </button>
 
                 {/* Информация о компании */}
                 <div className="company-detail card">

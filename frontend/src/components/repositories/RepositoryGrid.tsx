@@ -21,7 +21,6 @@ const RepositoryGrid: React.FC<RepositoryGridProps> = ({
 
     return (
         <>
-            <h2>Мои репозитории</h2>
             <div className="repos-grid">
                 {repositories.map((repo) => (
                     <RepositoryCard

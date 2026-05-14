@@ -1,19 +1,19 @@
 // common.scss - общие стили для всего приложения
 
 :root {
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --primary: #667eea;
-  --primary-dark: #5a67d8;
-  --secondary: #764ba2;
+  --primary-gradient: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  --primary: #ef4444;
+  --primary-dark: #dc2626;
+  --secondary: #f97316;
   --success: #10b981;
   --danger: #ef4444;
   --warning: #f59e0b;
-  --dark: #1a1a2e;
-  --dark-light: #16213e;
-  --gray: #6c757d;
-  --gray-light: #e9ecef;
+  --dark: #374151;
+  --dark-light: #4b5563;
+  --gray: #6b7280;
+  --gray-light: #f3f4f6;
   --glass-bg: rgba(255, 255, 255, 0.95);
-  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-border: rgba(239, 68, 68, 0.2);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
@@ -125,12 +125,13 @@
 
 .secondary-btn {
   background: white;
-  color: var(--dark);
-  border: 1px solid var(--gray-light);
+  color: var(--primary);
+  border: 1px solid #fee2e2;
   box-shadow: var(--shadow-sm);
 
   &:hover:not(:disabled) {
-    background: var(--gray-light);
+    background: #fff5f5;
+    border-color: var(--primary);
     transform: translateY(-2px);
   }
 }
@@ -146,7 +147,7 @@
 }
 
 .edit-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
 
   .icon {
     font-size: 1rem;
@@ -193,7 +194,7 @@
   &.success {
     background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
     color: #065f46;
-    border-left: 4px solid var(--success);
+    border-left: 4px solid #10b981;
   }
 
   &.error {
@@ -219,7 +220,8 @@
   animation: fadeIn 0.3s ease-out;
 
   .modal {
-    background: white;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
     border-radius: 1.5rem;
     padding: 2rem;
     max-width: 500px;
@@ -228,46 +230,44 @@
     overflow-y: auto;
     animation: scaleIn 0.3s ease-out;
     box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(239, 68, 68, 0.15);
 
     &::-webkit-scrollbar {
       width: 6px;
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--gray-light);
+      background: rgba(239, 68, 68, 0.05);
       border-radius: 10px;
     }
 
     &::-webkit-scrollbar-thumb {
-      background: var(--primary);
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
       border-radius: 10px;
     }
 
     h2 {
       font-size: 1.5rem;
       font-weight: 700;
-      color: var(--dark);
+      color: #ef4444;
       margin-bottom: 1.5rem;
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
     }
 
     input, textarea, select {
       width: 100%;
       padding: 0.75rem 1rem;
-      border: 2px solid var(--gray-light);
+      border: 1px solid #fee2e2;
       border-radius: 0.75rem;
       font-size: 0.875rem;
       transition: all 0.3s ease;
       margin-bottom: 1rem;
       font-family: inherit;
+      background: white;
 
       &:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
       }
     }
 
@@ -296,7 +296,7 @@
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid var(--gray-light);
+    border: 3px solid #fee2e2;
     border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -335,15 +335,15 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--gray-light);
+  background: rgba(239, 68, 68, 0.05);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--primary);
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
   border-radius: 10px;
 
   &:hover {
-    background: var(--primary-dark);
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
   }
 }
