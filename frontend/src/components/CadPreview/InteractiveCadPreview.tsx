@@ -85,8 +85,141 @@ const InteractiveCadPreview: React.FC = () => {
     const toPercent = (coord: CadCoord) => {
         const x = ((coord.x - VIEW_BOX.minX) / (VIEW_BOX.maxX - VIEW_BOX.minX)) * 100;
         const y = ((VIEW_BOX.maxY - coord.y) / (VIEW_BOX.maxY - VIEW_BOX.minY)) * 100;
-
         return { x, y };
+    };
+
+    // Функция для отрисовки сетки
+    const drawGrid = () => {
+        const gridLines = [];
+        const step = 0.3;  // шаг мелкой сетки
+        const majorStep = 1.0;  // шаг крупной сетки (каждая 5-я)
+
+        // Ширина и высота VIEW_BOX
+        const width = VIEW_BOX.maxX - VIEW_BOX.minX;  // 9.4
+        const height = VIEW_BOX.maxY - VIEW_BOX.minY; // 4.4
+
+        // ВЕРТИКАЛЬНЫЕ ЛИНИИ (X)
+        // Используем целые числа для итерации, чтобы избежать погрешности
+        const stepsX = Math.floor((width / 2) / step);  // 4.7 / 0.2 = 23.5 → 23 шага
+
+        for (let i = 1; i <= stepsX; i++) {
+            const x = i * step;  // 0.2, 0.4, 0.6... 4.6
+
+            // Проверка на крупную линию (каждые 5 шагов)
+            const isMajor = i % 5 === 0;  // 5, 10, 15, 20 (соответствует 1.0, 2.0, 3.0, 4.0)
+
+            const positionRight = toPercent({ x, y: 0 });
+            const positionLeft = toPercent({ x: -x, y: 0 });
+
+            const strokeColor = isMajor ? "#666" : "#999";
+            const strokeWidth = isMajor ? "1.2" : "0.8";
+            const opacity = isMajor ? "0.6" : "0.35";
+
+            // Линия справа
+            gridLines.push(
+                <line
+                    key={`v-right-${i}`}
+                    x1={`${positionRight.x}%`}
+                    y1="0%"
+                    x2={`${positionRight.x}%`}
+                    y2="100%"
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                />
+            );
+
+            // Линия слева
+            gridLines.push(
+                <line
+                    key={`v-left-${i}`}
+                    x1={`${positionLeft.x}%`}
+                    y1="0%"
+                    x2={`${positionLeft.x}%`}
+                    y2="100%"
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                />
+            );
+        }
+
+        // ГОРИЗОНТАЛЬНЫЕ ЛИНИИ (Y)
+        const stepsY = Math.floor((height / 2) / step);  // 2.2 / 0.2 = 11 шагов
+
+        for (let i = 1; i <= stepsY; i++) {
+            const y = i * step;  // 0.2, 0.4, 0.6... 2.2
+
+            // Проверка на крупную линию (каждые 5 шагов)
+            const isMajor = i % 5 === 0;  // 5, 10 (соответствует 1.0, 2.0)
+
+            const positionUp = toPercent({ x: 0, y });
+            const positionDown = toPercent({ x: 0, y: -y });
+
+            const strokeColor = isMajor ? "#666" : "#999";
+            const strokeWidth = isMajor ? "1.2" : "0.8";
+            const opacity = isMajor ? "0.6" : "0.35";
+
+            // Линия сверху
+            gridLines.push(
+                <line
+                    key={`h-up-${i}`}
+                    x1="0%"
+                    y1={`${positionUp.y}%`}
+                    x2="100%"
+                    y2={`${positionUp.y}%`}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                />
+            );
+
+            // Линия снизу
+            gridLines.push(
+                <line
+                    key={`h-down-${i}`}
+                    x1="0%"
+                    y1={`${positionDown.y}%`}
+                    x2="100%"
+                    y2={`${positionDown.y}%`}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                />
+            );
+        }
+
+        return gridLines;
+    };
+
+    // Функция для отрисовки оранжевых осей
+    const drawAxes = () => {
+        const center = toPercent({ x: 0, y: 0 });
+
+        return (
+            <>
+                {/* Ось X (горизонтальная) - оранжевая */}
+                <line
+                    x1="0%"
+                    y1={`${center.y}%`}
+                    x2="100%"
+                    y2={`${center.y}%`}
+                    stroke="#f1888c"
+                    strokeWidth="2.5"
+                    opacity="0.9"
+                />
+                {/* Ось Y (вертикальная) - оранжевая */}
+                <line
+                    x1={`${center.x}%`}
+                    y1="0%"
+                    x2={`${center.x}%`}
+                    y2="100%"
+                    stroke="#f1888c"
+                    strokeWidth="2.5"
+                    opacity="0.9"
+                />
+            </>
+        );
     };
 
     const pointerToCoord = (event: React.PointerEvent<HTMLDivElement>): CadCoord | null => {
@@ -150,7 +283,6 @@ const InteractiveCadPreview: React.FC = () => {
 
     const drawPoint = (point: CadCoord, className = "cad-shape-point") => {
         const position = toPercent(point);
-
         return <circle className={className} cx={`${position.x}%`} cy={`${position.y}%`} r="4.5" />;
     };
 
@@ -172,7 +304,6 @@ const InteractiveCadPreview: React.FC = () => {
     const drawCircle = (circle: Pick<CadCircle, "center" | "radius">, className = "cad-shape-circle") => {
         const center = toPercent(circle.center);
         const radiusX = (circle.radius / (VIEW_BOX.maxX - VIEW_BOX.minX)) * 100;
-
         return <circle className={className} cx={`${center.x}%`} cy={`${center.y}%`} r={`${radiusX}%`} />;
     };
 
@@ -270,10 +401,18 @@ const InteractiveCadPreview: React.FC = () => {
                     })}
 
                     <svg className="cad-shapes" aria-hidden="true">
+                        {/* Сетка */}
+                        {drawGrid()}
+
+                        {/* Оранжевые оси */}
+                        {drawAxes()}
+
+                        {/* Фигуры */}
                         {lines.map((line) => <React.Fragment key={line.id}>{drawLine(line)}</React.Fragment>)}
                         {circles.map((circle) => <React.Fragment key={circle.id}>{drawCircle(circle)}</React.Fragment>)}
                         {points.map((point) => <React.Fragment key={point.id}>{drawPoint(point)}</React.Fragment>)}
 
+                        {/* Превью фигур */}
                         {pending?.tool === "line" && drawLine({ start: pending.start, end: cursor }, "cad-shape-line cad-shape-preview")}
                         {pending?.tool === "circle" && drawCircle({ center: pending.center, radius: distance(pending.center, cursor) }, "cad-shape-circle cad-shape-preview")}
                         {pending?.tool === "line" && drawPoint(pending.start, "cad-shape-point cad-shape-anchor")}
