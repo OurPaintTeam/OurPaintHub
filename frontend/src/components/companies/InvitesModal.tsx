@@ -2,13 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../common/Modal';
 import { mediaUrl } from '../../config/api';
+import { User } from "../../types/company";
 
-interface User {
-    id: number;
-    username?: string;
-    email: string;
-    avatar?: string | null;
-}
+
 
 interface Invite {
     id: number;

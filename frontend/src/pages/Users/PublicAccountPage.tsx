@@ -14,29 +14,40 @@ import SectionHeader from "../../components/users/SectionHeader";
 import { formatDate, getFullName } from "../../utils/profileUtils";
 import { UserProfile, RepositoryWithVisibility, Company, PublicProfileResponse } from "../../types/profile";
 
-const PublicAccountPage: React.FC = () => {
+interface PublicAccountPageProps {
+    userId?: number | null; // Опциональный проп для передачи ID
+}
+
+const PublicAccountPage: React.FC<PublicAccountPageProps> = ({ userId: propUserId }) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
+    // Используем prop или параметр из URL
+    const targetId = propUserId || (id ? parseInt(id, 10) : null);
+
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [repositories, setRepositories] = useState<RepositoryWithVisibility[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!id) {
+        if (!targetId) {
             navigate("/404");
             return;
         }
 
         void loadProfile();
-    }, [id, navigate]);
+    }, [targetId, navigate]);
 
     const loadProfile = async () => {
-        if (!id) return;
+        if (!targetId) return;
 
         setLoading(true);
+        setError(null);
+
         try {
-            const data = await apiFetch<PublicProfileResponse>(`/profile/${id}/`, {
+            const data = await apiFetch<PublicProfileResponse>(`/profile/${targetId}/`, {
                 auth: true,
             });
 
@@ -45,6 +56,7 @@ const PublicAccountPage: React.FC = () => {
             setCompanies(data.companies || []);
         } catch (error) {
             console.error("Error loading profile:", error);
+            setError("Не удалось загрузить профиль пользователя");
         } finally {
             setLoading(false);
         }
@@ -69,10 +81,18 @@ const PublicAccountPage: React.FC = () => {
         );
     }
 
-    if (!profile) {
+    if (error || !profile) {
         return (
             <MainLayout isAuthenticated={true}>
-                <div className="profile-page page">Пользователь не найден</div>
+                <div className="profile-page page">
+                    <div className="error-state">
+                        <h2>Ошибка</h2>
+                        <p>{error || "Пользователь не найден"}</p>
+                        <button className="secondary-btn" onClick={() => navigate(-1)}>
+                            <FontAwesomeIcon icon={faArrowLeft} /> Вернуться назад
+                        </button>
+                    </div>
+                </div>
             </MainLayout>
         );
     }
@@ -80,12 +100,11 @@ const PublicAccountPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="profile-page page">
-
                 <div className="page-header">
                     <div>
                         <span className="section-label">Public profile</span>
                         <h1>Публичный профиль</h1>
-                        <p>Кабинет другого пользователя</p>
+                        <p>Профиль пользователя {profile.username}</p>
                     </div>
                 </div>
 

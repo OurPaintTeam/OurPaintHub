@@ -6,12 +6,10 @@ import { useAuth } from "./contexts/AuthContext";
 import NewsPage from "./pages/Content/NewsPage";
 import DocumentationPage from "./pages/Content/DocumentationPage";
 import DownloadPage from "./pages/Content/DownloadPage";
-import AccountPage from "./pages/Users/AccountPage";
 import LoginPage from "./pages/Users/LoginPage";
 import RegistrationPage from "./pages/Users/RegistrationPage";
 import QAPage from "./pages/Content/QAPage";
 import SettingsPage from "./pages/Users/SettingsPage";
-import PublicAccountPage from "./pages/Users/PublicAccountPage";
 import ContentEditorPage from "./pages/Content/ContentEditorPage";
 import EditNewsPage from "./pages/Content/EditNewsPage";
 import NewsDetailPage from "./pages/Content/NewsDetailPage";
@@ -29,6 +27,7 @@ import "./styles/toast.scss";
 import PublicRepositoriesPage from "./pages/Repositories/PublicRepositoriesPage";
 import CompanyPage from "./pages/Companies/CompanyPage";
 import NotificationPage from "./pages/NotificationPage";
+import ProfilePage from "./pages/Users/ProfilePage";
 
 
 function App() {
@@ -71,8 +70,7 @@ function App() {
                     <Route path="/download" element={<DownloadPage isAuthenticated={isAuthenticated} />} />
                     <Route path="/QA" element={<QAPage isAuthenticated={isAuthenticated} />} />
 
-                    <Route path="/profile" element={requireAuth(<AccountPage />)} />
-                    <Route path="/profile/:id" element={<PublicAccountPage />} />
+                    <Route path="/profile/:id" element={<ProfilePage/>} />
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
                     <Route path="/notification" element={requireAuth(<NotificationPage />)} />
 

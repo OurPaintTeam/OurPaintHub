@@ -1,7 +1,10 @@
-import React, { ChangeEvent, useEffect, useState, useRef } from "react";
+import React, { ChangeEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import { apiFetch, mediaUrl } from "../../config/api";
+import { Company, CompanyMember, CompanyInvite } from "../../types/company";
+import { Repository, FileWithPreview } from "../../types/repository";
+import { User} from "../../types/company";
 import "./Company.scss";
 import "../Repositories/RepositoriesPage.scss";
 
@@ -10,57 +13,7 @@ import MembersModal from "../../components/companies/MembersModal";
 import InvitesModal from "../../components/companies/InvitesModal";
 import RepositoryGrid from "../../components/repositories/RepositoryGrid";
 import CreateRepositoryModal from "../../components/repositories/CreateRepositoryModal";
-
-interface User {
-    id: number;
-    username?: string;
-    email: string;
-    avatar?: string | null;
-}
-
-interface Company {
-    id: number;
-    name: string;
-    description?: string;
-    owner_id: number;
-    owner_username?: string;
-    owner_avatar?: string | null;
-    can_manage?: boolean;
-    is_member?: boolean;
-    is_owner?: boolean;
-    member_count?: number;
-    logo?: string | null;
-}
-
-interface Repository {
-    id: number;
-    name: string;
-    description?: string;
-    visibility: "private" | "public";
-    logo?: string | null;
-    logo_repo?: string | null;
-}
-
-interface CreateRepositoryResponse {
-    message?: string;
-    repository: Repository;
-}
-
-interface FileWithPreview {
-    id: string;
-    file: File;
-    name: string;
-    size: string;
-}
-
-interface Invite {
-    id: number;
-    invited_user: string;
-    invited_user_id?: number;
-    invited_user_avatar?: string | null;
-    status: string;
-    created_at: string;
-}
+import {PublicProfileResponse} from "../../types/profile";
 
 const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
@@ -73,10 +26,13 @@ const formatFileSize = (bytes: number): string => {
 const CompanyPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
+    // Основные состояния
     const [company, setCompany] = useState<Company | null>(null);
-    const [members, setMembers] = useState<User[]>([]);
+    const [owner, setOwner] = useState<User | null>(null);
+    const [members, setMembers] = useState<CompanyMember[]>([]);
     const [repos, setRepos] = useState<Repository[]>([]);
-    const [invites, setInvites] = useState<Invite[]>([]);
+    const [invites, setInvites] = useState<CompanyInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
@@ -93,6 +49,7 @@ const CompanyPage: React.FC = () => {
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
+    const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
 
     // Состояния для создания репозитория
     const [repoName, setRepoName] = useState("");
@@ -103,8 +60,7 @@ const CompanyPage: React.FC = () => {
     const isMember = company?.is_member === true;
     const canManage = company?.can_manage === true;
 
-    const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
-
+    // Загрузка данных
     useEffect(() => {
         if (!id) {
             navigate("/404");
@@ -118,18 +74,31 @@ const CompanyPage: React.FC = () => {
 
         setLoading(true);
         try {
+            // Загружаем данные компании
             const companyData = await apiFetch<Company>(`/companies/${id}/`, { auth: true });
             setCompany(companyData);
             setCompanyName(companyData.name);
             setCompanyDescription(companyData.description || "");
             setCurrentLogoUrl(mediaUrl(companyData.logo));
 
+            // Загружаем данные владельца
+            if (companyData.owner_id) {
+                try {
+                    const response  = await apiFetch<PublicProfileResponse>(`/profile/${companyData.owner_id}/`, { auth: true });
+                    const ownerData = response.user;
+                    setOwner(ownerData);
+                } catch (err) {
+                    console.error("Ошибка загрузки владельца:", err);
+                }
+            }
+
+            // Загружаем дополнительные данные если пользователь состоит в компании
             if (companyData.is_member) {
                 const [membersData, reposData, invitesData] = await Promise.all([
-                    apiFetch<User[]>(`/companies/${id}/members/`, { auth: true }),
+                    apiFetch<CompanyMember[]>(`/companies/${id}/members/`, { auth: true }),
                     apiFetch<Repository[]>(`/companies/${id}/repositories/`, { auth: true }),
                     companyData.can_manage
-                        ? apiFetch<Invite[]>(`/companies/${id}/invites/`, { auth: true })
+                        ? apiFetch<CompanyInvite[]>(`/companies/${id}/invites/`, { auth: true })
                         : Promise.resolve([]),
                 ]);
                 setMembers(membersData || []);
@@ -148,6 +117,7 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Обновление компании
     const updateCompany = async () => {
         if (!company || !companyName.trim()) return;
 
@@ -163,7 +133,6 @@ const CompanyPage: React.FC = () => {
                 formData.append("logo", logoFile);
             }
 
-            // Используем явный флаг удаления
             if (removeLogoFlag) {
                 formData.append("remove_logo", "true");
             }
@@ -176,7 +145,7 @@ const CompanyPage: React.FC = () => {
 
             setLogoFile(null);
             setLogoPreview(null);
-            setRemoveLogoFlag(false); // Сбрасываем флаг после успешного сохранения
+            setRemoveLogoFlag(false);
             setShowEditModal(false);
             setMessage("Компания обновлена");
             await load();
@@ -187,13 +156,24 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Удаление компании
     const deleteCompany = async () => {
-        if (!company || !window.confirm("Удалить компанию?")) return;
-        await apiFetch(`/companies/${company.id}/delete/`, { method: "DELETE", auth: true });
-        navigate("/companies");
+        if (!company || !window.confirm("Удалить компанию? Это действие необратимо.")) return;
+
+        setSaving(true);
+        try {
+            await apiFetch(`/companies/${company.id}/delete/`, { method: "DELETE", auth: true });
+            setMessage("Компания удалена");
+            setTimeout(() => navigate("/companies"), 1500);
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка удаления компании");
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const searchUsers = async (q: string) => {
+    // Поиск пользователей
+    const searchUsers = async (q: string): Promise<User[]> => {
         if (!q.trim()) return [];
         try {
             const data = await apiFetch<User[]>(`/users/search/?q=${q}`, { auth: true });
@@ -203,6 +183,7 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Приглашение пользователя
     const inviteUser = async (user: User) => {
         if (!company) return;
 
@@ -228,6 +209,7 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Отмена приглашения
     const cancelInvite = async (inviteId: number) => {
         setSaving(true);
         setMessage("");
@@ -247,8 +229,9 @@ const CompanyPage: React.FC = () => {
         }
     };
 
-    const removeMember = async (removedMemberId: number) => {
-        if (!company || !window.confirm("Удалить участника?")) return;
+    // Удаление участника
+    const removeMember = async (memberId: number) => {
+        if (!company || !window.confirm("Удалить участника из компании?")) return;
 
         setSaving(true);
         setMessage("");
@@ -256,8 +239,7 @@ const CompanyPage: React.FC = () => {
             await apiFetch(`/companies/${company.id}/members/remove/`, {
                 method: "DELETE",
                 auth: true,
-                body: JSON.stringify({ member_id: removedMemberId }),
-                redirectOnError: false,
+                body: JSON.stringify({ member_id: memberId }),
             });
             setMessage("Участник удалён");
             await load();
@@ -268,6 +250,29 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Выход из компании
+    const leaveCompany = async () => {
+        if (!company || !window.confirm("Выйти из компании?")) return;
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            await apiFetch(`/companies/${company.id}/leave/`, {
+                method: "DELETE",
+                auth: true,
+            });
+
+            setMessage("Вы вышли из компании");
+            navigate("/companies");
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : "Ошибка выхода");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Создание репозитория компании
     const createCompanyRepository = async () => {
         if (!company || !repoName.trim()) {
             setMessage("Название репозитория обязательно");
@@ -294,11 +299,10 @@ const CompanyPage: React.FC = () => {
                 formData.append("message", "Создание пустого репозитория");
             }
 
-            const data = await apiFetch<CreateRepositoryResponse>("/repositories/create/", {
+            await apiFetch("/repositories/create/", {
                 method: "POST",
                 auth: true,
                 body: formData,
-                redirectOnError: false,
             });
 
             setRepoName("");
@@ -306,7 +310,7 @@ const CompanyPage: React.FC = () => {
             setRepoVisibility("private");
             setSelectedFiles([]);
             setShowCreateRepoModal(false);
-            setMessage(data.message || "Репозиторий создан");
+            setMessage("Репозиторий создан");
             await load();
         } catch (error) {
             setMessage(error instanceof Error ? error.message : "Ошибка создания репозитория");
@@ -315,6 +319,7 @@ const CompanyPage: React.FC = () => {
         }
     };
 
+    // Обработчики файлов
     const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files || []);
         const newFiles: FileWithPreview[] = files.map((file) => ({
@@ -334,39 +339,23 @@ const CompanyPage: React.FC = () => {
         setSelectedFiles([]);
     };
 
-    const handleRepositoryClick = (id: number) => {
-        navigate(`/repositories/${id}`);
+    const handleRepositoryClick = (repoId: number) => {
+        navigate(`/repositories/${repoId}`);
     };
 
-    const leaveCompany = async () => {
-        if (!company || !window.confirm("Выйти из компании?")) return;
-
-        setSaving(true);
-        setMessage("");
-
-        try {
-            await apiFetch(`/companies/${company.id}/leave/`, {
-                method: "DELETE",
-                auth: true,
-            });
-
-            setMessage("Вы вышли из компании");
-            navigate("/companies");
-        } catch (error) {
-            setMessage(error instanceof Error ? error.message : "Ошибка выхода");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    // Правильное использование mediaUrl
+    // URL для изображений
     const companyLogo = mediaUrl(company?.logo);
-    const ownerAvatar = mediaUrl(company?.owner_avatar);
+    const ownerAvatar = mediaUrl(owner?.avatar);
 
     if (loading) {
         return (
             <MainLayout isAuthenticated={true}>
-                <div className="companies-page page">Загрузка...</div>
+                <div className="companies-page page">
+                    <div className="loading-state">
+                        <div className="spinner"></div>
+                        <p>Загрузка компании...</p>
+                    </div>
+                </div>
             </MainLayout>
         );
     }
@@ -374,7 +363,15 @@ const CompanyPage: React.FC = () => {
     if (!company) {
         return (
             <MainLayout isAuthenticated={true}>
-                <div className="companies-page page">Компания не найдена</div>
+                <div className="companies-page page">
+                    <div className="error-state">
+                        <h2>Ошибка</h2>
+                        <p>Компания не найдена</p>
+                        <button className="secondary-btn" onClick={() => navigate("/companies")}>
+                            ← Вернуться к компаниям
+                        </button>
+                    </div>
+                </div>
             </MainLayout>
         );
     }
@@ -382,13 +379,19 @@ const CompanyPage: React.FC = () => {
     return (
         <MainLayout isAuthenticated={true}>
             <div className="companies-page page">
-
                 {/* Информация о компании */}
                 <div className="company-detail card">
                     <div className="company-header">
                         <div className="company-info">
                             {companyLogo ? (
-                                <img src={companyLogo} className="company-logo" alt={company.name} />
+                                <img
+                                    src={companyLogo}
+                                    className="company-logo"
+                                    alt={company.name}
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
                             ) : (
                                 <div className="company-logo-placeholder">
                                     {company.name.slice(0, 2).toUpperCase()}
@@ -407,12 +410,16 @@ const CompanyPage: React.FC = () => {
                         {ownerAvatar ? (
                             <img src={ownerAvatar} alt="Owner" className="owner-avatar-small" />
                         ) : (
-                            <div className="owner-avatar-placeholder-small">👑</div>
+                            <div className="owner-avatar-placeholder-small">
+                                {owner?.username?.[0]?.toUpperCase() || "👑"}
+                            </div>
                         )}
-                        <span>Владелец: {company.owner_username || company.owner_id}</span>
+                        <span>
+                            Владелец: {owner?.username || owner?.email || company.owner_username || `Пользователь ${company.owner_id}`}
+                        </span>
                     </div>
 
-                    <p>Участников: {company.member_count || 0}</p>
+                    <p className="member-count-text">👥 Участников: {company.member_count || 0}</p>
 
                     {/* Кнопки действий */}
                     {isMember && canManage && (
@@ -441,23 +448,27 @@ const CompanyPage: React.FC = () => {
                                 👥 Участники ({members.length})
                             </button>
                             <button onClick={leaveCompany} className="danger-btn">
-                                Выйти из компании
+                                🚪 Выйти из компании
                             </button>
                         </div>
                     )}
+                    
                 </div>
 
                 {/* Сообщения */}
                 {message && (
-                    <p className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
+                    <div className={`message ${message.includes("Ошибка") ? "error" : "success"}`}>
                         {message}
-                    </p>
+                    </div>
                 )}
 
                 {/* Секция репозиториев */}
                 <section className="section">
                     <div className="section-header">
                         <h2>Репозитории компании</h2>
+                        {isMember && !canManage && repos.length > 0 && (
+                            <span className="info-badge">Только для чтения</span>
+                        )}
                     </div>
 
                     {repos.length === 0 ? (
@@ -472,20 +483,23 @@ const CompanyPage: React.FC = () => {
                         </div>
                     ) : (
                         <RepositoryGrid
-                            repositories={repos}
+                            repositories={repos.map(repo => ({
+                                ...repo,
+                                logo: repo.logo_repo // Маппинг для совместимости с RepositoryGrid
+                            }))}
                             onRepositoryClick={handleRepositoryClick}
                         />
                     )}
                 </section>
 
-                {/* Модальное окно редактирования компании */}
+                {/* Модальные окна */}
                 <EditCompanyModal
                     isOpen={showEditModal}
                     onClose={() => {
                         setShowEditModal(false);
                         setLogoFile(null);
                         setLogoPreview(null);
-                        setRemoveLogoFlag(false); // Сбрасываем флаг при закрытии
+                        setRemoveLogoFlag(false);
                     }}
                     companyName={companyName}
                     setCompanyName={setCompanyName}
@@ -494,9 +508,9 @@ const CompanyPage: React.FC = () => {
                     logoFile={logoFile}
                     setLogoFile={(file) => {
                         setLogoFile(file);
-                        // При выборе нового файла сбрасываем флаг удаления
                         if (file) {
                             setRemoveLogoFlag(false);
+                            setLogoPreview(URL.createObjectURL(file));
                         }
                     }}
                     logoPreview={logoPreview}
@@ -505,13 +519,12 @@ const CompanyPage: React.FC = () => {
                         setLogoFile(null);
                         setLogoPreview(null);
                         setCurrentLogoUrl(null);
-                        setRemoveLogoFlag(true); // Устанавливаем флаг удаления
+                        setRemoveLogoFlag(true);
                     }}
                     onSave={updateCompany}
                     isSaving={saving}
                 />
 
-                {/* Модальное окно списка участников */}
                 <MembersModal
                     isOpen={showMembersModal}
                     onClose={() => setShowMembersModal(false)}
@@ -522,7 +535,6 @@ const CompanyPage: React.FC = () => {
                     isSaving={saving}
                 />
 
-                {/* Модальное окно приглашений */}
                 <InvitesModal
                     isOpen={showInvitesModal}
                     onClose={() => setShowInvitesModal(false)}
@@ -534,7 +546,6 @@ const CompanyPage: React.FC = () => {
                     isInviteLoading={saving}
                 />
 
-                {/* Модальное окно создания репозитория */}
                 <CreateRepositoryModal
                     isOpen={showCreateRepoModal}
                     onClose={() => {
