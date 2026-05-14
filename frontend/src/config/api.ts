@@ -217,19 +217,49 @@ interface ApiFetchOptions extends RequestInit {
     redirectOnError?: boolean;
 }
 
+export const setAccessToken = (token: string | null): void => {
+    if (token) {
+        localStorage.setItem("access_token", token);
+    } else {
+        localStorage.removeItem("access_token");
+    }
+};
+
+const PUBLIC_PATHS = [
+    "/login",
+    "/registration",
+    "/refresh",
+    "/validate",
+    "/health",
+    "/checkDB",
+];
+
+const isPublicPath = (path: string): boolean => {
+    return PUBLIC_PATHS.some(publicPath => path.includes(publicPath));
+};
+
+// Обновите apiFetch
 export const apiFetch = async <T = unknown>(
     path: string,
     options: ApiFetchOptions = {},
 ): Promise<T> => {
-    const { auth = false, redirectOnError = true, headers, ...fetchOptions } = options;
+    const { auth = !isPublicPath(path), redirectOnError = true, headers, ...fetchOptions } = options;
     const isFormData = fetchOptions.body instanceof FormData;
+    const isLogoutPath = path.includes("/logout");
+
+    // Если auth: true, добавляем токен
+    const authHeaders = auth ? getAuthHeaders() : {};
+
+    console.log(`🌐 ${fetchOptions.method || 'GET'} ${apiUrl(path)}`);
+    console.log('Auth enabled:', auth);
+    console.log('Is logout path:', isLogoutPath);
 
     try {
         const response = await fetch(apiUrl(path), {
             ...fetchOptions,
             headers: {
                 ...(fetchOptions.body && !isFormData ? { "Content-Type": "application/json" } : {}),
-                ...(auth ? getAuthHeaders() : {}),
+                ...authHeaders,
                 ...headers,
             },
             credentials: "include",
@@ -239,6 +269,39 @@ export const apiFetch = async <T = unknown>(
 
         if (response.ok) {
             return data as T;
+        }
+
+        // Для logout не обрабатываем ошибки, просто возвращаем успех
+        if (isLogoutPath) {
+            console.log("Logout request completed with status:", response.status);
+            // Даже если ошибка, очищаем токен
+            setAccessToken(null);
+            localStorage.removeItem("user");
+            return {} as T;
+        }
+
+        // Обработка 401 - пробуем обновить токен
+        if (response.status === 401 && auth && !path.includes("/refresh")) {
+            try {
+                const refreshResponse = await fetch(apiUrl("/refresh/"), {
+                    method: "POST",
+                    credentials: "include",
+                });
+
+                if (refreshResponse.ok) {
+                    const refreshData = await refreshResponse.json();
+                    if (refreshData.access_token) {
+                        setAccessToken(refreshData.access_token);
+                        // Повторяем исходный запрос
+                        return await apiFetch<T>(path, options);
+                    }
+                }
+            } catch (refreshError) {
+                console.error("Token refresh failed:", refreshError);
+            }
+
+            setAccessToken(null);
+            localStorage.removeItem("user");
         }
 
         let error: AppErrorState;
@@ -294,7 +357,7 @@ export const apiFetch = async <T = unknown>(
             };
         }
 
-        if (redirectOnError) {
+        if (redirectOnError && !isLogoutPath) {
             redirectToErrorPage(error);
         }
 
@@ -302,6 +365,12 @@ export const apiFetch = async <T = unknown>(
     } catch (error) {
         if (error instanceof ApiError) {
             throw error;
+        }
+
+        // Для logout игнорируем ошибки
+        if (isLogoutPath) {
+            console.log("Logout error ignored:", error);
+            return {} as T;
         }
 
         const appError: AppErrorState = navigator.onLine

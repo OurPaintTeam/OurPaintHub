@@ -131,12 +131,6 @@ const IconMenuButton: React.FC<IconMenuButtonProps> = ({ isAuthenticated = false
         navigate(path);
     };
 
-    const handleLogout = () => {
-        localStorage.clear();
-        setMenuOpen(false);
-        window.dispatchEvent(new Event("auth-changed"));
-        navigate("/login");
-    };
 
     if (!isAuthenticated) {
         return null;

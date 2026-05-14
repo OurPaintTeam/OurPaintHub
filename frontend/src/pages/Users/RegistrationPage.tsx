@@ -1,30 +1,17 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-    faUser,
-    faEnvelope,
-    faLock,
-    faCalendar,
-} from "@fortawesome/free-solid-svg-icons";
+import { faUser, faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "../../config/api";
+import { useAuth } from "../../contexts/AuthContext";
 // @ts-ignore
 import opLogo from "../../assets/OP_logo.svg";
 import "./RegistrationPage.scss";
-
-interface UserData {
-    id: number;
-    username: string;
-    email: string;
-}
-
-interface RegistrationResponse {
-    message?: string;
-    user?: UserData;
-}
+import { RegistrationResponse, LoginResponse } from "../../types/profile";
 
 const RegistrationPage: React.FC = () => {
     const navigate = useNavigate();
+    const { login } = useAuth(); // <-- Хук вызывается на верхнем уровне компонента
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -36,7 +23,6 @@ const RegistrationPage: React.FC = () => {
 
     const triggerErrorAnimation = (element: HTMLElement | null) => {
         if (!element) return;
-
         element.classList.remove("input-error");
         void element.offsetWidth;
         element.classList.add("input-error");
@@ -56,7 +42,8 @@ const RegistrationPage: React.FC = () => {
         }
 
         try {
-            const data = await apiFetch<RegistrationResponse>("/registration/", {
+            // 1. Регистрация пользователя
+            const regData = await apiFetch<RegistrationResponse>("/registration/", {
                 method: "POST",
                 redirectOnError: false,
                 body: JSON.stringify({
@@ -64,15 +51,43 @@ const RegistrationPage: React.FC = () => {
                     email,
                     password
                 }),
+                auth: false, // Не отправляем токен
             });
 
-            if (!data.user) {
-                setMessage("Ошибка: backend не вернул пользователя");
+            if (!regData.user || !regData.user.id) {
+                setMessage("Ошибка: backend не вернул корректные данные пользователя");
+                setIsLoading(false);
                 return;
             }
 
-            setMessage(`Успех! Пользователь зарегистрирован: ${data.user.email}`);
-            setTimeout(() => navigate("/login"), 1000);
+            setMessage("Регистрация успешна! Выполняется вход...");
+
+            // 2. Автоматический вход после регистрации
+            const loginData = await apiFetch<LoginResponse>("/login/", {
+                method: "POST",
+                redirectOnError: false,
+                body: JSON.stringify({
+                    login: username, // Используем username или email
+                    password
+                }),
+                auth: false, // Не отправляем токен для входа
+            });
+
+            if (!loginData.access_token || !loginData.user) {
+                setMessage("Аккаунт создан, но не удалось выполнить вход");
+                setTimeout(() => navigate("/login"), 1500);
+                setIsLoading(false);
+                return;
+            }
+
+            // 3. Сохраняем токен и переходим в профиль
+            login(loginData.access_token, loginData.user);
+            setMessage(`Добро пожаловать, ${loginData.user.username}!`);
+
+            setTimeout(() => {
+                navigate(`/profile/`);
+            }, 500);
+
         } catch (error) {
             setMessage(`Ошибка: ${error instanceof Error ? error.message : String(error)}`);
         } finally {

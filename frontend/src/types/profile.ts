@@ -1,5 +1,7 @@
-// Базовые интерфейсы для пользователя
-export interface UserProfile {
+// types/profile.ts
+
+// Единый интерфейс для пользователя
+export interface User {
     id: number;
     username: string;
     email: string;
@@ -12,10 +14,18 @@ export interface UserProfile {
     last_login?: string | null;
     profile_created_at?: string | null;
     profile_updated_at?: string | null;
+    role?: string;
+    is_admin?: boolean;
+    is_staff?: boolean;
+    is_superuser?: boolean;
 }
 
+// Для обратной совместимости
+export type UserProfile = User;
+export type UserData = User;
+
 // Расширенный интерфейс для аккаунта (с дополнительными полями)
-export interface UserProfileWithRole extends UserProfile {
+export interface UserProfileWithRole extends User {
     role: string;
     is_admin: boolean;
     is_staff: boolean;
@@ -30,7 +40,7 @@ export interface Repository {
     logo_repo?: string | null;
 }
 
-// Расширенный интерфейс для репозитория с видимостью (для публичного просмотра)
+// Расширенный интерфейс для репозитория с видимостью
 export interface RepositoryWithVisibility extends Repository {
     visibility: "private" | "public";
 }
@@ -51,7 +61,38 @@ export interface CompanyWithOwner extends Company {
 
 // Ответ от API для публичного профиля
 export interface PublicProfileResponse {
-    user: UserProfile;
+    user: User;
     repositories: RepositoryWithVisibility[];
     companies: Company[];
+}
+
+// Auth интерфейсы
+export interface LoginResponse {
+    access_token: string; // Убираем optional
+    user: User; // Используем User вместо UserData
+}
+
+export interface RegistrationResponse {
+    message?: string;
+    user: User;
+}
+
+export interface AuthResponse {
+    access_token?: string;
+    user?: User;
+}
+
+export interface ValidateResponse {
+    valid: boolean;
+    user: User;
+}
+
+export interface AuthContextType {
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    user: User | null;
+    accessToken: string | null;
+    login: (accessToken: string, userData: User) => void;
+    logout: () => void;
+    refresh: () => Promise<boolean>;
 }

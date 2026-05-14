@@ -7,26 +7,7 @@ import { useAuth } from "../../contexts/AuthContext";
 // @ts-ignore
 import opLogo from "../../assets/OP_logo.svg";
 import "./LoginPage.scss";
-
-interface UserData {
-    id: number;
-    username: string;
-    email: string;
-    first_name?: string;
-    last_name?: string;
-    role?: string;
-    is_admin?: boolean;
-    is_staff?: boolean;
-    is_superuser?: boolean;
-    bio?: string | null;
-    date_of_birth?: string | null;
-    avatar?: string | null;
-}
-
-interface LoginResponse {
-    access_token?: string;
-    user?: UserData;
-}
+import {LoginResponse} from "../../types/profile";
 
 const LoginPage: React.FC = () => {
     const navigate = useNavigate();
@@ -42,22 +23,27 @@ const LoginPage: React.FC = () => {
         setMessage("");
 
         try {
+            // ВАЖНО: auth: false - не отправляем токен для логина
             const data = await apiFetch<LoginResponse>("/login/", {
                 method: "POST",
                 redirectOnError: false,
                 body: JSON.stringify({ login: loginValue, password }),
+                auth: false,  // <-- КЛЮЧЕВОЙ МОМЕНТ
             });
 
-            if (!data.access_token || !data.user) {
-                setMessage("Ошибка: backend не вернул access token");
+            if (!data.access_token || !data.user || !data.user.id) {
+                setMessage("Ошибка: сервер вернул неполные данные");
                 return;
             }
 
             login(data.access_token, data.user);
-            window.dispatchEvent(new Event("auth-changed"));
 
             setMessage("Успешная авторизация!");
-            setTimeout(() => navigate("/profile"), 1000);
+
+            setTimeout(() => {
+                navigate(`/profile/`);
+            }, 500);
+
         } catch (error) {
             setMessage(`Ошибка: ${error instanceof Error ? error.message : String(error)}`);
         } finally {

@@ -1,46 +1,61 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import { apiFetch } from "../../config/api";
+import { useAuth } from "../../contexts/AuthContext";
 import AccountPage from "./AccountPage";
 import PublicAccountPage from "./PublicAccountPage";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
-import { UserProfile, UserProfileWithRole } from "../../types/profile";
+import { UserProfile } from "../../types/profile";
 import "./ProfilePage.scss";
 
 const ProfilePage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const { user: currentUser, isLoading: authLoading } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [targetUserId, setTargetUserId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        // Ждем загрузки auth состояния
+        if (authLoading) {
+            return;
+        }
+
+        // Если нет авторизации и нет ID в URL - перенаправляем на логин
+        if (!currentUser && !id) {
+            navigate("/login");
+            return;
+        }
+
         const loadData = async () => {
-            if (!id) {
-                setError("ID пользователя не указан");
-                setLoading(false);
-                return;
-            }
-
-            const userId = parseInt(id, 10);
-            if (isNaN(userId)) {
-                setError("Некорректный ID пользователя");
-                setLoading(false);
-                return;
-            }
-
-            setTargetUserId(userId);
             setLoading(true);
             setError(null);
 
             try {
-                // Получаем текущего пользователя
-                const currentUser = await apiFetch<UserProfileWithRole>("/profile/", {
-                    auth: true,
-                    redirectOnError: false
-                });
-                setCurrentUserId(currentUser.id);
+                // Если ID не указан в URL, используем ID текущего пользователя
+                let userId: number;
+
+                if (id) {
+                    userId = parseInt(id, 10);
+                    if (isNaN(userId)) {
+                        setError("Некорректный ID пользователя");
+                        setLoading(false);
+                        return;
+                    }
+                } else if (currentUser) {
+                    // Перенаправляем на URL с ID пользователя
+                    userId = currentUser.id;
+                    navigate(`/profile/${userId}`, { replace: true });
+                    return;
+                } else {
+                    setError("Пользователь не найден");
+                    setLoading(false);
+                    return;
+                }
+
+                setTargetUserId(userId);
             } catch (err) {
                 console.error("Ошибка загрузки профиля:", err);
                 setError("Не удалось загрузить данные пользователя");
@@ -50,11 +65,11 @@ const ProfilePage: React.FC = () => {
         };
 
         loadData();
-    }, [id]);
+    }, [id, currentUser, authLoading, navigate]);
 
-    if (loading) {
+    if (authLoading || loading) {
         return (
-            <MainLayout isAuthenticated={true}>
+            <MainLayout isAuthenticated={!!currentUser}>
                 <div className="profile-page-loader">
                     <LoadingSpinner />
                 </div>
@@ -64,7 +79,7 @@ const ProfilePage: React.FC = () => {
 
     if (error) {
         return (
-            <MainLayout isAuthenticated={true}>
+            <MainLayout isAuthenticated={!!currentUser}>
                 <div className="profile-page-error">
                     <div className="error-card">
                         <span className="error-icon">⚠️</span>
@@ -79,7 +94,7 @@ const ProfilePage: React.FC = () => {
     // Если нет целевого пользователя
     if (!targetUserId) {
         return (
-            <MainLayout isAuthenticated={true}>
+            <MainLayout isAuthenticated={!!currentUser}>
                 <div className="profile-page-error">
                     <div className="error-card">
                         <span className="error-icon">❌</span>
@@ -92,7 +107,7 @@ const ProfilePage: React.FC = () => {
     }
 
     // Если текущий пользователь = владелец профиля -> показываем личный кабинет
-    if (currentUserId === targetUserId) {
+    if (currentUser && currentUser.id === targetUserId) {
         return <AccountPage />;
     }
 

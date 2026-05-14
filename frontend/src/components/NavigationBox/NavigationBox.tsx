@@ -63,7 +63,7 @@ const NavigationBox: React.FC<NavigationBoxProps> = ({
 
     const handleLogout = async () => {
         try {
-            await logout();
+            logout();
             navigate("/login");
         } catch (error) {
             console.error("Ошибка logout:", error);

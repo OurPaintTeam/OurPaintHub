@@ -29,7 +29,6 @@ import CompanyPage from "./pages/Companies/CompanyPage";
 import NotificationPage from "./pages/NotificationPage";
 import ProfilePage from "./pages/Users/ProfilePage";
 
-
 function App() {
     const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -47,7 +46,6 @@ function App() {
         if (!isAuthenticated) {
             return <Navigate to="/login" replace />;
         }
-
         return isAdmin ? element : <Navigate to="/error?type=forbidden" replace />;
     };
 
@@ -70,7 +68,8 @@ function App() {
                     <Route path="/download" element={<DownloadPage isAuthenticated={isAuthenticated} />} />
                     <Route path="/QA" element={<QAPage isAuthenticated={isAuthenticated} />} />
 
-                    <Route path="/profile/:id" element={<ProfilePage/>} />
+                    <Route path="/profile" element={requireAuth(<ProfilePage />)} />
+                    <Route path="/profile/:id" element={requireAuth(<ProfilePage />)} />
                     <Route path="/settings" element={requireAuth(<SettingsPage />)} />
                     <Route path="/notification" element={requireAuth(<NotificationPage />)} />
 
@@ -88,7 +87,11 @@ function App() {
                     <Route path="/docs/edit/:id" element={requireAdmin(<EditDocumentationPage />)} />
                     <Route path="/download/add" element={requireAdmin(<AddVersionPage />)} />
 
-                    <Route path="/login" element={isAuthenticated ? <Navigate to="/profile" replace /> : <LoginPage />} />
+                    {/* Исправленные маршруты авторизации */}
+                    <Route
+                        path="/login"
+                        element={isAuthenticated ? <Navigate to="/profile" replace /> : <LoginPage />}
+                    />
                     <Route
                         path="/registration"
                         element={isAuthenticated ? <Navigate to="/profile" replace /> : <RegistrationPage />}
