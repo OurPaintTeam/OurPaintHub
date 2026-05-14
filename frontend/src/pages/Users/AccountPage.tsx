@@ -4,57 +4,22 @@ import MainLayout from "../../layout/MainLayout";
 import { apiFetch, mediaUrl } from "../../config/api";
 import "./AccountPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-    faBuilding,
-    faCalendarDays,
-    faEnvelope,
-    faFolderTree,
-    faGear,
-    faIdBadge,
-    faTrash,
-    faUserCircle,
-} from "@fortawesome/free-solid-svg-icons";
-
-interface UserProfile {
-    id: number;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    role: string;
-    is_admin: boolean;
-    is_staff: boolean;
-    is_superuser: boolean;
-    bio?: string | null;
-    date_of_birth?: string | null;
-    avatar?: string | null;
-    date_joined?: string | null;
-    last_login?: string | null;
-    profile_created_at?: string | null;
-    profile_updated_at?: string | null;
-}
-
-interface Repository {
-    id: number;
-    name: string;
-    description?: string;
-    logo_repo?: string | null;  // логотип репозитория
-}
-
-interface Company {
-    id: number;
-    name: string;
-    owner_id: number;
-    logo?: string | null;  // логотип компании
-    description?: string;
-}
+import { faEnvelope, faGear, faTrash, faCalendarDays, faIdBadge } from "@fortawesome/free-solid-svg-icons";
+import ProfileAvatar from "../../components/users/ProfileAvatar";
+import ProfileInfoRow from "../../components/users/ProfileInfoRow";
+import ProfileStats from "../../components/users/ProfileStats";
+import RepositoryList from "../../components/users/RepositoryList";
+import CompanyList from "../../components/users/CompanyList";
+import SectionHeader from "../../components/users/SectionHeader";
+import { formatDate, getFullName } from "../../utils/profileUtils";
+import { UserProfileWithRole, Repository, CompanyWithOwner } from "../../types/profile";
 
 const AccountPage: React.FC = () => {
     const navigate = useNavigate();
-    const [account, setAccount] = useState<UserProfile | null>(null);
+    const [account, setAccount] = useState<UserProfileWithRole | null>(null);
     const [repositories, setRepositories] = useState<Repository[]>([]);
-    const [companiesOwned, setCompaniesOwned] = useState<Company[]>([]);
-    const [companiesMember, setCompaniesMember] = useState<Company[]>([]);
+    const [companiesOwned, setCompaniesOwned] = useState<CompanyWithOwner[]>([]);
+    const [companiesMember, setCompaniesMember] = useState<CompanyWithOwner[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -72,7 +37,7 @@ const AccountPage: React.FC = () => {
     const loadAll = async () => {
         setLoading(true);
         try {
-            const profile = await apiFetch<UserProfile>("/profile/", {
+            const profile = await apiFetch<UserProfileWithRole>("/profile/", {
                 auth: true,
                 redirectOnError: false,
             });
@@ -84,7 +49,7 @@ const AccountPage: React.FC = () => {
             });
             setRepositories(Array.isArray(repos) ? repos : []);
 
-            const companies = await apiFetch<Company[]>("/companies/list/", {
+            const companies = await apiFetch<CompanyWithOwner[]>("/companies/list/", {
                 auth: true,
                 redirectOnError: false,
             });
@@ -118,54 +83,29 @@ const AccountPage: React.FC = () => {
         }
     };
 
-    const formatDate = (value?: string | null, withTime = false) => {
-        if (!value) return "Не указано";
-
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) return "Не указано";
-
-        return withTime
-            ? date.toLocaleString("ru-RU", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-            })
-            : date.toLocaleDateString("ru-RU");
-    };
-
-    // Функции для получения URL изображений
     const getAvatarUrl = useCallback((avatar: string | null | undefined): string | null => {
         return mediaUrl(avatar);
     }, []);
 
-    const getRepoLogoUrl = useCallback((logo: string | null | undefined): string | null => {
-        return mediaUrl(logo);
-    }, []);
-
-    const getCompanyLogoUrl = useCallback((logo: string | null | undefined): string | null => {
-        return mediaUrl(logo);
-    }, []);
-
     const avatarSrc = getAvatarUrl(account?.avatar);
-    const fullName = [account?.first_name, account?.last_name].filter(Boolean).join(" ");
     const companies = [...companiesOwned, ...companiesMember];
 
     const profileRows = useMemo(() => {
         if (!account) return [];
 
         return [
-            { label: "Username", value: account.username },
             { label: "Email", value: account.email },
             { label: "Имя", value: account.first_name || "Не указано" },
             { label: "Фамилия", value: account.last_name || "Не указано" },
             { label: "Дата рождения", value: formatDate(account.date_of_birth) },
-            { label: "Регистрация", value: formatDate(account.date_joined, true) },
-            { label: "Последний вход", value: formatDate(account.last_login, true) },
         ];
     }, [account]);
+
+    const stats = [
+        { number: repositories.length, label: "Репозитории", onClick: () => navigate("/repositories/my") },
+        { number: companiesOwned.length, label: "Личные компании", onClick: () => navigate("/companies") },
+        { number: companiesMember.length, label: "Участие", onClick: () => navigate("/companies") },
+    ];
 
     if (loading) {
         return (
@@ -183,21 +123,20 @@ const AccountPage: React.FC = () => {
                         <div>
                             <span className="section-label">OurPaint account</span>
                             <h1>Профиль</h1>
-                            <p>Вся информация пользователя, проекты и команды в одном рабочем виде.</p>
+                            <p>Ваш личный кабинет</p>
                         </div>
                     </div>
 
                     <div className="profile-layout">
                         <aside className="profile-sidebar">
-                            <div className="profile-avatar profile-avatar-large">
-                                {avatarSrc ?
-                                    <img src={avatarSrc} alt={account.username} /> :
-                                    <FontAwesomeIcon icon={faUserCircle} />
-                                }
-                            </div>
+                            <ProfileAvatar
+                                avatarUrl={avatarSrc}
+                                username={account.username}
+                                size="large"
+                            />
 
                             <div className="profile-identity">
-                                <h2>{fullName || account.username}</h2>
+                                <h2>{getFullName(account.first_name, account.last_name, account.username)}</h2>
                                 <p>@{account.username}</p>
                             </div>
 
@@ -223,6 +162,10 @@ const AccountPage: React.FC = () => {
                                     <FontAwesomeIcon icon={faCalendarDays} />
                                     Регистрация: {formatDate(account.date_joined)}
                                 </span>
+                                <span>
+                                    <FontAwesomeIcon icon={faCalendarDays} />
+                                    Последний вход: {formatDate(account.last_login)}
+                                </span>
                             </div>
 
                             <button
@@ -236,122 +179,53 @@ const AccountPage: React.FC = () => {
                         </aside>
 
                         <main className="profile-main">
-                            <div className="profile-stats">
-                                <div className="stat-card" onClick={() => navigate("/repositories/my")}>
-                                    <div className="stat-number">{repositories.length}</div>
-                                    <div className="stat-label">Репозитории</div>
-                                </div>
-                                <div className="stat-card" onClick={() => navigate("/companies")}>
-                                    <div className="stat-number">{companiesOwned.length}</div>
-                                    <div className="stat-label">Личные компании</div>
-                                </div>
-                                <div className="stat-card" onClick={() => navigate("/companies")}>
-                                    <div className="stat-number">{companiesMember.length}</div>
-                                    <div className="stat-label">Участие</div>
-                                </div>
-                            </div>
+                            <ProfileStats stats={stats} />
 
                             <section className="profile-section">
-                                <div className="profile-section-header">
-                                    <div>
-                                        <span className="section-label">Profile data</span>
-                                        <h2>Вся информация</h2>
-                                    </div>
-                                </div>
+                                <SectionHeader
+                                    label="Profile data"
+                                    title="Вся информация"
+                                />
 
                                 <div className="profile-info-grid">
                                     {profileRows.map((row) => (
-                                        <div className="profile-info-row" key={row.label}>
-                                            <span>{row.label}</span>
-                                            <strong>{row.value}</strong>
-                                        </div>
+                                        <ProfileInfoRow key={row.label} label={row.label} value={row.value} />
                                     ))}
-                                    <div className="profile-info-row profile-info-row-wide">
-                                        <span>О себе</span>
-                                        <strong>{account.bio || "Не указано"}</strong>
-                                    </div>
+                                    <ProfileInfoRow
+                                        label="О себе"
+                                        value={account.bio || "Не указано"}
+                                        isWide={true}
+                                    />
                                 </div>
                             </section>
 
                             <section className="profile-section">
-                                <div className="profile-section-header">
-                                    <div>
-                                        <span className="section-label">Repositories</span>
-                                        <h2>Ваши репозитории</h2>
-                                    </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/repositories/my")} type="button">
-                                        Все проекты
-                                    </button>
-                                </div>
+                                <SectionHeader
+                                    label="Repositories"
+                                    title="Ваши репозитории"
+                                    button={{ text: "Все проекты", onClick: () => navigate("/repositories/my") }}
+                                />
 
-                                <div className="profile-list">
-                                    {repositories.length === 0 ? (
-                                        <p className="empty-state">Репозиториев пока нет</p>
-                                    ) : (
-                                        repositories.slice(0, 4).map((repo) => (
-                                            <article
-                                                className="profile-list-card"
-                                                key={repo.id}
-                                                onClick={() => navigate(`/repositories/${repo.id}`)}
-                                            >
-                                                {getRepoLogoUrl(repo.logo_repo) ? (
-                                                    <img
-                                                        src={getRepoLogoUrl(repo.logo_repo)!}
-                                                        alt={repo.name}
-                                                        className="list-card-icon-img"
-                                                    />
-                                                ) : (
-                                                    <FontAwesomeIcon icon={faFolderTree} />
-                                                )}
-                                                <div>
-                                                    <h3>{repo.name}</h3>
-                                                    <p>{repo.description || "Без описания"}</p>
-                                                </div>
-                                            </article>
-                                        ))
-                                    )}
-                                </div>
+                                <RepositoryList
+                                    repositories={repositories}
+                                    maxItems={4}
+                                    emptyMessage="Репозиториев пока нет"
+                                />
                             </section>
 
                             <section className="profile-section">
-                                <div className="profile-section-header">
-                                    <div>
-                                        <span className="section-label">Companies</span>
-                                        <h2>Компании</h2>
-                                    </div>
-                                    <button className="secondary-btn" onClick={() => navigate("/companies")} type="button">
-                                        Открыть команды
-                                    </button>
-                                </div>
+                                <SectionHeader
+                                    label="Companies"
+                                    title="Компании"
+                                    button={{ text: "Открыть команды", onClick: () => navigate("/companies") }}
+                                />
 
-                                <div className="profile-list">
-                                    {companies.length === 0 ? (
-                                        <p className="empty-state">Вы пока не состоите в компаниях</p>
-                                    ) : (
-                                        companies.slice(0, 4).map((company) => (
-                                            <article
-                                                className="profile-list-card"
-                                                key={company.id}
-                                                onClick={() => navigate(`/companies/${company.id}`)}
-                                            >
-                                                {getCompanyLogoUrl(company.logo) ? (
-                                                    <img
-                                                        src={getCompanyLogoUrl(company.logo)!}
-                                                        alt={company.name}
-                                                        className="list-card-icon-img"
-                                                    />
-                                                ) : (
-                                                    <FontAwesomeIcon icon={faBuilding} />
-                                                )}
-                                                <div>
-                                                    <h3>{company.name}</h3>
-                                                    <p>{company.owner_id === account.id ? "Владелец" : "Участник"}</p>
-                                                    {company.description && <small>{company.description}</small>}
-                                                </div>
-                                            </article>
-                                        ))
-                                    )}
-                                </div>
+                                <CompanyList
+                                    companies={companies}
+                                    maxItems={4}
+                                    emptyMessage="Вы пока не состоите в компаниях"
+                                    currentUserId={account.id}
+                                />
                             </section>
                         </main>
                     </div>

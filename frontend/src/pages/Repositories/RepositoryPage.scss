@@ -1,6 +1,6 @@
 // RepositoryPage.scss - стили для страницы конкретного репозитория
 
-@import '../common.scss';
+@use '../common.scss';
 
 .repo-page {
   padding: 2rem;

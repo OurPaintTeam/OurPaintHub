@@ -1,6 +1,6 @@
 // PublicRepositoriesPage.scss - стили для страницы публичных репозиториев
 
-@import '../common.scss';
+@use  '../common.scss';
 
 .repos-page {
   padding: 2rem;

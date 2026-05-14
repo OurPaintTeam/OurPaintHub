@@ -1,5 +1,5 @@
 .settings-container {
-  padding: 40px;
+  padding: 24px; // уменьшено с 40px
   max-width: 600px;
   margin: 0 auto;
   background-color: #f9fafb;
@@ -10,9 +10,9 @@
     border: none;
     color: #4a90e2;
     cursor: pointer;
-    font-size: 14px;
-    margin-bottom: 10px;
-    padding: 6px 0;
+    font-size: 13px; // уменьшено с 14px
+    margin-bottom: 8px; // уменьшено с 10px
+    padding: 4px 0; // уменьшено с 6px 0
 
     &:hover {
       text-decoration: underline;
@@ -21,26 +21,26 @@
 
   h1 {
     color: #333;
-    margin-bottom: 30px;
+    margin-bottom: 20px; // уменьшено с 30px
     text-align: center;
-    font-size: 28px;
+    font-size: 24px; // уменьшено с 28px
   }
 }
 
 .settings-form {
   background: white;
-  padding: 30px;
+  padding: 20px; // уменьшено с 30px
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 14px; // уменьшено с 20px
 
   &.avatar-group {
     .avatar-preview {
-      width: 140px;
-      height: 140px;
+      width: 100px; // уменьшено с 140px
+      height: 100px; // уменьшено с 140px
       border-radius: 50%;
       background: #f3f4f6;
       border: 2px dashed #d1d5db;
@@ -48,7 +48,7 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      margin-bottom: 12px;
+      margin-bottom: 10px; // уменьшено с 12px
 
       img {
         width: 100%;
@@ -58,24 +58,24 @@
 
       .avatar-placeholder {
         color: #9ca3af;
-        font-size: 0.85rem;
+        font-size: 0.75rem; // уменьшено с 0.85rem
         text-align: center;
-        padding: 0 10px;
+        padding: 0 8px; // уменьшено с 0 10px
       }
     }
 
     .avatar-actions {
       display: flex;
-      gap: 10px;
+      gap: 8px; // уменьшено с 10px
       flex-wrap: wrap;
 
       .avatar-upload-btn,
       .avatar-remove-btn {
         border: none;
         border-radius: 6px;
-        padding: 10px 16px;
+        padding: 6px 12px; // уменьшено с 10px 16px
         cursor: pointer;
-        font-size: 0.9rem;
+        font-size: 0.85rem; // уменьшено с 0.9rem
         transition: all 0.2s ease;
       }
 
@@ -109,25 +109,25 @@
 
     .avatar-error {
       color: #dc2626;
-      font-size: 0.85rem;
-      margin-top: 8px;
+      font-size: 0.75rem; // уменьшено с 0.85rem
+      margin-top: 6px; // уменьшено с 8px
     }
   }
 
   label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 5px; // уменьшено с 8px
     font-weight: 500;
     color: #333;
-    font-size: 14px;
+    font-size: 13px; // уменьшено с 14px
   }
 
   .form-input {
     width: 100%;
-    padding: 12px;
+    padding: 8px 10px; // уменьшено с 12px
     border: 2px solid #ddd;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: 14px; // уменьшено с 16px
     transition: border-color 0.2s;
 
     &:focus {
@@ -143,13 +143,13 @@
 
   .form-textarea {
     width: 100%;
-    padding: 12px;
+    padding: 8px 10px; // уменьшено с 12px
     border: 2px solid #ddd;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: 14px; // уменьшено с 16px
     font-family: inherit;
     resize: vertical;
-    min-height: 100px;
+    min-height: 80px; // уменьшено с 100px
     transition: border-color 0.2s;
 
     &:focus {
@@ -166,21 +166,21 @@
 
 .form-actions {
   display: flex;
-  gap: 15px;
-  margin-top: 30px;
+  gap: 12px; // уменьшено с 15px
+  margin-top: 20px; // уменьшено с 30px
   justify-content: center;
 
   .save-btn {
     background: #28a745;
     color: white;
     border: none;
-    padding: 12px 24px;
+    padding: 8px 20px; // уменьшено с 12px 24px
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px; // уменьшено с 16px
     font-weight: 500;
     transition: background-color 0.2s;
-    min-width: 120px;
+    min-width: 100px; // уменьшено с 120px
 
     &:hover:not(:disabled) {
       background: #218838;
@@ -196,13 +196,13 @@
     background: #6c757d;
     color: white;
     border: none;
-    padding: 12px 24px;
+    padding: 8px 20px; // уменьшено с 12px 24px
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px; // уменьшено с 16px
     font-weight: 500;
     transition: background-color 0.2s;
-    min-width: 120px;
+    min-width: 100px; // уменьшено с 120px
 
     &:hover:not(:disabled) {
       background: #5a6268;
@@ -216,18 +216,18 @@
 }
 
 .message {
-  margin-top: 20px;
-  padding: 12px;
+  margin-top: 16px; // уменьшено с 20px
+  padding: 10px; // уменьшено с 12px
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px; // уменьшено с 14px
   text-align: center;
-  
+
   &.success {
     background: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
   }
-  
+
   &.error {
     background: #f8d7da;
     color: #721c24;
@@ -237,16 +237,16 @@
 
 @media (max-width: 768px) {
   .settings-container {
-    padding: 20px;
+    padding: 16px; // уменьшено с 20px
   }
 
   .settings-form {
-    padding: 20px;
+    padding: 16px; // уменьшено с 20px
   }
 
   .form-actions {
     flex-direction: column;
-    
+
     .save-btn,
     .cancel-btn {
       width: 100%;

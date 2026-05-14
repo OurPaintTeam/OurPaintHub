@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import {apiFetch, apiUrl, getAccessToken, mediaUrl} from "../../config/api";
 import { Repository, RepoFile, Commit, FileWithPreview } from "../../types/repository";
-import { formatFileSize } from "../../../utils/formatters";
+import { formatFileSize } from "../../utils/formatters";
 import RepositoryHeader from "../../components/repositories/RepositoryHeader";
 import FileList from "../../components/repositories/FileList";
 import CommitList from "../../components/repositories/CommitList";

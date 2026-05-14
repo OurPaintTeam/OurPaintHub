@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useRef } from 'react';
 import Modal from '../common/Modal';
 import { FileWithPreview } from '../../types/repository';
-import { formatFileSize } from '../../../utils/formatters';
+import { formatFileSize } from '../../utils/formatters';
 import "./CreateCommit.scss";
 
 interface CreateCommitModalProps {

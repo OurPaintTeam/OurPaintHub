@@ -1,6 +1,6 @@
 import React from 'react';
 import { RepoFile } from '../../types/repository';
-import { formatFileSize } from '../../../utils/formatters';
+import { formatFileSize } from '../../utils/formatters';
 
 interface FileListProps {
     files: RepoFile[];

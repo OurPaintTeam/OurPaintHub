@@ -1,4 +1,4 @@
-import { apiUrl } from "../src/config/api";
+import { apiUrl } from "../config/api";
 
 export const handleDownload = async (
     userId: number,

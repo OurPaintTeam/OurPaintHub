@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch } from "../../config/api";
+import { apiFetch, mediaUrl } from "../../config/api";
 import "./SettingsPage.scss";
 
 interface ProfileData {
@@ -63,7 +63,10 @@ const SettingsPage: React.FC = () => {
             setLastName(data.last_name || "");
             setBio(data.bio || "");
             setDateOfBirth(data.date_of_birth || "");
-            setAvatarPreview(data.avatar || null);
+
+            // Используем mediaUrl для получения полного URL аватара
+            const avatarUrl = mediaUrl(data.avatar);
+            setAvatarPreview(avatarUrl);
         } catch (e) {
             console.error(e);
             setMessage("Ошибка загрузки профиля");
@@ -78,8 +81,14 @@ const SettingsPage: React.FC = () => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        if (file.size == 0 ) {
+        if (file.size == 0) {
             setAvatarError("Файл 0MB");
+            return;
+        }
+
+        // Ограничение на размер файла (например, 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setAvatarError("Файл не должен превышать 5MB");
             return;
         }
 
@@ -121,7 +130,12 @@ const SettingsPage: React.FC = () => {
             setMessage("Профиль сохранён");
 
             if ((data as any)?.user) {
-                setProfile((data as any).user);
+                const updatedUser = (data as any).user;
+                setProfile(updatedUser);
+
+                // Обновляем avatarPreview с новым URL через mediaUrl
+                const newAvatarUrl = mediaUrl(updatedUser.avatar);
+                setAvatarPreview(newAvatarUrl);
             }
         } catch (e) {
             console.error(e);
@@ -173,6 +187,7 @@ const SettingsPage: React.FC = () => {
                                 <img
                                     src={avatarPreview}
                                     alt="avatar"
+                                    className="avatar-image"
                                 />
                             ) : (
                                 <div className="avatar-placeholder">

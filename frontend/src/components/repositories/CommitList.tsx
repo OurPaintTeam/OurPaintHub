@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Commit } from '../../types/repository';
-import { formatDate } from '../../../utils/formatters';
+import { formatDate } from '../../utils/formatters';
 
 interface CommitListProps {
     commits: Commit[];
