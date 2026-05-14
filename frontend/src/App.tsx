@@ -23,7 +23,7 @@ import CompaniesPage from "./pages/Companies/CompaniesPage";
 import MyRepositoriesPage from "./pages/Repositories/MyRepositoriesPage";
 import RepositoryPage from "./pages/Repositories/RepositoryPage";
 
-import "./styles/toast.scss";
+import "./contexts/toast.scss";
 import PublicRepositoriesPage from "./pages/Repositories/PublicRepositoriesPage";
 import CompanyPage from "./pages/Companies/CompanyPage";
 import NotificationPage from "./pages/NotificationPage";

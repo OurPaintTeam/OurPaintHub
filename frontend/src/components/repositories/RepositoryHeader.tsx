@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mediaUrl } from '../../config/api';
+import { mediaUrl } from '../../contexts/api';
 import { Repository } from '../../types/repository';
 import "./RepositoryHeader.scss";
 

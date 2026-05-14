@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { mediaUrl } from '../../config/api';
+import { mediaUrl } from '../../contexts/api';
 import { Repository } from '../../types/repository';
 
 interface RepositoryCardProps {

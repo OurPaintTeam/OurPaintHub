@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch, mediaUrl } from "../../config/api";
+import { apiFetch, mediaUrl } from "../../contexts/api";
 import {Repository} from "../../types/repository";
 // PublicRepositoriesPage.tsx
 import "./PublicRepositoriesPage.scss";

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch, mediaUrl } from "../../config/api";
+import { apiFetch, mediaUrl } from "../../contexts/api";
 import "./AccountPage.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faGear, faTrash, faCalendarDays, faIdBadge, faArrowLeft } from "@fortawesome/free-solid-svg-icons";

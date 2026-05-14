@@ -16,7 +16,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import MainLayout from "../../layout/MainLayout";
 import InteractiveCadPreview from "../../components/CadPreview/InteractiveCadPreview";
-import { apiFetch, apiUrl } from "../../config/api";
+import { apiFetch, apiUrl } from "../../contexts/api";
 import "./GeneralPage.scss";
 
 interface UserData {

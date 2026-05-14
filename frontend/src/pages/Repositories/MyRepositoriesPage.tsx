@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch } from "../../config/api";
+import { apiFetch } from "../../contexts/api";
 import CreateRepositoryModal from "../../components/repositories/CreateRepositoryModal";
 import Message from "../../components/common/Message";
 import "./MyRepositoriesPage.scss";

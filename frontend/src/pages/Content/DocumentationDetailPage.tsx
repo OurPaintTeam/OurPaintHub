@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
 import MarkdownText from "../../components/MarkdownText";
-import { apiFetch, getAccessToken } from "../../config/api";
+import { apiFetch, getAccessToken } from "../../contexts/api";
 import "./DocumentationDetailPage.scss";
 
 interface DocItem {

@@ -4,8 +4,8 @@ import MainLayout from "../../layout/MainLayout";
 import {
     DOCUMENTATION_CATEGORIES,
     DocumentationCategory,
-} from "../../constants/documentation";
-import { apiFetch } from "../../config/api";
+} from "../../types/documentation";
+import { apiFetch } from "../../contexts/api";
 import "./EditDocumentation.scss";
 
 interface UserData {

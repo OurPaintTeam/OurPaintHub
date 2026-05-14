@@ -1,7 +1,7 @@
 import React, {useState, ChangeEvent} from "react";
 import "./EditProjectModal.scss";
 import {useToast} from "../../contexts/ToastContext";
-import { apiUrl } from "../../config/api";
+import { apiUrl } from "../../contexts/api";
 
 interface EditProjectModalProps {
     projectId: number;

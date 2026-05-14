@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch, mediaUrl } from "../../config/api";
+import { apiFetch, mediaUrl } from "../../contexts/api";
 import { Company, CompanyMember, CompanyInvite } from "../../types/company";
 import { Repository, FileWithPreview } from "../../types/repository";
 import { User} from "../../types/company";

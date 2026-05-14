@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { DOCUMENTATION_CATEGORIES, DocumentationCategory } from "../../constants/documentation";
-import { apiUrl, getAccessToken, getAuthHeaders } from "../../config/api";
+import { DOCUMENTATION_CATEGORIES, DocumentationCategory } from "../../types/documentation";
+import { apiUrl, getAccessToken, getAuthHeaders } from "../../contexts/api";
 import "./ContentEditorPage.scss";
 
 interface UserData {

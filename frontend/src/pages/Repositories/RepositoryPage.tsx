@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import {apiFetch, apiUrl, getAccessToken, mediaUrl} from "../../config/api";
+import {apiFetch, apiUrl, getAccessToken, mediaUrl} from "../../contexts/api";
 import { Repository, RepoFile, Commit, FileWithPreview } from "../../types/repository";
 import { formatFileSize } from "../../utils/formatters";
 import RepositoryHeader from "../../components/repositories/RepositoryHeader";

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch, mediaUrl } from "../../config/api";
+import { apiFetch, mediaUrl } from "../../contexts/api";
 import "./EditNews.scss";
 
 interface NewsData {

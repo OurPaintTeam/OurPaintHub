@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layout/MainLayout";
-import { apiFetch, getAccessToken, mediaUrl } from "../../config/api";
+import { apiFetch, getAccessToken, mediaUrl } from "../../contexts/api";
 import "./Companies.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBuilding, faPlus, faUsers, faUserTie } from "@fortawesome/free-solid-svg-icons";

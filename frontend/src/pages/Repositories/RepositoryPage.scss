@@ -726,3 +726,20 @@
     transform: translateY(0);
   }
 }
+
+.repos-page,
+.repo-page,
+.companies-page {
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+.repo-card,
+.company-card {
+  text-align: left !important;
+}
+
+.repo-card h3,
+.company-card h3 {
+  margin-bottom: 10px !important;
+}

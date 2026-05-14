@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../common/Modal';
-import { mediaUrl } from '../../config/api';
+import { mediaUrl } from '../../contexts/api';
 
 interface User {
     id: number;

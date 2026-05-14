@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { apiFetch } from "../config/api";
+import { apiFetch } from "../contexts/api";
 import { useAuth } from "../contexts/AuthContext";
 import "./NotificationsPage.scss";
 

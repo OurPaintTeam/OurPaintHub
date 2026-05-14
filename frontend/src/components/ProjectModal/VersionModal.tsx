@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import { apiUrl } from "../../config/api";
+import { apiUrl } from "../../contexts/api";
 import "./VersionModal.scss";
 
 export interface VersionData {

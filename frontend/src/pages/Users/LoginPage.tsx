@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
-import { apiFetch } from "../../config/api";
+import { apiFetch } from "../../contexts/api";
 import { useAuth } from "../../contexts/AuthContext";
 // @ts-ignore
 import opLogo from "../../assets/OP_logo.svg";

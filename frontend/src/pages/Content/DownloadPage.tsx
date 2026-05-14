@@ -12,7 +12,7 @@ import {
     faServer,
     faTrash,
 } from "@fortawesome/free-solid-svg-icons";
-import { apiFetch, apiUrl } from "../../config/api";
+import { apiFetch, apiUrl } from "../../contexts/api";
 import "./DownloadPage.scss";
 
 interface DownloadItem {

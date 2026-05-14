@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFolderTree } from "@fortawesome/free-solid-svg-icons";
-import { mediaUrl } from "../../config/api";
+import { mediaUrl } from "../../contexts/api";
 import "./RepoCompanyList.scss";
 
 interface Repository {

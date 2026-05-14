@@ -5,8 +5,8 @@ import MarkdownText from "../../components/MarkdownText";
 import {
     DOCUMENTATION_CATEGORIES,
     DocumentationCategory,
-} from "../../constants/documentation";
-import { apiFetch } from "../../config/api";
+} from "../../types/documentation";
+import { apiFetch } from "../../contexts/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faDotCircle,

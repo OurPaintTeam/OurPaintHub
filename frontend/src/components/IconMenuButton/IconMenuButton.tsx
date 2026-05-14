@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
-import { apiUrl, getAuthHeaders, mediaUrl } from "../../config/api";
+import { apiUrl, getAuthHeaders, mediaUrl } from "../../contexts/api";
 import "./IconMenuButton.scss";
 
 interface IconMenuButtonProps {

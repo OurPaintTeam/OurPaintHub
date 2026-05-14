@@ -13,7 +13,7 @@ import {useAuth} from "../../contexts/AuthContext";
 import opLogo from "../../assets/OP_logo.svg";
 
 import "./NavigationBox.scss";
-import {apiFetch} from "../../config/api";
+import {apiFetch} from "../../contexts/api";
 
 interface NavigationBoxProps {
     isAuthenticated?: boolean;

@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationArrow, faPlus } from "@fortawesome/free-solid-svg-icons";
+import "./InteractiveCadPreview.scss";
 
 type CadTool = "select" | "point" | "line" | "circle";
 

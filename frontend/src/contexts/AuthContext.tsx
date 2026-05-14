@@ -7,7 +7,7 @@ import React, {
     ReactNode,
 } from "react";
 import { User, AuthContextType, AuthResponse, ValidateResponse } from "../types/profile";
-import { apiFetch, getAccessToken, setAccessToken, apiUrl } from "../config/api";
+import { apiFetch, getAccessToken, setAccessToken, apiUrl } from "./api";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
