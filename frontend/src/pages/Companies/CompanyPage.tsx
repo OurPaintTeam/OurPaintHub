@@ -447,12 +447,15 @@ const CompanyPage: React.FC = () => {
                             <button onClick={() => setShowMembersModal(true)} className="secondary-btn">
                                 👥 Участники ({members.length})
                             </button>
+                            <button onClick={() => setShowCreateRepoModal(true)} className="card-btn">
+                                📦 Создать репозиторий
+                            </button>
                             <button onClick={leaveCompany} className="danger-btn">
                                 🚪 Выйти из компании
                             </button>
                         </div>
                     )}
-                    
+
                 </div>
 
                 {/* Сообщения */}
@@ -466,8 +469,8 @@ const CompanyPage: React.FC = () => {
                 <section className="section">
                     <div className="section-header">
                         <h2>Репозитории компании</h2>
-                        {isMember && !canManage && repos.length > 0 && (
-                            <span className="info-badge">Только для чтения</span>
+                        {isMember  && (
+                            <button className="add-btn" onClick={() => setShowCreateRepoModal(true)}></button>
                         )}
                     </div>
 
@@ -485,7 +488,7 @@ const CompanyPage: React.FC = () => {
                         <RepositoryGrid
                             repositories={repos.map(repo => ({
                                 ...repo,
-                                logo: repo.logo_repo // Маппинг для совместимости с RepositoryGrid
+                                logo: repo.logo_repo
                             }))}
                             onRepositoryClick={handleRepositoryClick}
                         />
