@@ -1,13 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/logo2.ico" />
+    <link rel="icon" type="image/svg+xml" href="/OP_logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OurPaintHub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        --color-paint-page: #fdf5f4;
+        --color-paint-surface: #ffffff;
+        --color-paint-muted: #f8f3f2;
+        --color-paint-accent: #a92b20;
+        --color-paint-accent-hover: #bc372b;
+        --color-paint-accent-soft: #f8edea;
+        --color-paint-text: #2c2730;
+        --color-paint-body: #334155;
+        --color-paint-meta: #667085;
+        --color-paint-border: #d9dee7;
+        --color-cad-chrome: #4a4550;
+        --color-cad-chrome-deep: #3a363f;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

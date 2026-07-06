@@ -1,0 +1,154 @@
+// Добавьте эти стили в RepositoryPage.scss
+
+.repo-hero {
+  .repo-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+
+    .repo-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 1rem;
+      object-fit: cover;
+      box-shadow: var(--shadow-md);
+      transition: transform 0.3s ease;
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+
+    .repo-logo-placeholder {
+      width: 80px;
+      height: 80px;
+      border-radius: 1rem;
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: white;
+      box-shadow: var(--shadow-md);
+      transition: transform 0.3s ease;
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+
+    .repo-info {
+      flex: 1;
+
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        margin-bottom: 0.5rem;
+      }
+
+      .repo-description {
+        color: var(--gray);
+        font-size: 0.875rem;
+        line-height: 1.5;
+        margin-bottom: 1rem;
+      }
+
+      // Стили для кнопки владельца
+      .owner-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+
+        &:hover {
+          background: #f1f5f9;
+          transform: translateX(4px);
+          border-color: var(--primary);
+
+          .owner-arrow {
+            transform: translateX(4px);
+          }
+        }
+
+        .owner-avatar {
+          flex-shrink: 0;
+
+          .owner-avatar-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+
+          .owner-avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+        }
+
+        .owner-info-text {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.125rem;
+
+          .owner-label {
+            font-size: 0.625rem;
+            font-weight: 500;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .owner-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e293b;
+          }
+        }
+
+        .owner-arrow {
+          font-size: 1rem;
+          color: var(--primary);
+          transition: transform 0.3s ease;
+          opacity: 0.7;
+        }
+
+        &:hover .owner-arrow {
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .repo-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-light);
+  }
+}

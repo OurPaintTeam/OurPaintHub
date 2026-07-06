@@ -99,3 +99,32 @@
 .error-actions button.secondary:hover {
   background: #d1d5db;
 }
+
+
+.error-page {
+  display: flex !important;
+  min-height: 62vh;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-card {
+  max-width: 680px;
+  text-align: center;
+}
+
+.error-code {
+  margin-bottom: 12px;
+  color: var(--paint-accent);
+  font-size: 70px;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+}
+
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}

@@ -1,0 +1,237 @@
+.documentation-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+
+  h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+  }
+
+  .documentation-layout {
+    display: flex;
+    gap: 20px;
+  }
+
+
+  .doc-sidebar {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    .add-docs-btn {
+        background: white;
+        color: #4a90e2;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background: #4a90e2;
+          color: white;
+        }
+    }
+    .doc-category {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 15px;
+      background: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      color: #333;
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      .category-icon {
+        font-size: 18px;
+        color: #4a90e2;
+      }
+
+      &:hover {
+        background: #4a90e2;
+        color: white;
+
+        .category-icon {
+          color: white;
+        }
+      }
+
+      &.active {
+        background: #4a90e2;
+        color: white;
+
+        .category-icon {
+          color: white;
+        }
+        box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+      }
+    }
+  }
+
+  .doc-content {
+    flex: 1;
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+
+    .doc-section {
+      margin-bottom: 30px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+
+      .doc-header-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 15px;
+        margin-bottom: 10px;
+      }
+
+      .doc-title {
+        color: #4a90e2;
+        margin-bottom: 10px;
+        cursor: pointer;
+        flex: 1;
+        transition: color 0.2s;
+
+        &:hover {
+          color: #2d6fa8;
+          text-decoration: underline;
+        }
+      }
+
+      .doc-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .edit-btn,
+      .delete-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background: #f0f0f0;
+        }
+      }
+
+      .delete-btn:hover {
+        background: #ffe6e6;
+      }
+
+      .doc-preview {
+        cursor: pointer;
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background: #f8f9fa;
+        }
+      }
+
+      .doc-meta {
+        margin-top: 8px;
+        color: #888;
+        font-size: 0.85rem;
+
+        small {
+          margin-right: 8px;
+        }
+      }
+
+      p {
+        color: #555;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+    }
+  }
+}
+
+
+.documentation-page {
+  padding: 0 !important;
+}
+
+.documentation-page > h1 {
+  margin: 0 0 28px !important;
+  padding: 0 0 24px !important;
+  border-bottom: 1px solid rgba(217, 222, 231, 0.9);
+  text-align: left !important;
+}
+
+.documentation-layout {
+  display: grid !important;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 22px !important;
+}
+
+.doc-sidebar {
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: max-content;
+  border: 1px solid var(--paint-border) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  padding: 12px !important;
+  box-shadow: 0 16px 46px rgba(80, 45, 40, 0.08) !important;
+  backdrop-filter: blur(14px);
+}
+
+.doc-category {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: var(--paint-meta) !important;
+  padding: 11px 12px !important;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.doc-category:hover {
+  background: var(--paint-muted) !important;
+  color: var(--paint-text) !important;
+}
+
+.doc-category.active {
+  background: var(--paint-accent-soft) !important;
+  color: var(--paint-accent) !important;
+  box-shadow: inset 3px 0 0 var(--paint-accent);
+}
+
+.doc-category .category-icon {
+  color: currentColor !important;
+}
+
+.doc-content {
+  min-width: 0;
+}

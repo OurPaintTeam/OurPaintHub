@@ -6,52 +6,16 @@ import React, {
     useCallback,
     ReactNode,
 } from "react";
-import { apiFetch, getAccessToken } from "../config/api";
-
-export interface User {
-    id: number;
-    username: string;
-    email: string;
-    first_name?: string;
-    last_name?: string;
-    role?: string;
-    is_admin?: boolean;
-    is_staff?: boolean;
-    is_superuser?: boolean;
-    bio?: string | null;
-    date_of_birth?: string | null;
-    avatar?: string | null;
-}
-
-interface AuthContextType {
-    isAuthenticated: boolean;
-    isLoading: boolean;
-    user: User | null;
-    accessToken: string | null;
-    login: (accessToken: string, userData: User) => void;
-    logout: () => Promise<void>;
-    refresh: () => Promise<boolean>;
-}
-
-interface AuthResponse {
-    access_token?: string;
-    user?: User;
-}
-
-interface ValidateResponse {
-    valid: boolean;
-    user: User;
-}
+import { User, AuthContextType, AuthResponse, ValidateResponse } from "../types/profile";
+import { apiFetch, getAccessToken, setAccessToken, apiUrl } from "./api";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-
     if (context === undefined) {
         throw new Error("useAuth must be used within an AuthProvider");
     }
-
     return context;
 };
 
@@ -63,22 +27,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
-    const [accessToken, setAccessToken] = useState<string | null>(getAccessToken());
+    const [accessToken, setAccessTokenState] = useState<string | null>(getAccessToken());
 
     const clearAuth = useCallback(() => {
         setUser(null);
-        setAccessToken(null);
+        setAccessTokenState(null);
         setIsAuthenticated(false);
-        localStorage.removeItem("access_token");
+        setAccessToken(null);
         localStorage.removeItem("user");
         window.dispatchEvent(new Event("auth-changed"));
     }, []);
 
     const saveAuth = useCallback((token: string, userData: User) => {
         setUser(userData);
-        setAccessToken(token);
+        setAccessTokenState(token);
         setIsAuthenticated(true);
-        localStorage.setItem("access_token", token);
+        setAccessToken(token);
         localStorage.setItem("user", JSON.stringify(userData));
         window.dispatchEvent(new Event("auth-changed"));
     }, []);
@@ -114,13 +78,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     redirectOnError: false,
                 });
 
-                if (data.valid) {
+                if (data.valid && data.user) {
                     saveAuth(token, data.user);
                     return;
                 }
 
                 await refresh();
-            } catch {
+            } catch (error) {
+                console.error("Validation error:", error);
                 await refresh();
             }
         },
@@ -130,27 +95,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         const token = getAccessToken();
 
-        if (token) {
-            void validate(token).finally(() => setIsLoading(false));
-            return;
-        }
+        const initAuth = async () => {
+            if (token) {
+                await validate(token);
+            } else {
+                clearAuth();
+            }
+            setIsLoading(false);
+        };
 
-        void refresh().finally(() => setIsLoading(false));
-    }, [refresh, validate]);
+        initAuth();
+    }, [clearAuth, validate]);
 
     const login = (token: string, userData: User) => {
         saveAuth(token, userData);
     };
 
-    const logout = async () => {
-        try {
-            await apiFetch("/logout/", {
+    // Упрощенный logout - просто очищаем локальные данные
+    const logout = () => {
+        // Пытаемся отправить запрос на бэкенд, но не ждем ответа
+        const token = getAccessToken();
+        if (token) {
+            fetch(apiUrl("/logout/"), {
                 method: "POST",
-                redirectOnError: false,
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
+                credentials: "include",
+            }).catch(() => {
+                // Игнорируем ошибки
             });
-        } finally {
-            clearAuth();
         }
+
+        // Сразу очищаем локальные данные
+        clearAuth();
     };
 
     return (

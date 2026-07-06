@@ -1,0 +1,46 @@
+// Стили для закругления изображений и иконок в карточках репозиториев и компаний
+.profile-list-card {
+  // Стиль для изображений логотипов
+  .repo-company-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: var(--paint-accent-soft);
+  }
+
+  // Стиль для иконок-заглушек
+  .repo-company-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 12px;
+    background: var(--paint-accent-soft);
+    color: var(--paint-accent);
+    padding: 11px;
+  }
+}
+
+// Дополнительные варианты закругления (опционально)
+.repo-company-img-rounded-sm {
+  border-radius: 8px;
+}
+
+.repo-company-img-rounded-lg {
+  border-radius: 16px;
+}
+
+.repo-company-img-rounded-full {
+  border-radius: 50%;
+}
+
+.repo-company-icon-rounded-sm {
+  border-radius: 8px;
+}
+
+.repo-company-icon-rounded-lg {
+  border-radius: 16px;
+}
+
+.repo-company-icon-rounded-full {
+  border-radius: 50%;
+}

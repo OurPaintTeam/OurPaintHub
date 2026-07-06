@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
-import { getAccessToken } from "../config/api";
+import { getAccessToken } from "../contexts/api";
 import "./ErrorPage.scss";
 
 const ERROR_TITLES: Record<string, string> = {

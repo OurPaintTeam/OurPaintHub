@@ -1,0 +1,317 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #7C3AED 0%, #9D4EDD 50%, #5A189A 100%);
+  box-sizing: border-box;
+}
+
+.login-container {
+  background: #f0f0ff;
+  padding: 3rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1.25em 1.875em rgba(51, 51, 255, 0.3);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.login-header {
+  margin-bottom: 1rem;
+
+  svg {
+    font-size: 3rem;
+    color: #3333ff;
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    color: #222266;
+    margin-bottom: 0.25rem;
+  }
+
+  p {
+    color: #444488;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  .input-group {
+    position: relative;
+
+    svg {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 1rem;
+      pointer-events: none;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.85rem 1rem 0.85rem 2.8rem;
+      border: 0.1em solid #bbbbee;
+      border-radius: 0.5em;
+      font-size: 1em;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border-color: #3333ff;
+        box-shadow: 0 0 0.5em rgba(51, 51, 255, 0.5);
+        background-color: #fafaff;
+      }
+    }
+  }
+
+  .login-btn {
+    width: 100%;
+    padding: 1em;
+    background-color: #3333ff;
+    color: white;
+    border: none;
+    border-radius: 0.5em;
+    font-weight: 700;
+    font-size: 1.1em;
+    cursor: pointer;
+    box-shadow: 0 0.3125em 0.9375em rgba(51, 51, 255, 0.4);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      background-color: #0000cc;
+      box-shadow: 0 0.5em 1.25em rgba(0, 0, 204, 0.6);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+  }
+
+  .message {
+    margin-top: 1rem;
+    text-align: center;
+    font-style: italic;
+    color: #5555aa;
+  }
+
+  a {
+    color: #3333ff;
+    cursor: pointer;
+    font-weight: 600;
+
+    &:hover {
+      color: #0000cc;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
+
+  .login-header svg {
+    font-size: 2.5rem;
+  }
+
+  input, .login-btn {
+    font-size: 0.95rem;
+    padding: 0.7em 0.8em;
+  }
+}
+
+
+.login-page,
+.auth-page {
+  min-height: 100vh;
+  padding: 32px 18px !important;
+  background:
+          radial-gradient(circle at 18% 16%, rgba(169, 43, 32, 0.1), transparent 34%),
+          var(--paint-page) !important;
+}
+
+.login-container,
+.auth-container {
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.1fr;
+  align-items: center;
+  gap: 30px;
+  width: 100%;
+  max-width: 1024px;
+  min-height: calc(100vh - 64px);
+  margin: 0 auto;
+}
+
+.login-page .login-container,
+.auth-page .auth-container {
+  width: min(100%, 1050px) !important;
+  max-width: 1050px !important;
+  min-height: min(820px, calc(100vh - 64px)) !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border: 1px solid rgba(240, 236, 235, 0.95) !important;
+  border-radius: 22px !important;
+  background: rgba(255, 255, 255, 0.76) !important;
+  box-shadow: 0 28px 90px rgba(80, 45, 40, 0.12) !important;
+  padding: clamp(28px, 5vw, 56px) !important;
+  text-align: left !important;
+  backdrop-filter: blur(12px);
+}
+
+.login-page .login-header,
+.auth-page .auth-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  margin: 0 !important;
+  text-align: left !important;
+}
+
+.login-page .login-header::after,
+.auth-page .auth-header::after {
+  content: "CAD";
+  width: max-content;
+  margin-top: 22px;
+  border: 1px solid rgba(169, 43, 32, 0.18);
+  border-radius: 999px;
+  background: var(--paint-accent-soft);
+  color: var(--paint-accent);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.login-header svg,
+.auth-header svg,
+.auth-brand-logo {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 20px;
+  padding: 0;
+  border: 1px solid var(--paint-border);
+  border-radius: 18px;
+  background: #fff;
+  color: var(--paint-accent);
+  box-shadow: 0 20px 60px rgba(169, 43, 32, 0.18);
+}
+
+.auth-brand-logo {
+  display: block;
+  object-fit: contain;
+}
+
+.login-page .login-header svg,
+.auth-page .auth-header svg,
+.login-page .auth-brand-logo,
+.auth-page .auth-brand-logo {
+  margin-bottom: 22px !important;
+}
+
+.login-header h2,
+.auth-form h2 {
+  margin-top: 20px;
+  color: var(--paint-text) !important;
+  font-size: 26px !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.04em;
+}
+
+.login-page .login-header h1,
+.auth-page .auth-header h1 {
+  font-size: clamp(38px, 5vw, 58px) !important;
+}
+
+.login-page .login-header h2 {
+  margin-top: 28px !important;
+  color: var(--paint-text) !important;
+}
+
+.login-form,
+.auth-form {
+  border: 1px solid #f0eceb !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  padding: 32px !important;
+  box-shadow: 0 24px 70px rgba(80, 45, 40, 0.12) !important;
+}
+
+.login-page .login-form,
+.auth-page .auth-form {
+  width: 100%;
+  max-width: 500px;
+  justify-self: end;
+  border-radius: 20px !important;
+  padding: clamp(24px, 4vw, 34px) !important;
+}
+
+.auth-page .auth-form {
+  display: block !important;
+}
+
+.auth-page .auth-form form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-form form,
+.auth-form form {
+  display: grid;
+  gap: 16px;
+}
+
+.input-group {
+  position: relative;
+  margin-bottom: 0 !important;
+}
+
+.input-group svg {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--paint-meta);
+}
+
+.input-group input {
+  padding-left: 44px !important;
+  min-height: 48px;
+}
+
+.login-page .login-btn,
+.auth-page .auth-btn {
+  width: 100%;
+  min-height: 48px;
+  margin: 10px 0 0 !important;
+}
+
+.auth-form a,
+.login-form a {
+  color: var(--paint-accent) !important;
+  font-weight: 700;
+  cursor: pointer;
+}

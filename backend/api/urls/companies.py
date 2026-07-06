@@ -1,0 +1,43 @@
+from django.urls import path
+
+from api.views.companies import get_companies, create_company, update_company, delete_company, \
+    get_company_members, \
+    remove_company_member, get_company_repositories, get_incoming_invites, \
+    accept_invite, reject_invite, cancel_invite, create_company_invite, get_company, leave_company, get_company_invites
+
+urlpatterns = [
+    path("list/", get_companies),
+
+    path("create/", create_company),
+
+    path("update/<int:company_id>/", update_company),
+
+    path("<int:company_id>/", get_company),
+
+    path("<int:company_id>/delete/", delete_company),
+
+    path("<int:company_id>/members/", get_company_members),
+
+    path("<int:company_id>/members/remove/", remove_company_member),
+
+    path("<int:company_id>/leave/", leave_company),
+
+    path("<int:company_id>/repositories/", get_company_repositories),
+
+    # входящие приглашения пользователя
+    path("invites/incoming/", get_incoming_invites),
+
+    # исходящие приглашения пользователя
+    path("<int:company_id>/invites/", get_company_invites),
+
+    # принять приглашение
+    path("invites/<int:invite_id>/accept/", accept_invite),
+
+    # отклонить приглашение
+    path("invites/<int:invite_id>/reject/", reject_invite),
+
+    # отменить приглашение (owner / inviter)
+    path("invites/<int:invite_id>/cancel/", cancel_invite),
+
+    path("<int:company_id>/invite/", create_company_invite),
+]

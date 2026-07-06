@@ -1,0 +1,745 @@
+// RepositoryPage.scss - стили для страницы конкретного репозитория в бело-красно-персиковой гамме
+
+.repo-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeInUp 0.5s ease-out;
+  min-height: 100vh;
+  background: transparent;
+
+  .repo-hero {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 1.5rem;
+    padding: 2rem 2.25rem;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 15px 35px -10px rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+
+    .repo-header {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      padding: 0 0.25rem;
+
+      .repo-logo {
+        width: 100px;
+        height: 100px;
+        border-radius: 1.25rem;
+        object-fit: cover;
+        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.15);
+        transition: all 0.3s ease;
+        border: 2px solid rgba(239, 68, 68, 0.2);
+        background: white;
+
+        &:hover {
+          transform: scale(1.05) rotate(2deg);
+          box-shadow: 0 12px 30px rgba(239, 68, 68, 0.25);
+          border-color: #ef4444;
+        }
+      }
+
+      .repo-logo-placeholder {
+        width: 100px;
+        height: 100px;
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 8px 20px rgba(239, 68, 68, 0.2);
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: scale(1.05) rotate(2deg);
+          box-shadow: 0 12px 30px rgba(239, 68, 68, 0.3);
+        }
+      }
+
+      .repo-info {
+        flex: 1;
+
+        h1 {
+          font-size: 2.2rem;
+          font-weight: 700;
+          background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          margin-bottom: 0.5rem;
+          letter-spacing: -0.02em;
+        }
+
+        .repo-description {
+          color: #6b7280;
+          font-size: 0.95rem;
+          line-height: 1.5;
+          margin-bottom: 0.75rem;
+        }
+
+        .repo-owner {
+          color: #ef4444;
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.35rem 0.9rem;
+          background: rgba(239, 68, 68, 0.08);
+          border-radius: 0.75rem;
+          font-size: 0.85rem;
+
+          &::before {
+            content: "👤";
+            font-size: 0.9rem;
+          }
+        }
+      }
+    }
+
+    .repo-stats {
+      display: flex;
+      gap: 1.5rem;
+      padding: 1rem 0;
+      margin-bottom: 1rem;
+      border-top: 1px solid rgba(239, 68, 68, 0.1);
+      border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+
+      .stat {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #6b7280;
+
+        .stat-number {
+          font-weight: 700;
+          color: #ef4444;
+          font-size: 1.1rem;
+        }
+
+        .stat-label {
+          color: #9ca3af;
+        }
+      }
+    }
+
+    .repo-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-right: 0.25rem;
+
+      button {
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        &.btn-primary {
+          background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+          color: white;
+          border: none;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+
+          &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+          }
+        }
+
+        &.btn-secondary {
+          background: white;
+          color: #ef4444;
+          border: 1px solid #fecaca;
+
+          &:hover {
+            background: #fff5f5;
+            border-color: #ef4444;
+            transform: translateY(-2px);
+          }
+        }
+
+        &.btn-danger {
+          background: white;
+          color: #dc2626;
+          border: 1px solid #fecaca;
+
+          &:hover {
+            background: #fee2e2;
+            border-color: #dc2626;
+          }
+        }
+      }
+    }
+  }
+
+  .repo-content-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+
+    @media (max-width: 968px) {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .repo-column {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(239, 68, 68, 0.12);
+      transition: all 0.3s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 320px;
+      max-height: min(70vh, 720px);
+      height: fit-content;
+
+      &:hover {
+        box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.2);
+      }
+
+      .repo-column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        background: rgba(255, 255, 255, 0.98);
+        border-bottom: 1px solid rgba(239, 68, 68, 0.15);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+
+        h2 {
+          font-size: 1.35rem;
+          font-weight: 600;
+          color: #374151;
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          margin: 0;
+
+          &::before {
+            content: "";
+            width: 4px;
+            height: 22px;
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            border-radius: 2px;
+          }
+        }
+
+        .add-btn {
+          width: 38px;
+          height: 38px;
+          border-radius: 0.75rem;
+          background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+          color: white;
+          border: none;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+
+          &::before,
+          &::after {
+            content: '';
+            position: absolute;
+            background-color: white;
+            border-radius: 2px;
+          }
+
+          &::before {
+            width: 16px;
+            height: 2px;
+          }
+
+          &::after {
+            width: 2px;
+            height: 16px;
+          }
+
+          span {
+            display: none;
+          }
+
+          &:hover {
+            transform: rotate(90deg) scale(1.05);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+          }
+        }
+      }
+
+      .repo-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        max-height: 58vh;
+
+        &::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: rgba(239, 68, 68, 0.05);
+          border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+          border-radius: 3px;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: #9ca3af;
+          font-size: 0.9rem;
+
+          &::before {
+            content: "📁";
+            display: block;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+          }
+        }
+
+        .file-card, .commit-card {
+          background: white;
+          border-radius: 0.9rem;
+          padding: 0.9rem 1rem;
+          margin-bottom: 0.75rem;
+          transition: all 0.25s ease;
+          border: 1px solid #fee2e2;
+          animation: slideInRight 0.3s ease-out;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+
+          &:last-child {
+            margin-bottom: 0;
+          }
+
+          &:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08);
+            border-color: #fecaca;
+          }
+        }
+
+        .file-card {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+          border-bottom: 1px solid #fee2e2;
+
+          .file-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+
+            .file-icon {
+              font-size: 1.4rem;
+            }
+
+            .file-details {
+              flex: 1;
+              min-width: 0;
+
+              .file-name {
+                font-weight: 600;
+                color: #374151;
+                display: block;
+                margin-bottom: 0.2rem;
+                font-size: 0.9rem;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+              }
+
+              .file-meta {
+                font-size: 0.7rem;
+                color: #9ca3af;
+              }
+            }
+          }
+
+          .file-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+
+            .icon-btn {
+              width: 32px;
+              height: 32px;
+              border-radius: 0.5rem;
+              border: none;
+              cursor: pointer;
+              transition: all 0.25s ease;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 0.9rem;
+              background: #fee2e2;
+              color: #ef4444;
+
+              &:hover {
+                transform: scale(1.05);
+                background: #fecaca;
+              }
+
+              &.danger {
+                background: #fee2e2;
+                color: #dc2626;
+
+                &:hover {
+                  background: #fecaca;
+                  color: #ef4444;
+                }
+              }
+            }
+          }
+        }
+
+        .commit-card {
+          border-bottom: 1px solid #fee2e2;
+
+          .commit-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+
+            .commit-hash {
+              font-family: monospace;
+              font-size: 0.75rem;
+              background: #fee2e2;
+              padding: 0.25rem 0.6rem;
+              border-radius: 0.5rem;
+              color: #ef4444;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s ease;
+
+              &:hover {
+                background: #fecaca;
+                transform: translateY(-2px) scale(1.03);
+                box-shadow: 0 4px 12px rgba(239, 68, 68, 0.18);
+              }
+            }
+          }
+
+          .commit-message {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            overflow-wrap: anywhere;
+
+            &:hover {
+              color: #ef4444;
+            }
+          }
+
+          .commit-meta {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+            min-width: 0;
+
+            .commit-author {
+              color: #ef4444;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.2s ease;
+
+              &:hover {
+                color: #b91c1c;
+                transform: translateY(-1px);
+                text-decoration: underline;
+              }
+            }
+          }
+
+          .commit-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+
+            button {
+              padding: 0.3rem 0.7rem;
+              font-size: 0.7rem;
+              border-radius: 0.5rem;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              border: none;
+
+              &.view-btn {
+                background: #fee2e2;
+                color: #ef4444;
+
+                &:hover {
+                  background: #fecaca;
+                }
+              }
+
+              &.revert-btn {
+                background: white;
+                color: #dc2626;
+                border: 1px solid #fecaca;
+
+                &:hover {
+                  background: #fee2e2;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Карточка просмотра коммита
+  .commit-view-card {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border-radius: 1rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #fecaca;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+
+    .commit-view-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+
+      strong {
+        color: #ef4444;
+        font-weight: 600;
+      }
+
+      code {
+        background: #fee2e2;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.5rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: #ef4444;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: #fecaca;
+          transform: translateY(-1px);
+        }
+      }
+    }
+
+    .back-btn {
+      background: white;
+      color: #ef4444;
+      border: 1px solid #fecaca;
+      padding: 0.5rem 1rem;
+      border-radius: 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.85rem;
+
+      &:hover {
+        background: #fff5f5;
+        border-color: #ef4444;
+        transform: translateY(-1px);
+      }
+    }
+  }
+}
+
+.commit-hash-link {
+  font-family: monospace;
+  font-size: 0.75rem;
+  background: #fee2e2;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+
+  &:hover {
+    background: #fecaca;
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.18);
+    color: #dc2626;
+  }
+
+  &:active {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.commit-author-link {
+  color: #ef4444;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  &::before {
+    content: "👤";
+    font-size: 0.65rem;
+    opacity: 0.8;
+  }
+
+  &:hover {
+    color: #b91c1c;
+    transform: translateX(2px) translateY(-1px);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateX(0) translateY(0);
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .repo-page {
+    padding: 1rem;
+
+    .repo-hero {
+      padding: 1.25rem;
+    }
+
+    .repo-header {
+      padding: 0;
+    }
+
+    .repo-actions {
+      padding-right: 0;
+    }
+
+    .repo-content-grid .repo-column {
+      min-height: 260px;
+      max-height: none;
+
+      .repo-column-header {
+        padding: 0.75rem;
+
+        h2 {
+          font-size: 1.2rem;
+        }
+      }
+
+      .repo-list {
+        max-height: 55vh;
+      }
+    }
+
+    .commit-view-card {
+      flex-direction: column;
+      text-align: center;
+
+      .back-btn {
+        width: 100%;
+      }
+    }
+  }
+}
+
+// Анимации
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.repos-page,
+.repo-page,
+.companies-page {
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+.repo-card,
+.company-card {
+  text-align: left !important;
+}
+
+.repo-card h3,
+.company-card h3 {
+  margin-bottom: 10px !important;
+}

@@ -1,6 +1,7 @@
 import React, {useState, ChangeEvent} from "react";
 import "./EditProjectModal.scss";
 import {useToast} from "../../contexts/ToastContext";
+import { apiUrl } from "../../contexts/api";
 
 interface EditProjectModalProps {
     projectId: number;
@@ -49,7 +50,7 @@ const EditProjectModal: React.FC<EditProjectModalProps> = ({
 
         try {
             setSaving(true);
-            const response = await fetch(`https://localhost:8000/api/project/change/${projectId}/`, {
+            const response = await fetch(apiUrl(`/project/change/${projectId}/`), {
                 method: "PATCH",
                 body: formData,
             });
